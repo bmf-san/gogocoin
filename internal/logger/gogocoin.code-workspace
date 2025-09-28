@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"name": "gogocoin",
+			"path": "../.."
+		},
+		{
+			"name": "go-bitflyer-api-client",
+			"path": "../../../go-bitflyer-api-client"
+		},
+		{
+			"path": "../../../sleyt"
+		}
+	],
+	"settings": {}
+}

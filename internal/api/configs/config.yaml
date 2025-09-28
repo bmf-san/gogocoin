@@ -1,0 +1,54 @@
+app:
+    name: test-gogocoin
+api:
+    endpoint: ""
+    websocket_endpoint: ""
+    credentials:
+        api_key: ""
+        api_secret: ""
+    timeout: 0s
+    retry_count: 0
+    rate_limit:
+        requests_per_minute: 0
+    port: 0
+trading:
+    fee_rate: 0
+    initial_balance: 100000
+    symbols: []
+    strategy:
+        name: moving_average_cross
+    risk_management:
+        max_total_loss_percent: 0
+        max_trade_loss_percent: 0
+        max_daily_loss_percent: 0
+        max_trade_amount_percent: 0
+        max_daily_trades: 0
+        min_trade_interval: ""
+        stop_loss_percent: 2.5
+        take_profit_percent: 5
+strategy_params:
+    moving_average_cross:
+        short_period: 0
+        long_period: 0
+        ma_type: ""
+        min_cross_strength: 0
+    simple_test:
+        trade_interval: 0
+        fixed_amount: 0
+        max_trades: 0
+        price_change_threshold: 0
+data:
+    market_data:
+        history_days: 0
+ui:
+    host: ""
+    port: 8080
+logging:
+    level: ""
+    format: ""
+    output: ""
+    file_path: ""
+    max_size_mb: 0
+    max_backups: 0
+    max_age_days: 0
+    categories: {}

@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>gogocoin - Trading Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sleyt@latest/dist/css/index.css" />
+    <style>
+      body {
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .main-content {
+        flex: 1;
+        overflow: auto;
+        padding: 1rem;
+      }
+
+      .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: var(--color-danger);
+        display: inline-block;
+      }
+
+      .status-indicator.running {
+        background-color: var(--color-success);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      .card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .card-body {
+        flex: 1;
+        overflow: auto;
+      }
+    </style>
+  </head>
+
+  <body class="bg-body">
+    <!-- Header -->
+    <header class="bg-slate-900 text-slate-50 py-3 px-4">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-bold m-0">gogocoin</h1>
+          <span class="badge bg-white text-slate-300">Trading Bot</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <button id="start-trading-btn" class="btn btn-success btn-sm">Start</button>
+          <button id="stop-trading-btn" class="btn btn-danger btn-sm">Stop</button>
+          <div class="flex items-center gap-2 bg-white px-3 py-2 rounded">
+            <span class="status-indicator" id="status-indicator"></span>
+            <span class="text-sm font-semibold text-slate-300" id="status-text">Stopped</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- 2x4 Grid (added System Logs) -->
+      <div class="grid grid-cols-2 gap-4" style="height: calc(100vh - 120px);">
+
+        <!-- System Status -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="font-semibold">System Status</h2>
+          </div>
+          <div class="card-body">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <p class="text-xs text-secondary mb-1">Mode</p>
+                <p id="mode" class="text-xl font-bold">-</p>
+              </div>
+              <div>
+                <p class="text-xs text-secondary mb-1">Strategy</p>
+                <p id="strategy" class="text-xl font-bold">-</p>
+              </div>
+              <div>
+                <p class="text-xs text-secondary mb-1">Total Trades</p>
+                <p id="total-trades" class="text-xl font-bold">-</p>
+              </div>
+              <div>
+                <p class="text-xs text-secondary mb-1">Uptime</p>
+                <p id="uptime" class="text-xl font-bold">-</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Balance -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="font-semibold">Balance</h2>
+          </div>
+          <div class="card-body">
+            <div id="balance-info" class="space-y-2">
+              <div class="text-center text-secondary py-4">Loading...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="font-semibold">Performance</h2>
+          </div>
+          <div class="card-body">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="text-center p-4 bg-body rounded">
+                <p class="text-xs text-secondary mb-2">Total PnL</p>
+                <p id="total-pnl" class="text-2xl font-bold">¥0</p>
+              </div>
+              <div class="text-center p-4 bg-body rounded">
+                <p class="text-xs text-secondary mb-2">Win Rate</p>
+                <p id="win-rate" class="text-2xl font-bold">0%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Orders -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="font-semibold">Recent Orders</h2>
+          </div>
+          <div class="card-body">
+            <div id="orders-info" class="space-y-2">
+              <div class="text-center text-secondary py-4">Loading...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trade History -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="font-semibold">Trade History</h2>
+          </div>
+          <div class="card-body">
+            <table class="table table-sm w-full">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Pair</th>
+                  <th>Side</th>
+                  <th class="text-right">Size</th>
+                  <th class="text-right">PnL</th>
+                </tr>
+              </thead>
+              <tbody id="trades-table">
+                <tr>
+                  <td colspan="5" class="text-center text-secondary">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PnL History -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="font-semibold">PnL History</h2>
+          </div>
+          <div class="card-body">
+            <table class="table table-sm w-full">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th class="text-right">PnL</th>
+                  <th class="text-right">Rate</th>
+                  <th class="text-right">Trades</th>
+                </tr>
+              </thead>
+              <tbody id="pnl-history-table">
+                <tr>
+                  <td colspan="4" class="text-center text-secondary">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- System Logs -->
+        <div class="card col-span-2">
+          <div class="card-header flex justify-between items-center">
+            <h2 class="font-semibold">System Logs</h2>
+            <div class="flex gap-2">
+              <select id="log-level-filter" class="form-select form-select-sm form-control">
+                <option value="">All Levels</option>
+                <option value="DEBUG">Debug</option>
+                <option value="INFO">Info</option>
+                <option value="WARN">Warn</option>
+                <option value="ERROR">Error</option>
+              </select>
+              <select id="log-category-filter" class="form-select form-select-sm form-control">
+                <option value="">All Categories</option>
+                <!-- Note: These values match LogCategory constants in internal/logger/logger.go -->
+                <option value="system">System</option>
+                <option value="trading">Trading</option>
+                <option value="api">API</option>
+                <option value="strategy">Strategy</option>
+                <option value="ui">UI</option>
+                <option value="data">Data</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="logs-container" class="space-y-1 font-mono text-xs">
+              <div class="text-center text-secondary py-4">Loading...</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <script src="script.js?v=20251005-4"></script>
+  </body>
+</html>
