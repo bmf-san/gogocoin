@@ -1,0 +1,79 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Data files
+data/
+*.db
+*.sqlite
+
+# Temporary files
+tmp/
+temp/
+
+# Git
+.git/
+.gitignore
+
+# GitHub
+.github/
+
+# Docker
+Dockerfile*
+.dockerignore
+
+# Documentation
+README.md
+LICENSE
+docs/
+
+# Configuration (will be copied separately)
+# configs/
+
+# Backup files
+*.bak
+*.backup
+
+# Test files
+*_test.go
+testdata/
+
+# Build artifacts
+backtest_debug.log
