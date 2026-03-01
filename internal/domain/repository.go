@@ -25,8 +25,8 @@ type LogRepository interface {
 
 // MarketDataRepository is the interface for market data persistence
 type MarketDataRepository interface {
-	SaveMarketData(data *MarketData) error  // Save market data to database
-	SaveTicker(ticker *MarketData) error     // Alias for SaveMarketData (backward compatibility)
+	SaveMarketData(data *MarketData) error // Save market data to database
+	SaveTicker(ticker *MarketData) error   // Alias for SaveMarketData (backward compatibility)
 }
 
 // PerformanceRepository is the interface for performance metrics persistence
@@ -49,7 +49,11 @@ type Transaction interface {
 	UpdatePosition(position *Position) error
 }
 
-// TradingRepository is the unified interface for trading-related persistence
+// TradingRepository is the unified interface for trading-related persistence.
+//
+// Deprecated: Use individual repositories (TradeRepository, PositionRepository,
+// BalanceRepository, TransactionManager) with separate injection.
+// Will be removed in Phase 5 once all callers have been migrated.
 type TradingRepository interface {
 	TradeRepository
 	PositionRepository

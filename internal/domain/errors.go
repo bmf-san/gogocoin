@@ -28,9 +28,9 @@ const (
 
 // Error is a custom error type with additional context
 type Error struct {
-	Type    ErrType // Error category
-	Message string  // Human-readable error message
-	Err     error   // Underlying error (optional)
+	Type    ErrType                // Error category
+	Message string                 // Human-readable error message
+	Err     error                  // Underlying error (optional)
 	Context map[string]interface{} // Additional context
 }
 
@@ -45,6 +45,16 @@ func (e *Error) Error() string {
 // Unwrap returns the underlying error
 func (e *Error) Unwrap() error {
 	return e.Err
+}
+
+// Is enables errors.Is to match *Error values by Type.
+// This allows code like: errors.Is(err, domain.ErrRateLimitExceeded)
+func (e *Error) Is(target error) bool {
+	t, ok := target.(*Error)
+	if !ok {
+		return false
+	}
+	return e.Type == t.Type
 }
 
 // NewError creates a new Error

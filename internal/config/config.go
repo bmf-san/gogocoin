@@ -11,17 +11,17 @@ import (
 
 // Config represents the application-wide configuration
 type Config struct {
-	App            AppConfig              `yaml:"app"`
-	API            APIConfig              `yaml:"api"`
-	Trading        TradingConfig          `yaml:"trading"`
-	StrategyParams StrategyParams         `yaml:"strategy_params"`
-	Data           DataConfig             `yaml:"data"`
-	UI             UIConfig               `yaml:"ui"`
-	Logging        LoggingConfig          `yaml:"logging"`
-	DataRetention  DataRetentionConfig    `yaml:"data_retention"`
-	Worker         WorkerConfig           `yaml:"worker"`
-	Runtime        StrategyRuntimeConfig  `yaml:"runtime"`
-	TradingRuntime TradingRuntimeConfig   `yaml:"trading_runtime"`
+	App            AppConfig             `yaml:"app"`
+	API            APIConfig             `yaml:"api"`
+	Trading        TradingConfig         `yaml:"trading"`
+	StrategyParams StrategyParams        `yaml:"strategy_params"`
+	Data           DataConfig            `yaml:"data"`
+	UI             UIConfig              `yaml:"ui"`
+	Logging        LoggingConfig         `yaml:"logging"`
+	DataRetention  DataRetentionConfig   `yaml:"data_retention"`
+	Worker         WorkerConfig          `yaml:"worker"`
+	Runtime        StrategyRuntimeConfig `yaml:"runtime"`
+	TradingRuntime TradingRuntimeConfig  `yaml:"trading_runtime"`
 }
 
 // AppConfig represents basic application settings
@@ -198,17 +198,47 @@ func (c *Config) Validate() error {
 
 	// Data retention configuration
 	if c.DataRetention.RetentionDays < 0 {
-		return fmt.Errorf("data_retention.retention_days must be non-negative (minimum 1 day)")
+		return fmt.Errorf("data_retention.retention_days must be non-negative")
 	}
 	// Default to 1 day if not specified or set to 0
 	if c.DataRetention.RetentionDays == 0 {
 		c.DataRetention.RetentionDays = 1
 	}
 
-	// Apply default worker configuration if not specified
-	if c.Worker.MarketDataChannelBuffer == 0 {
+	// Apply default worker configuration per field if not specified.
+	// Replacing the whole struct would discard fields the user intentionally configured.
+	{
 		defaults := DefaultWorkerConfig()
-		c.Worker = defaults
+		if c.Worker.MarketDataChannelBuffer == 0 {
+			c.Worker.MarketDataChannelBuffer = defaults.MarketDataChannelBuffer
+		}
+		if c.Worker.SignalChannelBuffer == 0 {
+			c.Worker.SignalChannelBuffer = defaults.SignalChannelBuffer
+		}
+		if c.Worker.ReconnectIntervalSeconds == 0 {
+			c.Worker.ReconnectIntervalSeconds = defaults.ReconnectIntervalSeconds
+		}
+		if c.Worker.MaxReconnectIntervalSeconds == 0 {
+			c.Worker.MaxReconnectIntervalSeconds = defaults.MaxReconnectIntervalSeconds
+		}
+		if c.Worker.ConnectionCheckIntervalSeconds == 0 {
+			c.Worker.ConnectionCheckIntervalSeconds = defaults.ConnectionCheckIntervalSeconds
+		}
+		if c.Worker.MaxConcurrentSaves == 0 {
+			c.Worker.MaxConcurrentSaves = defaults.MaxConcurrentSaves
+		}
+		if c.Worker.MarketData == (MarketDataWorkerConfig{}) {
+			c.Worker.MarketData = defaults.MarketData
+		}
+		if c.Worker.Signal == (SignalWorkerConfig{}) {
+			c.Worker.Signal = defaults.Signal
+		}
+		if c.Worker.Strategy == (StrategyWorkerConfig{}) {
+			c.Worker.Strategy = defaults.Strategy
+		}
+		if c.Worker.Maintenance == (MaintenanceWorkerConfig{}) {
+			c.Worker.Maintenance = defaults.Maintenance
+		}
 	}
 
 	// Validate worker configuration

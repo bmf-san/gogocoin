@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/bmf-san/gogocoin/v1/internal/app"
 	"github.com/bmf-san/gogocoin/v1/internal/config"
 	"github.com/bmf-san/gogocoin/v1/internal/logger"
 )
@@ -41,21 +40,6 @@ func main() {
 		}
 	}()
 
-	// Initialize application
-	application, err := app.New(cfg, appLogger)
-	if err != nil {
-		appLogger.LogError("system", "app_initialization", err, map[string]interface{}{
-			"config_path": configPath,
-		})
-		appLogger.System().WithError(err).Error("Failed to initialize application")
-		return
-	}
-	defer func() {
-		if err := application.Close(); err != nil {
-			appLogger.System().WithError(err).Error("Failed to close application")
-		}
-	}()
-
 	// Setup context and signal handling
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -73,28 +57,22 @@ func main() {
 	})
 
 	// Run application
-	appLogger.System().Info("Starting gogocoin...")
 	go func() {
-		if err := application.Run(ctx); err != nil {
+		if err := Run(ctx, cfg, appLogger); err != nil {
 			appLogger.LogError("system", "app_run", err, nil)
-			appLogger.System().WithError(err).Error("Failed to run application")
+			appLogger.System().WithError(err).Error("Application failed")
 			cancel()
 		}
 	}()
 
 	// Wait for signal
-	appLogger.System().Info("gogocoin started successfully. Press Ctrl+C to exit.")
+	log.Println("gogocoin started. Press Ctrl+C to exit.")
 	<-sigChan
 
 	// Shutdown process
 	appLogger.LogShutdown("user_interrupt")
 	appLogger.System().Info("Shutting down gogocoin...")
-
-	// Stop application
-	if err := application.Stop(); err != nil {
-		appLogger.LogError("system", "app_stop", err, nil)
-		log.Printf("Error occurred while stopping application: %v", err)
-	}
+	cancel()
 
 	appLogger.System().Info("gogocoin shut down successfully")
 }

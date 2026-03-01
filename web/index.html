@@ -103,7 +103,7 @@
       </div>
 
       <!-- Section 2: Balance, Orders, PnL History -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <!-- Balance -->
         <div class="card glass transition-all duration-300 hover:shadow-xl h-96 max-h-96 flex flex-col overflow-hidden">
           <div class="card-header border-b border-slate-200">
@@ -120,30 +120,6 @@
               </thead>
               <tbody id="balance-table">
                 <tr><td colspan="3" class="text-center text-secondary py-6">読み込み中...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Recent Orders -->
-        <div class="card glass transition-all duration-300 hover:shadow-xl h-96 max-h-96 flex flex-col overflow-hidden">
-          <div class="card-header border-b border-slate-200">
-            <h2 class="font-bold text-lg">最近の注文</h2>
-          </div>
-          <div class="card-body flex-1 min-h-0 overflow-y-auto">
-            <table class="table table-sm w-full">
-              <thead>
-                <tr class="border-b-2 border-slate-300">
-                  <th class="font-bold">売買</th>
-                  <th class="font-bold">通貨ペア</th>
-                  <th class="text-right font-bold">価格</th>
-                  <th class="text-right font-bold">数量</th>
-                  <th class="font-bold">状態</th>
-                  <th class="font-bold">日時</th>
-                </tr>
-              </thead>
-              <tbody id="orders-table">
-                <tr><td colspan="6" class="text-center text-secondary py-6">読み込み中...</td></tr>
               </tbody>
             </table>
           </div>

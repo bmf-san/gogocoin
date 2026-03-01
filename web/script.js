@@ -109,11 +109,10 @@ class GogocoinUI {
                 this.fetchAPI(`/api/status?symbol=${this.selectedSymbol}`),
                 this.fetchAPI('/api/balance'),
                 this.fetchAPI('/api/performance'),
-                this.fetchAPI('/api/orders?limit=5'),
                 this.fetchAPI('/api/trades?limit=50')
             ]);
 
-            const [statusResult, balanceResult, performanceResult, ordersResult, tradesResult] = results;
+            const [statusResult, balanceResult, performanceResult, tradesResult] = results;
 
             // Update only successful data (always update what we can)
             if (statusResult.status === 'fulfilled') {
@@ -136,13 +135,6 @@ class GogocoinUI {
                 console.error('Failed to load performance:', performanceResult.reason);
                 this.updatePerformance(null, true);
                 this.updatePerformanceTable(null, true);
-            }
-
-            if (ordersResult.status === 'fulfilled') {
-                this.updateOrders(ordersResult.value, false);
-            } else {
-                console.error('Failed to load orders:', ordersResult.reason);
-                this.updateOrders([], true);
             }
 
             if (tradesResult.status === 'fulfilled') {
@@ -337,37 +329,6 @@ class GogocoinUI {
                 todayPnlEl.className = 'text-lg font-bold';
             }
         }
-    }
-
-    // Update order information
-    updateOrders(orders, hasError) {
-        const tbody = document.querySelector('#orders-table');
-
-        if (!tbody) {
-            console.error('orders-table not found');
-            return;
-        }
-
-        if (hasError) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><span class="text-danger text-sm">⚠ 取得エラー</span></td></tr>';
-            return;
-        }
-
-        if (!orders || orders.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary py-4">最近の注文はありません</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = orders.map(order => `
-            <tr>
-                <td><span class="badge ${order.side === 'BUY' ? 'badge-success' : 'badge-danger'}">${this.escapeHtml(order.side)}</span></td>
-                <td class="font-semibold text-sm">${this.escapeHtml(order.symbol || '-')}</td>
-                <td class="text-right text-sm">¥${this.escapeHtml(this.formatNumber(order.price))}</td>
-                <td class="text-right text-sm">${this.escapeHtml(this.formatNumber(order.size))}</td>
-                <td class="text-xs">${this.escapeHtml(order.status || '-')}</td>
-                <td class="text-xs text-secondary">${this.escapeHtml(this.formatShortDateTime(order.executed_at))}</td>
-            </tr>
-        `).join('');
     }
 
     // Update trades (called from dashboard data load)

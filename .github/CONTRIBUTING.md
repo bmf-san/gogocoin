@@ -40,6 +40,8 @@ gogocoinへの貢献に興味を持っていただきありがとうございま
 - すべてのテストがパスすることを確認：`make test`
 - リンターを実行：`make lint`
 - コードをフォーマット：`make fmt`
+- `docs/openapi.yaml` を変更した場合は必ず再生成：`make generate`
+  - `internal/api/api.gen.go` は自動生成ファイルのため直接編集しない
 
 #### コミットメッセージガイドライン
 
@@ -67,7 +69,7 @@ cd gogocoin
 2. 依存関係をインストール
 ```bash
 go mod download
-make install-tools
+make install-tools  # golangci-lint・oapi-codegen をインストール
 ```
 
 3. 設定を初期化
@@ -80,29 +82,16 @@ make init
 make test
 ```
 
-5. ローカルで実行
+5. （API仕様を変更した場合）コードを再生成
 ```bash
-make build
-./bin/gogocoin
+make generate
 ```
 
-### テスト
+6. ローカルで実行
+```bash
+make up
+```
 
-- 新機能に対してユニットテストを作成
-- 既存のテストがパスすることを確認
-- 正常系とエラー系の両方をテスト
-- 適切な場合は統合テストを含める
+## ライセンス
 
-### ドキュメント
-
-- ユーザー向けの変更についてはREADME.mdを更新
-- 複雑なロジックにはインラインコメントを追加
-- 必要に応じて設定例を更新
-
-## 質問がありますか？
-
-質問がある場合は、お気軽に：
-- 明確化のためにIssueを作成
-- メンテナーに連絡
-
-ご貢献ありがとうございます！
+このプロジェクトへの貢献は [MIT License](../LICENSE) のもとで公開されます。

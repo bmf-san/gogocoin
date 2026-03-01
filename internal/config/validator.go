@@ -65,8 +65,15 @@ func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 	// Calculate minimum notional required
 	minNotional := minSize * estimatedPrice
 
-	// Get min_notional from strategy params
-	strategyParams, err := cfg.GetStrategyParams("scalping")
+	// Get min_notional from strategy params using the configured strategy name.
+	strategyName := cfg.Trading.Strategy.Name
+	if strategyName == "" {
+		if v.logger != nil {
+			v.logger.System().Warn("No strategy name configured, skipping min_notional validation")
+		}
+		return nil
+	}
+	strategyParams, err := cfg.GetStrategyParams(strategyName)
 	if err != nil {
 		if v.logger != nil {
 			v.logger.System().Warn("Failed to get strategy params, using default 200 JPY")
@@ -89,12 +96,12 @@ func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 
 	if configMinNotionalFloat < minNotional {
 		return fmt.Errorf(
-			"⚠️  CONFIGURATION ERROR for %s:\n"+
+			"CONFIGURATION ERROR for %s:\n"+
 				"   Minimum order size: %.8f %s\n"+
 				"   Estimated minimum cost: %.0f JPY (at ~%.0f JPY per unit)\n"+
 				"   Your config min_notional: %.0f JPY\n"+
 				"   \n"+
-				"   ❌ Your orders will be REJECTED by the exchange!\n"+
+				"   Your orders will be REJECTED by the exchange!\n"+
 				"   \n"+
 				"   Solutions:\n"+
 				"   1. Increase min_notional to at least %.0f JPY in config.yaml\n"+
@@ -118,7 +125,7 @@ func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 			WithField("min_notional", minNotional).
 			WithField("config_min", configMinNotionalFloat).
 			WithField("validation", "PASSED").
-			Info("✓ Trading configuration validated for symbol")
+			Info("Trading configuration validated for symbol")
 	}
 
 	return nil
