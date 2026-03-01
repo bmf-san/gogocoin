@@ -1,0 +1,38 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - staticcheck
+    - govet
+    - ineffassign
+    - misspell
+    - gocritic
+  settings:
+    misspell:
+      locale: US
+    gocritic:
+      enabled-checks:
+        - hugeParam
+        - rangeValCopy
+        - nilValReturn
+  exclusions:
+    paths:
+      - ".*_mock\\.go"
+      - ".*\\.pb\\.go"
+      - "testdata/.*"
+    rules:
+      - path: "_test\\.go"
+        linters: [gocritic]          # *_test.go では gocritic を無効化
+      - text: "Statuser"
+        linters: [misspell]          # misspell の誤検知ワードを無視
+
+issues:
+  # これらは v2 でも有効なまま
+  max-issues-per-linter: 0
+  max-same-issues: 0

@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>gogocoin - トレーディングダッシュボード</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sleyt@1.2.0/dist/css/index.css" integrity="sha384-XAant6PZx4mPJlVxom7T5kv9aomwGExox10yMOslz7M3og33vxmFc3py2QhYbyHi" crossorigin="anonymous" />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+
+  <body class="bg-body">
+    <!-- Header -->
+    <header class="bg-slate-900 text-slate-50 py-4 px-4 shadow-xl">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <h1 class="text-3xl font-black m-0 tracking-tight">gogocoin</h1>
+        </div>
+        <div class="flex items-center gap-3">
+          <button id="start-trading-btn" class="btn btn-success btn-sm transition-transform duration-200 hover:scale-110 shadow-md">開始</button>
+          <button id="stop-trading-btn" class="btn btn-danger btn-sm transition-transform duration-200 hover:scale-110 shadow-md hidden">停止</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto p-8 pb-16">
+      <!-- Section 1: System, Market, Performance -->
+      <div class="grid grid-cols-1 md:grid-cols-2 mb-8">
+        <!-- System Status -->
+        <div class="card glass transition-all duration-300 hover:shadow-xl h-96 max-h-96 flex flex-col overflow-hidden">
+          <div class="card-header border-b border-slate-200">
+            <h2 class="font-bold text-lg">システム状態</h2>
+          </div>
+          <div class="card-body flex-1 min-h-0 overflow-y-auto">
+            <div class="space-y-4">
+              <!-- Trading Status Badge -->
+              <div id="trading-status-badge" class="p-3 glass rounded-lg text-center border-2 border-slate-300 mb-3">
+                <p class="text-xs uppercase tracking-wide mb-1">取引状態</p>
+                <p class="text-lg font-black">停止中</p>
+              </div>
+
+              <!-- Market Monitoring -->
+              <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 mb-3">
+                <p class="text-xs text-secondary mb-2 uppercase tracking-wide">監視中の通貨ペア</p>
+                <div id="monitoring-prices" class="space-y-2">
+                  <div class="text-center text-secondary py-2 text-xs">読み込み中...</div>
+                </div>
+              </div>
+
+              <!-- Metrics Grid -->
+              <div class="grid grid-cols-2 gap-4">
+                <div class="metric-card">
+                  <p class="text-xs text-secondary mb-2 uppercase tracking-wide">接続状態</p>
+                  <p id="credentials-status" class="text-xl font-black">-</p>
+                </div>
+                <div class="metric-card">
+                  <p class="text-xs text-secondary mb-2 uppercase tracking-wide">戦略</p>
+                  <p id="strategy" class="text-xl font-black">-</p>
+                </div>
+                <div class="metric-card">
+                  <p class="text-xs text-secondary mb-2 uppercase tracking-wide">総取引回数</p>
+                  <p id="total-trades" class="text-xl font-black">-</p>
+                </div>
+                <div class="metric-card">
+                  <p class="text-xs text-secondary mb-2 uppercase tracking-wide">稼働時間</p>
+                  <p id="uptime" class="text-xl font-black">-</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance -->
+        <div class="card glass transition-all duration-300 hover:shadow-xl h-96 max-h-96 flex flex-col overflow-hidden">
+          <div class="card-header border-b border-slate-200">
+            <h2 class="font-bold text-lg">パフォーマンス</h2>
+          </div>
+          <div class="card-body flex-1 min-h-0 overflow-y-auto">
+            <div class="space-y-4">
+              <div class="text-center p-5 glass rounded-lg mb-3 border-2 border-primary">
+                <p class="text-xs text-secondary mb-2 uppercase tracking-wide font-semibold">総損益</p>
+                <p id="total-pnl" class="text-4xl font-black">¥0</p>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="text-center p-4 bg-white rounded-lg shadow-sm">
+                  <p class="text-xs text-secondary mb-2 uppercase tracking-wide">勝率</p>
+                  <p id="win-rate" class="text-2xl font-black">0%</p>
+                </div>
+                <div class="text-center p-4 bg-white rounded-lg shadow-sm">
+                  <p class="text-xs text-secondary mb-2 uppercase tracking-wide">本日損益</p>
+                  <p id="today-pnl" class="text-2xl font-black">¥0</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Balance, Orders, PnL History -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        <!-- Balance -->
+        <div class="card glass transition-all duration-300 hover:shadow-xl h-96 max-h-96 flex flex-col overflow-hidden">
+          <div class="card-header border-b border-slate-200">
+            <h2 class="font-bold text-lg">残高</h2>
+          </div>
+          <div class="card-body flex-1 min-h-0 overflow-y-auto">
+            <table class="table table-sm w-full">
+              <thead>
+                <tr class="border-b-2 border-slate-300">
+                  <th class="font-bold">通貨</th>
+                  <th class="text-right font-bold">総量</th>
+                  <th class="text-right font-bold">利用可能</th>
+                </tr>
+              </thead>
+              <tbody id="balance-table">
+                <tr><td colspan="3" class="text-center text-secondary py-6">読み込み中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PnL History -->
+        <div class="card glass transition-all duration-300 hover:shadow-xl h-96 max-h-96 flex flex-col overflow-hidden">
+          <div class="card-header border-b border-slate-200">
+            <h2 class="font-bold text-lg">日別損益</h2>
+          </div>
+          <div class="card-body flex-1 min-h-0 overflow-y-auto">
+              <table class="table table-sm w-full">
+              <thead>
+                <tr class="border-b-2 border-slate-300">
+                  <th class="font-bold">日付</th>
+                  <th class="text-right font-bold">損益</th>
+                  <th class="text-right font-bold">勝率</th>
+                  <th class="text-right font-bold">取引数</th>
+                </tr>
+              </thead>
+              <tbody id="pnl-history-table">
+                <tr>
+                  <td colspan="4" class="text-center text-secondary py-6">読み込み中...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Trade History and System Logs -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- Trade History (Left Column) -->
+          <div class="card glass transition-all duration-300 hover:shadow-xl h-96 max-h-96 flex flex-col overflow-hidden">
+          <div class="card-header border-b border-slate-200">
+            <h2 class="font-bold text-lg">取引履歴</h2>
+          </div>
+          <div class="card-body flex-1 min-h-0 overflow-y-auto">
+              <table class="table table-sm w-full">
+                <thead>
+                  <tr class="border-b-2 border-slate-300">
+                    <th class="font-bold">日時</th>
+                    <th class="font-bold">通貨ペア</th>
+                    <th class="font-bold">売買</th>
+                    <th class="text-right font-bold">価格</th>
+                    <th class="text-right font-bold">数量</th>
+                    <th class="text-right font-bold">手数料</th>
+                    <th class="text-right font-bold">損益</th>
+                  </tr>
+                </thead>
+                <tbody id="trades-table">
+                  <tr>
+                    <td colspan="7" class="text-center text-secondary py-6">読み込み中...</td>
+                  </tr>
+                </tbody>
+              </table>
+          </div>
+        </div>
+
+          <!-- System Logs (Right Column) -->
+          <div class="card glass transition-all duration-300 hover:shadow-xl h-96 max-h-96 flex flex-col overflow-hidden">
+          <div class="card-header flex justify-between items-center border-b border-slate-200">
+            <h2 class="font-bold text-lg">システムログ</h2>
+            <div class="flex gap-2">
+              <select id="log-level-filter" class="form-select form-select-sm form-control w-auto transition-colors duration-200">
+                <option value="">全レベル</option>
+                <option value="DEBUG">デバッグ</option>
+                <option value="INFO">情報</option>
+                <option value="WARN">警告</option>
+                <option value="ERROR">エラー</option>
+              </select>
+              <select id="log-category-filter" class="form-select form-select-sm form-control w-auto transition-colors duration-200">
+                <option value="">全カテゴリ</option>
+                <option value="system">システム</option>
+                <option value="trading">取引</option>
+                <option value="api">API</option>
+                <option value="strategy">戦略</option>
+                <option value="ui">UI</option>
+                <option value="data">データ</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body flex-1 min-h-0 overflow-y-auto">
+            <div id="logs-container" class="space-y-1 font-mono text-xs">
+              <div class="text-center text-secondary py-6">読み込み中...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="script.js?v=20260227"></script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+# oapi-codegen configuration for gogocoin HTTP adapter
+# Run: oapi-codegen --config internal/adapter/http/oapi-codegen.yaml docs/openapi.yaml
+package: api
+output: internal/adapter/http/api.gen.go
+
+generate:
+  std-http-server: true   # generate ServerInterface + RegisterHandlers for net/http
+  strict-server: true     # generate StrictServerInterface (typed request/response objects)
+  models: true            # generate Go types from OpenAPI schemas
+
+output-options:
+  skip-prune: false
