@@ -99,6 +99,7 @@ make up
 
 # 5. Web UIにアクセス
 open http://localhost:8080
+
 ```
 
 ### .envファイルの設定例
@@ -106,6 +107,7 @@ open http://localhost:8080
 ```bash
 BITFLYER_API_KEY=your_actual_api_key_here
 BITFLYER_API_SECRET=your_actual_api_secret_here
+
 ```
 
 **⚠️ 注意**: このボットはライブトレードのみ対応しています。実資金を使用するため、設定を十分に確認してから使用してください。
@@ -128,6 +130,7 @@ make restart
 # イメージ再ビルド
 make rebuild
 # または: docker compose up -d --build
+
 ```
 
 ## 使い方
@@ -149,6 +152,7 @@ make restart
 
 # 再ビルド
 make rebuild
+
 ```
 
 ### Web UI
@@ -206,6 +210,7 @@ make lint
 
 # Docker経由で実行
 make up
+
 ```
 
 ### API コード生成
@@ -215,10 +220,15 @@ make up
 ```bash
 # api.gen.go を再生成
 make generate
+
 ```
 
 > `internal/api/api.gen.go` は自動生成ファイルです。直接編集せず、必ず `make generate` 経由で更新してください。
 > CI の `codegen` ジョブが spec と生成コードの同期を検証します。
+
+## 関連
+
+- [gogocoin-vps-template](https://github.com/bmf-san/gogocoin-vps-template) — VPS（ConoHa 等）に systemd + GitHub Actions でデプロイする運用構成のテンプレート
 
 ## コントリビューション
 
