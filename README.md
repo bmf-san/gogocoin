@@ -167,21 +167,6 @@ make rebuild
 | [docs/DESIGN_DOC.md](docs/DESIGN_DOC.md) | アーキテクチャ設計ドキュメント |
 | [docs/openapi.yaml](docs/openapi.yaml) | API仕様（OpenAPI 3.1） |
 
-## デプロイ
-
-### VPS へのデプロイ
-
-[gogocoin-vps-template](https://github.com/bmf-san/gogocoin-vps-template) を使うと、VPS に systemd + GitHub Actions でデプロイする構成をすぐに用意できます。
-
-- Ubuntu 24.04 LTS 向けセットアップスクリプト
-- systemd ユニットファイル
-- GitHub Actions デプロイワークフロー（`workflow_dispatch`）
-- `make setup` / `make config` / `make tunnel` / `make backup` コマンド
-
-詳細は [gogocoin-vps-template の README](https://github.com/bmf-san/gogocoin-vps-template) を参照してください。
-
----
-
 ## 運用
 
 ### 推奨運用
@@ -234,6 +219,10 @@ make generate
 
 > `internal/api/api.gen.go` は自動生成ファイルです。直接編集せず、必ず `make generate` 経由で更新してください。
 > CI の `codegen` ジョブが spec と生成コードの同期を検証します。
+
+## 関連
+
+- [gogocoin-vps-template](https://github.com/bmf-san/gogocoin-vps-template) — VPS（ConoHa 等）に systemd + GitHub Actions でデプロイする運用構成のテンプレート
 
 ## コントリビューション
 
