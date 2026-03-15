@@ -43,6 +43,7 @@ data/
 *~
 
 # Coverage files
+cover.out
 coverage.out
 coverage.html
 
