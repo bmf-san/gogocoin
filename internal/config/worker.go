@@ -9,9 +9,10 @@ type WorkerConfig struct {
 	SignalChannelBuffer     int `yaml:"signal_channel_buffer"`
 
 	// Reconnection settings
-	ReconnectIntervalSeconds        int `yaml:"reconnect_interval_seconds"`
-	MaxReconnectIntervalSeconds     int `yaml:"max_reconnect_interval_seconds"`
-	ConnectionCheckIntervalSeconds  int `yaml:"connection_check_interval_seconds"`
+	ReconnectIntervalSeconds       int `yaml:"reconnect_interval_seconds"`
+	MaxReconnectIntervalSeconds    int `yaml:"max_reconnect_interval_seconds"`
+	ConnectionCheckIntervalSeconds int `yaml:"connection_check_interval_seconds"`
+	StaleDataTimeoutSeconds        int `yaml:"stale_data_timeout_seconds"`
 
 	// Database save settings
 	MaxConcurrentSaves int `yaml:"max_concurrent_saves"`
@@ -32,9 +33,9 @@ type WorkerConfig struct {
 // MarketDataWorkerConfig represents market data worker configuration
 type MarketDataWorkerConfig struct {
 	// Reconnection settings
-	ReconnectInterval        time.Duration `yaml:"reconnect_interval"`
-	MaxReconnectInterval     time.Duration `yaml:"max_reconnect_interval"`
-	ConnectionCheckInterval  time.Duration `yaml:"connection_check_interval"`
+	ReconnectInterval       time.Duration `yaml:"reconnect_interval"`
+	MaxReconnectInterval    time.Duration `yaml:"max_reconnect_interval"`
+	ConnectionCheckInterval time.Duration `yaml:"connection_check_interval"`
 }
 
 // SignalWorkerConfig represents signal worker configuration
@@ -68,11 +69,12 @@ type MaintenanceWorkerConfig struct {
 func DefaultWorkerConfig() WorkerConfig {
 	return WorkerConfig{
 		MarketDataChannelBuffer:        1000,
-		SignalChannelBuffer:             100,
-		ReconnectIntervalSeconds:        10,
-		MaxReconnectIntervalSeconds:     300,
-		ConnectionCheckIntervalSeconds:  30,
-		MaxConcurrentSaves:              10,
+		SignalChannelBuffer:            100,
+		ReconnectIntervalSeconds:       10,
+		MaxReconnectIntervalSeconds:    300,
+		ConnectionCheckIntervalSeconds: 30,
+		StaleDataTimeoutSeconds:        180,
+		MaxConcurrentSaves:             10,
 		MarketData: MarketDataWorkerConfig{
 			ReconnectInterval:       10 * time.Second,
 			MaxReconnectInterval:    5 * time.Minute,

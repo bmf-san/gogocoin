@@ -28,14 +28,14 @@ func createTestLogger(t *testing.T) *logger.Logger {
 
 // mockClientFactory implements ClientFactory for testing
 type mockClientFactory struct {
-	mu                  sync.Mutex
-	connected           bool
-	reconnectError      error
-	reconnectCallCount  int
-	subscribeError      error
-	subscribeCallCount  int
-	simulateDisconnect  bool
-	disconnectAfter     int // Disconnect after N subscription calls
+	mu                 sync.Mutex
+	connected          bool
+	reconnectError     error
+	reconnectCallCount int
+	subscribeError     error
+	subscribeCallCount int
+	simulateDisconnect bool
+	disconnectAfter    int // Disconnect after N subscription calls
 }
 
 func (m *mockClientFactory) IsConnected() bool {
@@ -129,6 +129,7 @@ func TestMarketDataWorker_ReconnectionScenario(t *testing.T) {
 			1,   // 1 second reconnect interval
 			300, // 5 minutes max
 			1,   // 1 second connection check
+			0,   // stale data timeout (default 3m)
 		)
 
 		// Start worker in background
@@ -188,6 +189,7 @@ func TestMarketDataWorker_ReconnectionScenario(t *testing.T) {
 			1,   // 1 second reconnect interval
 			300, // 5 minutes max
 			1,   // 1 second connection check
+			0,   // stale data timeout (default 3m)
 		)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -236,6 +238,7 @@ func TestMarketDataWorker_ReconnectionScenario(t *testing.T) {
 			1,   // 1 second reconnect interval
 			300, // 5 minutes max
 			1,   // 1 second connection check
+			0,   // stale data timeout (default 3m)
 		)
 
 		// Start worker
@@ -284,6 +287,7 @@ func TestMarketDataWorker_ReconnectionScenario(t *testing.T) {
 			1,
 			300,
 			1,
+			0,
 		)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -325,6 +329,7 @@ func TestMarketDataWorker_ChannelManagement(t *testing.T) {
 			1,
 			300,
 			1,
+			0,
 		)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -375,6 +380,7 @@ func TestMarketDataWorker_ChannelManagement(t *testing.T) {
 			1,
 			300,
 			1,
+			0,
 		)
 
 		ctx, cancel := context.WithCancel(context.Background())

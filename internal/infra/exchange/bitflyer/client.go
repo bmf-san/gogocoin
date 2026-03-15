@@ -145,6 +145,14 @@ func (c *Client) IsConnected() bool {
 	return c.isConnected
 }
 
+// SetDisconnected marks the client as disconnected so the worker will reconnect.
+// Used by the market data worker when it detects a silently dead WebSocket.
+func (c *Client) SetDisconnected() {
+	c.mu.Lock()
+	c.isConnected = false
+	c.mu.Unlock()
+}
+
 // Close closes the client
 func (c *Client) Close(ctx context.Context) error {
 	c.mu.Lock()

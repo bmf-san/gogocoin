@@ -224,6 +224,9 @@ func (c *Config) Validate() error {
 		if c.Worker.ConnectionCheckIntervalSeconds == 0 {
 			c.Worker.ConnectionCheckIntervalSeconds = defaults.ConnectionCheckIntervalSeconds
 		}
+		if c.Worker.StaleDataTimeoutSeconds == 0 {
+			c.Worker.StaleDataTimeoutSeconds = defaults.StaleDataTimeoutSeconds
+		}
 		if c.Worker.MaxConcurrentSaves == 0 {
 			c.Worker.MaxConcurrentSaves = defaults.MaxConcurrentSaves
 		}
