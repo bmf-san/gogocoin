@@ -189,6 +189,7 @@ func Run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface) er
 		cfg.Worker.ReconnectIntervalSeconds,
 		cfg.Worker.MaxReconnectIntervalSeconds,
 		cfg.Worker.ConnectionCheckIntervalSeconds,
+		cfg.Worker.StaleDataTimeoutSeconds,
 	)
 	strategyWorker := adapterworker.NewStrategyWorker(log, strat, marketDataCh, signalCh)
 	signalWorker := adapterworker.NewSignalWorker(log, signalCh, tradingCtrl, riskMgr, trader, strat, perfAnalytics, cfg.Runtime.SellSizePercentage)

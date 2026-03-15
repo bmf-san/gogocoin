@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/bmf-san/gogocoin/v1/internal/domain"
@@ -14,6 +15,7 @@ const (
 	defaultReconnectInterval       = 10 * time.Second
 	defaultMaxReconnectInterval    = 5 * time.Minute
 	defaultConnectionCheckInterval = 30 * time.Second
+	defaultStaleDataTimeout        = 3 * time.Minute
 )
 
 // MarketDataWorker manages WebSocket connections and market data subscriptions
@@ -25,6 +27,8 @@ type MarketDataWorker struct {
 	reconnectInterval       time.Duration
 	maxReconnectInterval    time.Duration
 	connectionCheckInterval time.Duration
+	staleDataTimeout        time.Duration
+	lastDataReceivedNs      atomic.Int64 // unix nanoseconds; updated on every ticker callback
 }
 
 // ClientFactory defines the interface for creating and managing clients
@@ -43,6 +47,7 @@ func NewMarketDataWorker(
 	reconnectIntervalSec int,
 	maxReconnectIntervalSec int,
 	connectionCheckIntervalSec int,
+	staleDataTimeoutSec int,
 ) *MarketDataWorker {
 	// Clamp to defaults to prevent zero/negative duration panics in time.NewTicker
 	if reconnectIntervalSec <= 0 {
@@ -54,6 +59,9 @@ func NewMarketDataWorker(
 	if connectionCheckIntervalSec <= 0 {
 		connectionCheckIntervalSec = int(defaultConnectionCheckInterval.Seconds())
 	}
+	if staleDataTimeoutSec <= 0 {
+		staleDataTimeoutSec = int(defaultStaleDataTimeout.Seconds())
+	}
 	return &MarketDataWorker{
 		logger:                  logger,
 		symbols:                 symbols,
@@ -62,6 +70,7 @@ func NewMarketDataWorker(
 		reconnectInterval:       time.Duration(reconnectIntervalSec) * time.Second,
 		maxReconnectInterval:    time.Duration(maxReconnectIntervalSec) * time.Second,
 		connectionCheckInterval: time.Duration(connectionCheckIntervalSec) * time.Second,
+		staleDataTimeout:        time.Duration(staleDataTimeoutSec) * time.Second,
 	}
 }
 
@@ -126,6 +135,7 @@ func (w *MarketDataWorker) Run(ctx context.Context) error {
 
 			err := w.clientFactory.SubscribeToTicker(ctx, symbol, func(data domain.MarketData) {
 				w.logger.Data().WithField("symbol", data.Symbol).WithField("close", data.Close).Debug("Market data received in callback")
+				w.lastDataReceivedNs.Store(time.Now().UnixNano())
 
 				select {
 				case w.marketDataCh <- data:
@@ -161,6 +171,9 @@ func (w *MarketDataWorker) Run(ctx context.Context) error {
 			w.logger.Data().WithField("subscribed_symbols", subscribedCount).WithField("total_symbols", len(w.symbols)).Info("Market data subscriptions completed")
 		}
 
+		// Reset last-data timestamp so the stale-data detector doesn't trip immediately
+		w.lastDataReceivedNs.Store(time.Now().UnixNano())
+
 		// Monitor connection health
 		ticker := time.NewTicker(w.connectionCheckInterval)
 
@@ -172,6 +185,18 @@ func (w *MarketDataWorker) Run(ctx context.Context) error {
 					w.logger.Data().Warn("WebSocket connection lost, initiating reconnection")
 					ticker.Stop()
 					break monitorLoop // Exit inner loop to reconnect
+				}
+				// Stale data check: reconnect if no ticker has arrived for staleDataTimeout
+				if elapsed := time.Since(time.Unix(0, w.lastDataReceivedNs.Load())); elapsed > w.staleDataTimeout {
+					w.logger.Data().
+						WithField("elapsed_seconds", elapsed.Seconds()).
+						Warn("No market data received - WebSocket may be silently dead, forcing reconnection")
+					ticker.Stop()
+					// Mark disconnected so the outer loop will call ReconnectClient
+					if rc, ok := w.clientFactory.(interface{ SetDisconnected() }); ok {
+						rc.SetDisconnected()
+					}
+					break monitorLoop
 				}
 			case <-ctx.Done():
 				ticker.Stop()
