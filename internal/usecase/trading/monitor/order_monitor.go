@@ -23,7 +23,7 @@ const (
 
 // OrderMonitor monitors order execution and status
 type OrderMonitor struct {
-	logger           *logger.Logger
+	logger           logger.LoggerInterface
 	orderGetter      OrderGetter
 	balanceUpdater   BalanceUpdater
 	pnlCalculator    PnLCalculator
@@ -50,7 +50,7 @@ type PnLCalculator interface {
 
 // NewOrderMonitor creates a new order monitor
 func NewOrderMonitor(
-	logger *logger.Logger,
+	logger logger.LoggerInterface,
 	orderGetter OrderGetter,
 	balanceUpdater BalanceUpdater,
 	pnlCalculator PnLCalculator,

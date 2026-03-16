@@ -47,7 +47,7 @@ type BitflyerTrader struct {
 
 	// Collaborating dependencies
 	client             *bitflyer.Client
-	logger             *logger.Logger
+	logger             logger.LoggerInterface
 	db                 domain.TradingRepository
 	strategyName       string
 	onOrderCompletedFn func(*domain.OrderResult)
@@ -62,7 +62,7 @@ type BitflyerTrader struct {
 // NewTraderWithDependencies creates a new BitflyerTrader with all dependencies injected
 func NewTraderWithDependencies(
 	client *bitflyer.Client,
-	logger *logger.Logger,
+	logger logger.LoggerInterface,
 	db domain.TradingRepository,
 	marketSpecSvc domain.MarketSpecService,
 	strategyName string,

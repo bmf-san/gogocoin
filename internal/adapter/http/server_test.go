@@ -14,7 +14,7 @@ import (
 	"github.com/bmf-san/gogocoin/v1/internal/domain"
 	"github.com/bmf-san/gogocoin/v1/internal/infra/persistence"
 	"github.com/bmf-san/gogocoin/v1/internal/logger"
-	"github.com/bmf-san/gogocoin/v1/internal/usecase/strategy"
+	strategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
 )
 
 // mock structure for testing

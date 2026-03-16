@@ -8,7 +8,7 @@ import (
 
 	"github.com/bmf-san/gogocoin/v1/internal/domain"
 	"github.com/bmf-san/gogocoin/v1/internal/logger"
-	strategy "github.com/bmf-san/gogocoin/v1/internal/usecase/strategy"
+	strategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
 )
 
 // createTestLogger creates a logger for testing
@@ -297,13 +297,13 @@ func TestTradingFlow_EndToEnd(t *testing.T) {
 		}
 
 		// Step 1: Generate signal
-		marketData := &domain.MarketData{
+		marketData := &strategy.MarketData{
 			Symbol:    "BTC_JPY",
 			Price:     5000000,
 			Timestamp: time.Now(),
 		}
 
-		signal, err := strat.GenerateSignal(ctx, marketData, []domain.MarketData{})
+		signal, err := strat.GenerateSignal(ctx, marketData, []strategy.MarketData{})
 		if err != nil {
 			t.Fatalf("Failed to generate signal: %v", err)
 		}
@@ -415,7 +415,7 @@ func TestTradingFlow_EndToEnd(t *testing.T) {
 			t.Fatalf("Failed to start strategy: %v", err)
 		}
 
-		marketData := &domain.MarketData{
+		marketData := &strategy.MarketData{
 			Symbol:    "BTC_JPY",
 			Price:     5000000,
 			Timestamp: time.Now(),
@@ -466,7 +466,7 @@ func TestTradingFlow_EndToEnd(t *testing.T) {
 			}
 		}
 
-		sellMarketData := &domain.MarketData{
+		sellMarketData := &strategy.MarketData{
 			Symbol:    "BTC_JPY",
 			Price:     sellPrice,
 			Timestamp: time.Now(),
@@ -540,7 +540,7 @@ func TestTradingFlow_EndToEnd(t *testing.T) {
 		actions := []strategy.SignalAction{strategy.SignalBuy, strategy.SignalSell, strategy.SignalBuy}
 
 		for i := 0; i < 3; i++ {
-			marketData := &domain.MarketData{
+			marketData := &strategy.MarketData{
 				Symbol:    "BTC_JPY",
 				Price:     prices[i],
 				Timestamp: time.Now(),
@@ -625,7 +625,7 @@ func TestTradingFlow_ErrorHandling(t *testing.T) {
 			}
 		}
 
-		marketData := &domain.MarketData{
+		marketData := &strategy.MarketData{
 			Symbol:    "BTC_JPY",
 			Price:     5000000,
 			Timestamp: time.Now(),
