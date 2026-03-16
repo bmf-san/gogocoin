@@ -7,9 +7,9 @@ import (
 
 	"github.com/bmf-san/gogocoin/v1/internal/domain"
 	"github.com/bmf-san/gogocoin/v1/internal/logger"
-	"github.com/bmf-san/gogocoin/v1/internal/usecase/strategy"
 	"github.com/bmf-san/gogocoin/v1/internal/usecase/trading"
 	"github.com/bmf-san/gogocoin/v1/internal/utils"
+	strategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
 )
 
 // RiskManager defines the interface for risk management operations

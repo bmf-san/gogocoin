@@ -1,0 +1,470 @@
+package scalping
+
+import (
+	"context"
+	"fmt"
+	"math"
+	"sync"
+	"time"
+
+	strategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
+)
+
+// MarketSpecService is an optional hook for exchange-provided minimum order sizes.
+type MarketSpecService interface {
+	GetMinimumOrderSize(symbol string) (float64, error)
+}
+
+// symbolEMAState tracks per-symbol EMA crossover direction.
+type symbolEMAState struct {
+	mu                sync.Mutex
+	prevFastAboveSlow bool
+	initialized       bool
+}
+
+// Strategy is a stateless EMA-crossover scalping strategy with optional RSI
+// filter and per-symbol parameter overrides.
+//
+// It embeds *strategy.BaseStrategy and satisfies the strategy.Strategy interface.
+type Strategy struct {
+	*strategy.BaseStrategy
+
+	emaFastPeriod  int
+	emaSlowPeriod  int
+	takeProfitPct  float64
+	stopLossPct    float64
+	cooldownSec    int
+	maxDailyTrades int
+	minNotional    float64
+	feeRate        float64
+
+	rsiPeriod     int
+	rsiOverbought float64
+	rsiOversold   float64
+
+	symbolParams map[string]SymbolOverride
+
+	marketSpecSvc MarketSpecService
+
+	lastTradeTime   time.Time
+	dailyTradeCount int
+	lastTradeDate   string
+	mu              sync.RWMutex
+
+	symbolEMAStates sync.Map // map[string]*symbolEMAState
+}
+
+// New creates a new scalping Strategy with the given Params.
+func New(cfg Params) *Strategy {
+	base := strategy.NewBaseStrategy(
+		"scalping",
+		"Stateless EMA-crossover scalping strategy with RSI filter",
+		"2.0.0",
+	)
+
+	rsiOverbought := cfg.RSIOverbought
+	if rsiOverbought == 0 {
+		rsiOverbought = 70.0
+	}
+	rsiOversold := cfg.RSIOversold
+	if rsiOversold == 0 {
+		rsiOversold = 30.0
+	}
+
+	return &Strategy{
+		BaseStrategy:   base,
+		emaFastPeriod:  cfg.EMAFastPeriod,
+		emaSlowPeriod:  cfg.EMASlowPeriod,
+		takeProfitPct:  cfg.TakeProfitPct,
+		stopLossPct:    cfg.StopLossPct,
+		cooldownSec:    cfg.CooldownSec,
+		maxDailyTrades: cfg.MaxDailyTrades,
+		minNotional:    cfg.MinNotional,
+		feeRate:        cfg.FeeRate,
+		rsiPeriod:      cfg.RSIPeriod,
+		rsiOverbought:  rsiOverbought,
+		rsiOversold:    rsiOversold,
+		symbolParams:   cfg.SymbolParams,
+	}
+}
+
+// NewDefault creates a Strategy with conservative default parameters.
+func NewDefault() *Strategy {
+	return New(Params{
+		EMAFastPeriod:  9,
+		EMASlowPeriod:  21,
+		TakeProfitPct:  0.8,
+		StopLossPct:    0.4,
+		CooldownSec:    90,
+		MaxDailyTrades: 3,
+		MinNotional:    200.0,
+		FeeRate:        0.001,
+	})
+}
+
+// SetMarketSpecService injects an optional exchange-specific order-size service.
+func (s *Strategy) SetMarketSpecService(svc MarketSpecService) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.marketSpecSvc = svc
+}
+
+// ── strategy.Strategy interface ──────────────────────────────────────────────
+
+// Initialize applies config from a map[string]interface{} (YAML-decoded params).
+func (s *Strategy) Initialize(config map[string]interface{}) error {
+	if config == nil {
+		return nil
+	}
+	if v, ok := config["ema_fast_period"].(int); ok {
+		s.emaFastPeriod = v
+	}
+	if v, ok := config["ema_slow_period"].(int); ok {
+		s.emaSlowPeriod = v
+	}
+	if v, ok := config["take_profit_pct"].(float64); ok {
+		s.takeProfitPct = v
+	}
+	if v, ok := config["stop_loss_pct"].(float64); ok {
+		s.stopLossPct = v
+	}
+	if v, ok := config["cooldown_sec"].(int); ok {
+		s.cooldownSec = v
+	}
+	if v, ok := config["max_daily_trades"].(int); ok {
+		s.maxDailyTrades = v
+	}
+	if v, ok := config["min_notional"].(float64); ok {
+		s.minNotional = v
+	}
+	if v, ok := config["fee_rate"].(float64); ok {
+		s.feeRate = v
+	}
+	if v, ok := config["rsi_period"].(int); ok {
+		s.rsiPeriod = v
+	}
+	if v, ok := config["rsi_overbought"].(float64); ok {
+		s.rsiOverbought = v
+	}
+	if v, ok := config["rsi_oversold"].(float64); ok {
+		s.rsiOversold = v
+	}
+	return s.validate()
+}
+
+// UpdateConfig is an alias for Initialize.
+func (s *Strategy) UpdateConfig(config map[string]interface{}) error {
+	return s.Initialize(config)
+}
+
+// GetConfig returns the current effective configuration.
+func (s *Strategy) GetConfig() map[string]interface{} {
+	return map[string]interface{}{
+		"ema_fast_period":  s.emaFastPeriod,
+		"ema_slow_period":  s.emaSlowPeriod,
+		"take_profit_pct":  s.takeProfitPct,
+		"stop_loss_pct":    s.stopLossPct,
+		"cooldown_sec":     s.cooldownSec,
+		"max_daily_trades": s.maxDailyTrades,
+		"min_notional":     s.minNotional,
+		"fee_rate":         s.feeRate,
+		"rsi_period":       s.rsiPeriod,
+		"rsi_overbought":   s.rsiOverbought,
+		"rsi_oversold":     s.rsiOversold,
+		"symbol_params":    s.symbolParams,
+	}
+}
+
+// GenerateSignal generates a BUY/SELL/HOLD signal with EMA crossover
+// confirmation and an optional RSI filter.
+func (s *Strategy) GenerateSignal(ctx context.Context, data *strategy.MarketData, history []strategy.MarketData) (*strategy.Signal, error) {
+	if data == nil {
+		return nil, fmt.Errorf("market data is nil")
+	}
+
+	fastPeriod, slowPeriod := s.symbolEMAPeriods(data.Symbol)
+
+	if len(history) < slowPeriod {
+		return s.CreateSignal(data.Symbol, strategy.SignalHold, 0, data.Price, 0,
+			map[string]interface{}{"reason": "insufficient_history"}), nil
+	}
+
+	emaFast := s.calculateEMA(history, fastPeriod)
+	emaSlow := s.calculateEMA(history, slowPeriod)
+
+	if s.isInCooldown() {
+		return s.CreateSignal(data.Symbol, strategy.SignalHold, 0, data.Price, 0,
+			map[string]interface{}{"reason": "cooldown", "ema_fast": emaFast, "ema_slow": emaSlow}), nil
+	}
+
+	if s.isDailyLimitReached() {
+		return s.CreateSignal(data.Symbol, strategy.SignalHold, 0, data.Price, 0,
+			map[string]interface{}{"reason": "daily_limit", "ema_fast": emaFast, "ema_slow": emaSlow}), nil
+	}
+
+	// EMA crossover confirmation – only signal on direction change tick.
+	currentFastAbove := emaFast > emaSlow
+	stateVal, _ := s.symbolEMAStates.LoadOrStore(data.Symbol, &symbolEMAState{})
+	st := stateVal.(*symbolEMAState)
+	st.mu.Lock()
+	crossoverConfirmed := !st.initialized || (currentFastAbove != st.prevFastAboveSlow)
+	st.prevFastAboveSlow = currentFastAbove
+	st.initialized = true
+	st.mu.Unlock()
+
+	action := s.baseSignal(data.Price, emaFast, emaSlow)
+
+	if action != strategy.SignalHold && !crossoverConfirmed {
+		return s.CreateSignal(data.Symbol, strategy.SignalHold, 0, data.Price, 0,
+			map[string]interface{}{"reason": "no_new_crossover", "ema_fast": emaFast, "ema_slow": emaSlow}), nil
+	}
+
+	// RSI filter
+	if action != strategy.SignalHold && s.rsiPeriod > 0 {
+		rsi := s.calculateRSI(history, s.rsiPeriod)
+		if action == strategy.SignalBuy && rsi > s.rsiOverbought {
+			return s.CreateSignal(data.Symbol, strategy.SignalHold, 0, data.Price, 0,
+				map[string]interface{}{"reason": "rsi_overbought", "rsi": rsi, "ema_fast": emaFast, "ema_slow": emaSlow}), nil
+		}
+		if action == strategy.SignalSell && rsi < s.rsiOversold {
+			return s.CreateSignal(data.Symbol, strategy.SignalHold, 0, data.Price, 0,
+				map[string]interface{}{"reason": "rsi_oversold", "rsi": rsi, "ema_fast": emaFast, "ema_slow": emaSlow}), nil
+		}
+	}
+
+	qty := s.quantityForSymbol(data.Symbol, data.Price)
+	return s.CreateSignal(data.Symbol, action, 1.0, data.Price, qty,
+		map[string]interface{}{"ema_fast": emaFast, "ema_slow": emaSlow}), nil
+}
+
+// Analyze generates a signal from a batch of historical data.
+func (s *Strategy) Analyze(data []strategy.MarketData) (*strategy.Signal, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("no data to analyze")
+	}
+	latest := data[len(data)-1]
+	return s.GenerateSignal(context.Background(), &latest, data)
+}
+
+// Reset clears all internal state.
+func (s *Strategy) Reset() error {
+	s.mu.Lock()
+	s.lastTradeTime = time.Time{}
+	s.dailyTradeCount = 0
+	s.lastTradeDate = ""
+	s.mu.Unlock()
+	s.symbolEMAStates.Range(func(k, _ interface{}) bool {
+		s.symbolEMAStates.Delete(k)
+		return true
+	})
+	return s.BaseStrategy.Reset()
+}
+
+// RecordTrade records a completed trade (updates cooldown and daily counter).
+func (s *Strategy) RecordTrade() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lastTradeTime = time.Now()
+	today := s.lastTradeTime.Format("2006-01-02")
+	if s.lastTradeDate != today {
+		s.dailyTradeCount = 1
+		s.lastTradeDate = today
+	} else {
+		s.dailyTradeCount++
+	}
+}
+
+// InitializeDailyTradeCount seeds today's trade counter from persistent storage.
+func (s *Strategy) InitializeDailyTradeCount(count int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.dailyTradeCount = count
+	s.lastTradeDate = time.Now().Format("2006-01-02")
+}
+
+// GetTakeProfitPrice returns the take-profit price from an entry price.
+func (s *Strategy) GetTakeProfitPrice(entry float64) float64 {
+	return entry * (1.0 + s.takeProfitPct/100.0)
+}
+
+// GetStopLossPrice returns the stop-loss price from an entry price.
+func (s *Strategy) GetStopLossPrice(entry float64) float64 {
+	return entry * (1.0 - s.stopLossPct/100.0)
+}
+
+// ── internal helpers ─────────────────────────────────────────────────────────
+
+func (s *Strategy) validate() error {
+	if s.emaFastPeriod <= 0 {
+		return fmt.Errorf("ema_fast_period must be positive")
+	}
+	if s.emaSlowPeriod <= 0 {
+		return fmt.Errorf("ema_slow_period must be positive")
+	}
+	if s.emaFastPeriod >= s.emaSlowPeriod {
+		return fmt.Errorf("ema_fast_period must be less than ema_slow_period")
+	}
+	if s.takeProfitPct <= 0 {
+		return fmt.Errorf("take_profit_pct must be positive")
+	}
+	if s.stopLossPct <= 0 {
+		return fmt.Errorf("stop_loss_pct must be positive")
+	}
+	if s.cooldownSec < 0 {
+		return fmt.Errorf("cooldown_sec must be non-negative")
+	}
+	if s.maxDailyTrades <= 0 {
+		return fmt.Errorf("max_daily_trades must be positive")
+	}
+	if s.minNotional <= 0 {
+		return fmt.Errorf("min_notional must be positive")
+	}
+	if s.feeRate < 0 || s.feeRate > 0.1 {
+		return fmt.Errorf("fee_rate must be between 0 and 0.1")
+	}
+	return nil
+}
+
+func (s *Strategy) baseSignal(price, emaFast, emaSlow float64) strategy.SignalAction {
+	if emaFast > emaSlow && price > emaFast {
+		return strategy.SignalBuy
+	}
+	if emaFast < emaSlow && price < emaFast {
+		return strategy.SignalSell
+	}
+	return strategy.SignalHold
+}
+
+func (s *Strategy) calculateEMA(history []strategy.MarketData, period int) float64 {
+	if len(history) < period {
+		return 0.0
+	}
+	data := history[len(history)-period:]
+	sum := 0.0
+	for i := range data {
+		sum += data[i].Price
+	}
+	ema := sum / float64(period)
+	multiplier := 2.0 / float64(period+1)
+	for i := 1; i < len(data); i++ {
+		ema = (data[i].Price-ema)*multiplier + ema
+	}
+	return ema
+}
+
+func (s *Strategy) calculateRSI(history []strategy.MarketData, period int) float64 {
+	if len(history) < period+1 {
+		return 50.0
+	}
+	data := history[len(history)-(period+1):]
+	var gains, losses float64
+	for i := 1; i < len(data); i++ {
+		change := data[i].Price - data[i-1].Price
+		if change > 0 {
+			gains += change
+		} else {
+			losses -= change
+		}
+	}
+	avgGain := gains / float64(period)
+	avgLoss := losses / float64(period)
+	if avgLoss == 0 {
+		return 100.0
+	}
+	return 100.0 - (100.0 / (1.0 + avgGain/avgLoss))
+}
+
+func (s *Strategy) symbolEMAPeriods(symbol string) (fast, slow int) {
+	if s.symbolParams != nil {
+		if ov, ok := s.symbolParams[symbol]; ok {
+			if ov.EMAFastPeriod > 0 {
+				fast = ov.EMAFastPeriod
+			}
+			if ov.EMASlowPeriod > 0 {
+				slow = ov.EMASlowPeriod
+			}
+		}
+	}
+	if fast == 0 {
+		fast = s.emaFastPeriod
+	}
+	if slow == 0 {
+		slow = s.emaSlowPeriod
+	}
+	return
+}
+
+func (s *Strategy) symbolMinNotional(symbol string) float64 {
+	if s.symbolParams != nil {
+		if ov, ok := s.symbolParams[symbol]; ok && ov.MinNotional > 0 {
+			return ov.MinNotional
+		}
+	}
+	return s.minNotional
+}
+
+func (s *Strategy) quantityForSymbol(symbol string, price float64) float64 {
+	if price <= 0 {
+		return 0
+	}
+	notional := s.symbolMinNotional(symbol)
+	qty := math.Ceil((notional/price)*1e8) / 1e8
+	minSize := s.minimumOrderSize(symbol)
+	if qty < minSize {
+		qty = minSize
+	}
+	if qty*price < notional {
+		qty += 1.0 / 1e8
+	}
+	return qty
+}
+
+func (s *Strategy) minimumOrderSize(symbol string) float64 {
+	s.mu.RLock()
+	svc := s.marketSpecSvc
+	s.mu.RUnlock()
+	if svc != nil {
+		if min, err := svc.GetMinimumOrderSize(symbol); err == nil && min > 0 {
+			return min
+		}
+	}
+	return fallbackMinOrderSize(symbol)
+}
+
+func fallbackMinOrderSize(symbol string) float64 {
+	switch symbol {
+	case "BTC_JPY":
+		return 0.001
+	case "ETH_JPY":
+		return 0.01
+	case "XRP_JPY":
+		return 1.0
+	case "XLM_JPY":
+		return 10.0
+	case "MONA_JPY", "ELF_JPY":
+		return 1.0
+	case "BCH_JPY":
+		return 0.01
+	default:
+		return 0.001
+	}
+}
+
+func (s *Strategy) isInCooldown() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.lastTradeTime.IsZero() {
+		return false
+	}
+	return time.Since(s.lastTradeTime).Seconds() < float64(s.cooldownSec)
+}
+
+func (s *Strategy) isDailyLimitReached() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	today := time.Now().Format("2006-01-02")
+	if s.lastTradeDate != today {
+		return false
+	}
+	return s.dailyTradeCount >= s.maxDailyTrades
+}

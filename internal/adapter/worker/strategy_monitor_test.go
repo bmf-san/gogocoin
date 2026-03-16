@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/bmf-san/gogocoin/v1/internal/logger"
-	"github.com/bmf-san/gogocoin/v1/internal/usecase/strategy"
+	strategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
 )
 
 // mockStrategyGetter implements StrategyGetter for testing
