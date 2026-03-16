@@ -15,6 +15,13 @@ type MarketSpecService interface {
 	GetMinimumOrderSize(symbol string) (float64, error)
 }
 
+// symbolEMAState tracks per-symbol EMA crossover direction for confirmation logic.
+type symbolEMAState struct {
+	mu               sync.Mutex
+	prevFastAboveSlow bool
+	initialized      bool
+}
+
 // ScalpingStrategy is a minimal stateless scalping strategy
 // - Uses only EMA-based signals (no internal position state)
 // - Supports 200-300 JPY minimum capital
@@ -33,6 +40,14 @@ type ScalpingStrategy struct {
 	minNotional    float64 // Minimum order amount (default: 200 JPY)
 	feeRate        float64 // Transaction fee rate (default: 0.001 = 0.1%)
 
+	// RSI filter configuration
+	rsiPeriod     int     // RSI period (0 = disabled)
+	rsiOverbought float64 // RSI overbought threshold (default: 70)
+	rsiOversold   float64 // RSI oversold threshold (default: 30)
+
+	// Per-symbol parameter overrides
+	symbolParams map[string]ScalpingSymbolOverride
+
 	// Services
 	marketSpecSvc MarketSpecService // Optional market specification service
 
@@ -41,6 +56,9 @@ type ScalpingStrategy struct {
 	dailyTradeCount int
 	lastTradeDate   string
 	mu              sync.RWMutex // Protects internal state
+
+	// Per-symbol EMA crossover state for confirmation logic
+	symbolEMAStates sync.Map // map[string]*symbolEMAState
 }
 
 // NewScalping creates a new minimal stateless scalping strategy
@@ -50,6 +68,16 @@ func NewScalping(cfg ScalpingParams) *ScalpingStrategy {
 		"Minimal stateless scalping strategy using EMA crossover",
 		"2.0.0",
 	)
+
+	// RSI defaults when not configured
+	rsiOverbought := cfg.RSIOverbought
+	if rsiOverbought == 0 {
+		rsiOverbought = 70.0
+	}
+	rsiOversold := cfg.RSIOversold
+	if rsiOversold == 0 {
+		rsiOversold = 30.0
+	}
 
 	return &ScalpingStrategy{
 		BaseStrategy:    base,
@@ -61,6 +89,10 @@ func NewScalping(cfg ScalpingParams) *ScalpingStrategy {
 		maxDailyTrades:  cfg.MaxDailyTrades,
 		minNotional:     cfg.MinNotional,
 		feeRate:         cfg.FeeRate,
+		rsiPeriod:       cfg.RSIPeriod,
+		rsiOverbought:   rsiOverbought,
+		rsiOversold:     rsiOversold,
+		symbolParams:    cfg.SymbolParams,
 		lastTradeTime:   time.Time{},
 		dailyTradeCount: 0,
 		lastTradeDate:   "",
@@ -96,6 +128,15 @@ func (s *ScalpingStrategy) Initialize(config map[string]interface{}) error {
 	}
 	if feeRate, ok := config["fee_rate"].(float64); ok {
 		s.feeRate = feeRate
+	}
+	if rsiPeriod, ok := config["rsi_period"].(int); ok {
+		s.rsiPeriod = rsiPeriod
+	}
+	if rsiOB, ok := config["rsi_overbought"].(float64); ok {
+		s.rsiOverbought = rsiOB
+	}
+	if rsiOS, ok := config["rsi_oversold"].(float64); ok {
+		s.rsiOversold = rsiOS
 	}
 
 	return s.ValidateConfig()
@@ -138,24 +179,26 @@ func (s *ScalpingStrategy) ValidateConfig() error {
 	return nil
 }
 
-// GenerateSignal generates a trading signal (stateless pure function)
-// Input: current price, fast EMA, slow EMA
+// GenerateSignal generates a trading signal with RSI filter and EMA crossover confirmation.
 // Output: BUY/SELL/HOLD signal
 func (s *ScalpingStrategy) GenerateSignal(ctx context.Context, data *MarketData, history []MarketData) (*Signal, error) {
 	if data == nil {
 		return nil, fmt.Errorf("market data is nil")
 	}
 
+	// Resolve symbol-specific EMA periods
+	fastPeriod, slowPeriod := s.getSymbolEMAPeriods(data.Symbol)
+
 	// Check if we have enough history for EMA calculation
-	if len(history) < s.emaSlowPeriod {
+	if len(history) < slowPeriod {
 		return s.CreateSignal(data.Symbol, SignalHold, 0.0, data.Price, 0.0, map[string]interface{}{
 			"reason": "insufficient_history",
 		}), nil
 	}
 
 	// Calculate EMAs
-	emaFast := s.calculateEMA(history, s.emaFastPeriod)
-	emaSlow := s.calculateEMA(history, s.emaSlowPeriod)
+	emaFast := s.calculateEMA(history, fastPeriod)
+	emaSlow := s.calculateEMA(history, slowPeriod)
 
 	// Check cooldown
 	if s.isInCooldown() {
@@ -175,16 +218,58 @@ func (s *ScalpingStrategy) GenerateSignal(ctx context.Context, data *MarketData,
 		}), nil
 	}
 
-	// Stateless signal generation
+	// ── EMA crossover confirmation (#4) ──────────────────────────────────────
+	// Only generate BUY/SELL on the tick where EMA direction actually changes.
+	// This eliminates repeated signals during a sustained trend.
+	currentFastAbove := emaFast > emaSlow
+	stateVal, _ := s.symbolEMAStates.LoadOrStore(data.Symbol, &symbolEMAState{})
+	st := stateVal.(*symbolEMAState)
+	st.mu.Lock()
+	crossoverConfirmed := !st.initialized || (currentFastAbove != st.prevFastAboveSlow)
+	st.prevFastAboveSlow = currentFastAbove
+	st.initialized = true
+	st.mu.Unlock()
+
+	// Base signal from EMA crossover
 	signal := s.generateStatelessSignal(data.Price, emaFast, emaSlow)
 
-	// Calculate quantity based on minimum notional
-	quantity := s.calculateQuantity(data.Symbol, data.Price)
+	if signal != SignalHold && !crossoverConfirmed {
+		return s.CreateSignal(data.Symbol, SignalHold, 0.0, data.Price, 0.0, map[string]interface{}{
+			"reason":   "no_new_crossover",
+			"ema_fast": emaFast,
+			"ema_slow": emaSlow,
+		}), nil
+	}
+
+	// ── RSI filter (#3) ──────────────────────────────────────────────────────
+	// Skip trades in overbought (for BUY) or oversold (for SELL) conditions.
+	if signal != SignalHold && s.rsiPeriod > 0 {
+		rsi := s.calculateRSI(history, s.rsiPeriod)
+		if signal == SignalBuy && rsi > s.rsiOverbought {
+			return s.CreateSignal(data.Symbol, SignalHold, 0.0, data.Price, 0.0, map[string]interface{}{
+				"reason":   "rsi_overbought",
+				"rsi":      rsi,
+				"ema_fast": emaFast,
+				"ema_slow": emaSlow,
+			}), nil
+		}
+		if signal == SignalSell && rsi < s.rsiOversold {
+			return s.CreateSignal(data.Symbol, SignalHold, 0.0, data.Price, 0.0, map[string]interface{}{
+				"reason":   "rsi_oversold",
+				"rsi":      rsi,
+				"ema_fast": emaFast,
+				"ema_slow": emaSlow,
+			}), nil
+		}
+	}
+
+	// Calculate quantity using symbol-specific min_notional
+	quantity := s.calculateQuantityForSymbol(data.Symbol, data.Price)
 
 	return s.CreateSignal(
 		data.Symbol,
 		signal,
-		1.0, // Full strength for simplicity
+		1.0,
 		data.Price,
 		quantity,
 		map[string]interface{}{
@@ -206,6 +291,81 @@ func (s *ScalpingStrategy) generateStatelessSignal(price, emaFast, emaSlow float
 		return SignalSell
 	}
 	return SignalHold
+}
+
+// calculateRSI calculates the Wilder RSI for the given period.
+// Returns 50.0 (neutral) when there is insufficient history.
+func (s *ScalpingStrategy) calculateRSI(history []MarketData, period int) float64 {
+	if len(history) < period+1 {
+		return 50.0
+	}
+	data := history[len(history)-(period+1):]
+	var gains, losses float64
+	for i := 1; i < len(data); i++ {
+		change := data[i].Price - data[i-1].Price
+		if change > 0 {
+			gains += change
+		} else {
+			losses -= change
+		}
+	}
+	avgGain := gains / float64(period)
+	avgLoss := losses / float64(period)
+	if avgLoss == 0 {
+		return 100.0
+	}
+	rs := avgGain / avgLoss
+	return 100.0 - (100.0 / (1.0 + rs))
+}
+
+// getSymbolEMAPeriods returns the EMA periods for a given symbol,
+// falling back to the global defaults when no override is configured.
+func (s *ScalpingStrategy) getSymbolEMAPeriods(symbol string) (fast, slow int) {
+	if s.symbolParams != nil {
+		if ov, ok := s.symbolParams[symbol]; ok {
+			if ov.EMAFastPeriod > 0 {
+				fast = ov.EMAFastPeriod
+			}
+			if ov.EMASlowPeriod > 0 {
+				slow = ov.EMASlowPeriod
+			}
+		}
+	}
+	if fast == 0 {
+		fast = s.emaFastPeriod
+	}
+	if slow == 0 {
+		slow = s.emaSlowPeriod
+	}
+	return fast, slow
+}
+
+// getSymbolMinNotional returns the min_notional for a given symbol.
+func (s *ScalpingStrategy) getSymbolMinNotional(symbol string) float64 {
+	if s.symbolParams != nil {
+		if ov, ok := s.symbolParams[symbol]; ok && ov.MinNotional > 0 {
+			return ov.MinNotional
+		}
+	}
+	return s.minNotional
+}
+
+// calculateQuantityForSymbol calculates order quantity using symbol-specific min_notional.
+func (s *ScalpingStrategy) calculateQuantityForSymbol(symbol string, price float64) float64 {
+	if price <= 0 {
+		return 0.0
+	}
+	notional := s.getSymbolMinNotional(symbol)
+	quantity := notional / price
+	quantity = math.Ceil(quantity*100000000) / 100000000
+	minOrderSize := s.getMinimumOrderSize(symbol)
+	if quantity < minOrderSize {
+		quantity = minOrderSize
+	}
+	if quantity*price < notional {
+		quantity += 1.0 / 100000000
+	}
+	return quantity
 }
 
 // calculateEMA calculates exponential moving average
@@ -404,6 +564,11 @@ func (s *ScalpingStrategy) Reset() error {
 	s.lastTradeTime = time.Time{}
 	s.dailyTradeCount = 0
 	s.lastTradeDate = ""
+	// Clear per-symbol EMA confirmation state
+	s.symbolEMAStates.Range(func(k, _ interface{}) bool {
+		s.symbolEMAStates.Delete(k)
+		return true
+	})
 	return s.BaseStrategy.Reset()
 }
 
@@ -418,5 +583,9 @@ func (s *ScalpingStrategy) GetConfig() map[string]interface{} {
 		"max_daily_trades": s.maxDailyTrades,
 		"min_notional":     s.minNotional,
 		"fee_rate":         s.feeRate,
+		"rsi_period":       s.rsiPeriod,
+		"rsi_overbought":   s.rsiOverbought,
+		"rsi_oversold":     s.rsiOversold,
+		"symbol_params":    s.symbolParams,
 	}
 }

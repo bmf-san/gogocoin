@@ -245,6 +245,19 @@ func buildStrategy(cfg *config.Config) (strategy.Strategy, error) {
 	// but different Go types; convert explicitly so the factory type assertion succeeds.
 	if cfg.Trading.Strategy.Name == "scalping" {
 		if cp, ok := params.(config.ScalpingParams); ok {
+			// Build per-symbol overrides
+			var symParams map[string]strategy.ScalpingSymbolOverride
+			if len(cp.SymbolParams) > 0 {
+				symParams = make(map[string]strategy.ScalpingSymbolOverride, len(cp.SymbolParams))
+				for sym, ov := range cp.SymbolParams {
+					symParams[sym] = strategy.ScalpingSymbolOverride{
+						EMAFastPeriod: ov.EMAFastPeriod,
+						EMASlowPeriod: ov.EMASlowPeriod,
+						CooldownSec:   ov.CooldownSec,
+						MinNotional:   ov.MinNotional,
+					}
+				}
+			}
 			params = strategy.ScalpingParams{
 				EMAFastPeriod:  cp.EMAFastPeriod,
 				EMASlowPeriod:  cp.EMASlowPeriod,
@@ -254,6 +267,10 @@ func buildStrategy(cfg *config.Config) (strategy.Strategy, error) {
 				MaxDailyTrades: cp.MaxDailyTrades,
 				MinNotional:    cp.MinNotional,
 				FeeRate:        cp.FeeRate,
+				RSIPeriod:      cp.RSIPeriod,
+				RSIOverbought:  cp.RSIOverbought,
+				RSIOversold:    cp.RSIOversold,
+				SymbolParams:   symParams,
 			}
 		}
 	}
