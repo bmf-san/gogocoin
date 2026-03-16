@@ -3,7 +3,7 @@ package persistence
 import (
 	"time"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/domain"
 )
 
 // PerformanceRepository implements domain.PerformanceRepository over *DB.

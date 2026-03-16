@@ -3,7 +3,7 @@ package logger
 import (
 	"testing"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/domain"
 )
 
 // mockLogRepository is a test double for domain.LogRepository that counts SaveLog calls.

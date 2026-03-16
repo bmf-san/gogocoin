@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
-	"github.com/bmf-san/gogocoin/v1/internal/infra/exchange/bitflyer"
-	"github.com/bmf-san/gogocoin/v1/internal/logger"
-	"github.com/bmf-san/gogocoin/v1/internal/usecase/trading/balance"
-	"github.com/bmf-san/gogocoin/v1/internal/usecase/trading/monitor"
-	"github.com/bmf-san/gogocoin/v1/internal/usecase/trading/order"
-	"github.com/bmf-san/gogocoin/v1/internal/usecase/trading/pnl"
-	"github.com/bmf-san/gogocoin/v1/internal/usecase/trading/validator"
+	"github.com/bmf-san/gogocoin/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/infra/exchange/bitflyer"
+	"github.com/bmf-san/gogocoin/internal/logger"
+	"github.com/bmf-san/gogocoin/internal/usecase/trading/balance"
+	"github.com/bmf-san/gogocoin/internal/usecase/trading/monitor"
+	"github.com/bmf-san/gogocoin/internal/usecase/trading/order"
+	"github.com/bmf-san/gogocoin/internal/usecase/trading/pnl"
+	"github.com/bmf-san/gogocoin/internal/usecase/trading/validator"
 )
 
 // Trader is the complete trader interface used by consumers of this package.

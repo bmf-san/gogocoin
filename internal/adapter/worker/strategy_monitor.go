@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/bmf-san/gogocoin/v1/internal/logger"
-	strategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
+	"github.com/bmf-san/gogocoin/internal/logger"
+	strategy "github.com/bmf-san/gogocoin/pkg/strategy"
 )
 
 // StrategyMonitorWorker monitors strategy health

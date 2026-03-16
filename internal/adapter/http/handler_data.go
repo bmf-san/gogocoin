@@ -10,8 +10,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/bmf-san/gogocoin/v1/internal/config"
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/config"
+	"github.com/bmf-san/gogocoin/internal/domain"
 )
 
 // customConfigResponse returns the full application config as JSON,

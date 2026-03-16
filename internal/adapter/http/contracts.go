@@ -3,8 +3,8 @@ package api
 import (
 	"context"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
-	strategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
+	"github.com/bmf-san/gogocoin/internal/domain"
+	strategy "github.com/bmf-san/gogocoin/pkg/strategy"
 )
 
 // DatabaseService defines the database operations needed by the API server.

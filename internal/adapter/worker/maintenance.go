@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
-	"github.com/bmf-san/gogocoin/v1/internal/logger"
+	"github.com/bmf-san/gogocoin/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/logger"
 )
 
 const maintenanceLastCleanupKey = "maintenance_last_cleanup_date"

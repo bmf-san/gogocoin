@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	strategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
+	strategy "github.com/bmf-san/gogocoin/pkg/strategy"
 )
 
 // MarketSpecService is an optional hook for exchange-provided minimum order sizes.

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/domain"
 )
 
 // MarketDataRepository implements domain.MarketDataRepository over *DB.

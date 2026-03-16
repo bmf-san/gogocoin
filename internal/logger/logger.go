@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/domain"
 )
 
 // LogEntry is removed - use domain.LogEntry instead
