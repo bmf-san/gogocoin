@@ -3,8 +3,8 @@ package validator
 import (
 	"testing"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
-	"github.com/bmf-san/gogocoin/v1/internal/logger"
+	"github.com/bmf-san/gogocoin/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/logger"
 )
 
 func TestValidateOrder(t *testing.T) {

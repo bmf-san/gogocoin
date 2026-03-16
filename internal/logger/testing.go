@@ -4,7 +4,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/domain"
 )
 
 // NopLogger is a no-op logger for use in unit tests.

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/bmf-san/go-bitflyer-api-client/client/http"
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
-	"github.com/bmf-san/gogocoin/v1/internal/infra/exchange/bitflyer"
-	"github.com/bmf-san/gogocoin/v1/internal/logger"
+	"github.com/bmf-san/gogocoin/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/infra/exchange/bitflyer"
+	"github.com/bmf-san/gogocoin/internal/logger"
 )
 
 const (

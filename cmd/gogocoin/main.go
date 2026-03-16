@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/bmf-san/gogocoin/v1/pkg/engine"
-	pkgstrategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
-	pkgscalping "github.com/bmf-san/gogocoin/v1/pkg/strategy/scalping"
+	"github.com/bmf-san/gogocoin/pkg/engine"
+	pkgstrategy "github.com/bmf-san/gogocoin/pkg/strategy"
+	pkgscalping "github.com/bmf-san/gogocoin/pkg/strategy/scalping"
 )
 
 func main() {

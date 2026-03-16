@@ -3,9 +3,9 @@ package pnl
 import (
 	"fmt"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
-	"github.com/bmf-san/gogocoin/v1/internal/infra/persistence"
-	"github.com/bmf-san/gogocoin/v1/internal/logger"
+	"github.com/bmf-san/gogocoin/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/infra/persistence"
+	"github.com/bmf-san/gogocoin/internal/logger"
 )
 
 const (

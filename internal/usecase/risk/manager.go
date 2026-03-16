@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
-	"github.com/bmf-san/gogocoin/v1/internal/logger"
-	"github.com/bmf-san/gogocoin/v1/internal/usecase/trading"
-	"github.com/bmf-san/gogocoin/v1/internal/utils"
-	strategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
+	"github.com/bmf-san/gogocoin/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/logger"
+	"github.com/bmf-san/gogocoin/internal/usecase/trading"
+	"github.com/bmf-san/gogocoin/internal/utils"
+	strategy "github.com/bmf-san/gogocoin/pkg/strategy"
 )
 
 // RiskManager defines the interface for risk management operations

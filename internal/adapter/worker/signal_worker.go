@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
-	"github.com/bmf-san/gogocoin/v1/internal/logger"
-	strategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
+	"github.com/bmf-san/gogocoin/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/logger"
+	strategy "github.com/bmf-san/gogocoin/pkg/strategy"
 )
 
 // SignalWorker processes trading signals and executes trades

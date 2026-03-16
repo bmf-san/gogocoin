@@ -1,4 +1,4 @@
-module github.com/bmf-san/gogocoin/v1
+module github.com/bmf-san/gogocoin
 
 go 1.25.0
 

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bmf-san/gogocoin/v1/internal/logger"
+	"github.com/bmf-san/gogocoin/internal/logger"
 )
 
 // WorkerManager manages the lifecycle of multiple workers

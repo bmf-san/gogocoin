@@ -1,7 +1,7 @@
 package persistence
 
 import (
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/domain"
 )
 
 // Repository is a composite struct that aggregates all individual repositories

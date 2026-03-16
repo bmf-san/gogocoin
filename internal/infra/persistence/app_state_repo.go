@@ -3,7 +3,7 @@ package persistence
 import (
 	"database/sql"
 
-	"github.com/bmf-san/gogocoin/v1/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/domain"
 )
 
 // AppStateRepository implements domain.AppStateRepository over *DB.

@@ -1,7 +1,7 @@
 package engine
 
 import (
-	pkgstrategy "github.com/bmf-san/gogocoin/v1/pkg/strategy"
+	pkgstrategy "github.com/bmf-san/gogocoin/pkg/strategy"
 )
 
 // Option is a functional option for engine configuration.
