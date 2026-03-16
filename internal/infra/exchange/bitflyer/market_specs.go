@@ -160,6 +160,20 @@ func (s *MarketSpecificationService) getHardcodedSpec(productCode string) *Marke
 			PriceMin:    0.0,
 			PriceMax:    1000.0,
 		},
+		"XLM_JPY": {
+			ProductCode: "XLM_JPY",
+			SizeMin:     10.0,
+			SizeMax:     10000000.0,
+			PriceMin:    0.0,
+			PriceMax:    100.0,
+		},
+		"MONA_JPY": {
+			ProductCode: "MONA_JPY",
+			SizeMin:     1.0,
+			SizeMax:     1000000.0,
+			PriceMin:    0.0,
+			PriceMax:    10000.0,
+		},
 		"BTC_USD": {
 			ProductCode: "BTC_USD",
 			SizeMin:     0.001,
@@ -182,7 +196,7 @@ func (s *MarketSpecificationService) getHardcodedSpec(productCode string) *Marke
 // populateFallbackSpecs populates cache with fallback specifications
 // when API is unavailable
 func (s *MarketSpecificationService) populateFallbackSpecs() {
-	fallbackSymbols := []string{"BTC_JPY", "ETH_JPY", "XRP_JPY", "BTC_USD", "BTC_EUR"}
+	fallbackSymbols := []string{"BTC_JPY", "ETH_JPY", "XRP_JPY", "XLM_JPY", "MONA_JPY", "BTC_USD", "BTC_EUR"}
 	for _, symbol := range fallbackSymbols {
 		if spec := s.getHardcodedSpec(symbol); spec != nil {
 			spec.FetchedAt = time.Now()

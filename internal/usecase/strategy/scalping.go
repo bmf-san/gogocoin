@@ -298,6 +298,8 @@ func getMinimumOrderSizeFallback(symbol string) float64 {
 		return 10.0 // 10 XLM
 	case "MONA_JPY":
 		return 1.0 // 1 MONA
+	case "ELF_JPY":
+		return 1.0 // 1 ELF
 	case "BCH_JPY":
 		return 0.01 // 0.01 BCH
 	default:
