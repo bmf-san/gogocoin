@@ -1,12 +1,5 @@
 # gogocoin Architecture Design Doc
 
-> **ドキュメントのスコープ — ターゲット設計**: このドキュメントはリファクタリング後の**目標アーキテクチャ**を記述する。
-> 現在のコードベースは以下のとおり構造が異なる:
-> - Composition Root は `internal/app/` にある（目標: `cmd/gogocoin/bootstrap.go` + `trading_ctrl.go`）
-> - パッケージ構成は `internal/database/`・`internal/api/`・`internal/worker/`・`internal/trading/` 等のフラット配置
->   （目標の `infra/persistence/`・`adapter/http/`・`adapter/worker/`・`usecase/trading/` 構造への移行が必要）
-> - `domain/errors.go` は現在 `*Error` 構造体ベースのエラー型を使用（目標の sentinel-only パターンへの移行が必要）
-
 ## 1. アーキテクチャ概要
 
 ### 1.1 C4 Context — システム全体像

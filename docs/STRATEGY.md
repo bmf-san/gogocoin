@@ -37,6 +37,23 @@ EMAベースのステートレス・スキャルピング戦略です。
 | 売り（SELL） | 短期EMA < 中期EMA かつ 現在価格 < 短期EMA |
 | 待機（HOLD） | 上記以外、またはクールダウン中、または日次制限到達時 |
 
+### RSI フィルタ（オプション）
+
+`rsi_period` を 0 以外に設定すると RSI フィルタが有効になります。上記 EMA 条件に加え、以下の条件も満たす場合のみシグナルが発行されます:
+
+| シグナル | RSI 条件 |
+|---|---|
+| BUY | RSI < `rsi_overbought`（買われ過ぎでない） |
+| SELL | RSI > `rsi_oversold`（売られ過ぎでない） |
+
+```yaml
+strategy_params:
+  scalping:
+    rsi_period: 14        # 0 = RSI フィルタ無効（デフォルト）
+    rsi_overbought: 70    # 買われ過ぎしきい値
+    rsi_oversold: 30      # 売られ過ぎしきい値
+```
+
 ---
 
 ## 推奨設定
