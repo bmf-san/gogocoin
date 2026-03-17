@@ -45,6 +45,14 @@ strategy_params:
     max_daily_trades: 3       # Max 3 trades per day (conservative)
     min_notional: 200         # Minimum 200 JPY per trade
     fee_rate: 0.001           # 0.1% trading fee
+    # RSI filter (optional; 0 = disabled)
+    rsi_period: 0             # Set to e.g. 14 to enable RSI filter
+    rsi_overbought: 70        # Suppress BUY when RSI >= this value
+    rsi_oversold: 30          # Suppress SELL when RSI <= this value
+    # Per-symbol overrides (optional; omit to use global defaults)
+    # symbol_params:
+    #   XLM_JPY:
+    #     min_notional: 280
 
 data:
   market_data:
