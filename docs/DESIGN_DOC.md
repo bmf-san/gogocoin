@@ -399,6 +399,177 @@ type AnalyticsRepository interface {
     GetPerformanceMetrics(days int) ([]domain.PerformanceMetric, error)
 }
 
+---
+
+## 5. プラガブル戦略アーキテクチャ（`pkg/`）
+
+gogocoin はリポジトリ利用者が独自の取引戦略を差し込めるよう、**`pkg/`** 以下に公開 API を提供する。
+`internal/` は外部からインポート不可だが、`pkg/` はセマンティックバージョニング対象の安定 API として扱う。
+
+```
+pkg/
+├── engine/
+│   ├── engine.go   # Run() / RunWithLogger()
+│   └── options.go  # WithStrategy() / WithConfigPath()
+└── strategy/
+    ├── strategy.go     # Strategy インターフェース
+    ├── signal.go       # Signal 型（BUY / SELL / HOLD）
+    ├── market_data.go  # MarketData 型
+    ├── metrics.go      # StrategyMetrics / StrategyStatus 型
+    ├── base.go         # BaseStrategy（共通フィールド・デフォルト実装）
+    ├── registry.go     # Registry（ctor 登録・取得）
+    └── scalping/       # 同梱デフォルト戦略
+```
+
+### 5.1 `pkg/strategy.Strategy` インターフェース
+
+```go
+type Strategy interface {
+    // シグナル生成
+    GenerateSignal(ctx context.Context, data *MarketData, history []MarketData) (*Signal, error)
+    Analyze(data []MarketData) (*Signal, error)
+
+    // ライフサイクル
+    Start(ctx context.Context) error
+    Stop(ctx context.Context) error
+    IsRunning() bool
+    GetStatus() StrategyStatus
+    Reset() error
+
+    // メトリクス・取引カウント
+    GetMetrics() StrategyMetrics
+    RecordTrade()
+    InitializeDailyTradeCount(count int)
+
+    // 設定
+    Name() string
+    Description() string
+    Version() string
+    Initialize(config map[string]interface{}) error   // config.yaml の strategy_params.<name> ブロックを受け取る
+    UpdateConfig(config map[string]interface{}) error
+    GetConfig() map[string]interface{}
+}
+```
+
+### 5.2 カスタム戦略の実装手順
+
+**1. 別リポジトリを作成し、gogocoin を `go.mod` に追加する**
+
+```bash
+go get github.com/bmf-san/gogocoin@latest
+```
+
+**2. `pkg/strategy.BaseStrategy` を埋め込んで戦略を実装する**
+
+`BaseStrategy` はライフサイクル（Start/Stop/IsRunning/GetStatus/Reset）・カウント
+（RecordTrade/InitializeDailyTradeCount）・メトリクスのデフォルト実装を提供する。
+
+```go
+package mystrategy
+
+import (
+    "context"
+
+    "github.com/bmf-san/gogocoin/pkg/strategy"
+)
+
+type MyStrategy struct {
+    strategy.BaseStrategy
+    // 戦略固有フィールド
+}
+
+func New() strategy.Strategy { return &MyStrategy{} }
+
+func (s *MyStrategy) Name() string        { return "mystrategy" }
+func (s *MyStrategy) Description() string { return "My custom strategy" }
+func (s *MyStrategy) Version() string     { return "0.1.0" }
+
+func (s *MyStrategy) Initialize(cfg map[string]interface{}) error {
+    // config.yaml の strategy_params.mystrategy ブロックを受け取る
+    return nil
+}
+
+func (s *MyStrategy) UpdateConfig(cfg map[string]interface{}) error { return s.Initialize(cfg) }
+func (s *MyStrategy) GetConfig() map[string]interface{}             { return nil }
+
+func (s *MyStrategy) GenerateSignal(
+    ctx context.Context,
+    data *strategy.MarketData,
+    history []strategy.MarketData,
+) (*strategy.Signal, error) {
+    // シグナルロジック
+    return &strategy.Signal{Action: strategy.Hold}, nil
+}
+
+func (s *MyStrategy) Analyze(data []strategy.MarketData) (*strategy.Signal, error) {
+    return &strategy.Signal{Action: strategy.Hold}, nil
+}
+```
+
+**3. `engine.Run()` でエントリポイントを実装する**
+
+```go
+package main
+
+import (
+    "context"
+    "os"
+    "os/signal"
+    "syscall"
+
+    "github.com/bmf-san/gogocoin/pkg/engine"
+    pkgstrategy "github.com/bmf-san/gogocoin/pkg/strategy"
+    "example.com/myrepo/mystrategy"
+)
+
+func main() {
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    if err := engine.Run(ctx,
+        engine.WithStrategy("mystrategy", func() pkgstrategy.Strategy { return mystrategy.New() }),
+        engine.WithConfigPath("./configs/config.yaml"),
+    ); err != nil {
+        os.Exit(1)
+    }
+}
+```
+
+**4. `config.yaml` で戦略名を指定する**
+
+```yaml
+trading:
+  strategy:
+    name: "mystrategy"   # WithStrategy() の第1引数と一致させる
+
+strategy_params:
+  mystrategy:            # Initialize() に渡される map のキー
+    my_param: 42
+```
+
+### 5.3 `pkg/engine.Run()` の内部フロー
+
+```
+engine.Run(ctx, opts...)
+  └─ config.Load()                    # configPath を読み込む
+  └─ logger.New()                     # 構造化ロガーを初期化
+  └─ run(ctx, cfg, log, ec)
+       ├─ persistence.NewDB()         # SQLite 接続・マイグレーション
+       ├─ bitflyer.NewClient()        # bitFlyer API クライアント
+       ├─ registry.Get(cfg.trading.strategy.name)
+       │    └─ Constructor()          # WithStrategy() で登録した ctor を呼ぶ
+       ├─ strategy.Initialize(strategyParams)
+       ├─ WorkerManager.Start()       # MarketDataWorker / StrategyWorker 等を起動
+       ├─ HTTPServer.Start()          # REST API + Web UI
+       └─ <ctx.Done()> → graceful shutdown
+```
+
+### 5.4 同梱戦略: `pkg/strategy/scalping`
+
+EMAクロスオーバー + RSI フィルタによるスキャルピング戦略。
+`engine.WithStrategy("scalping", scalping.NewDefault)` で登録する。
+詳細パラメータは [docs/STRATEGY.md](STRATEGY.md) を参照。
+
 type Manager struct {
     cfg             ManagerConfig
     balanceProvider balanceProvider
