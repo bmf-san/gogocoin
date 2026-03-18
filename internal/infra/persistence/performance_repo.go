@@ -17,12 +17,14 @@ func NewPerformanceRepository(db *DB) *PerformanceRepository {
 // Compile-time check.
 var _ domain.PerformanceRepository = (*PerformanceRepository)(nil)
 
-// SavePerformanceMetric inserts a performance metric record.
+// SavePerformanceMetric upserts a performance metric record (one row per calendar day).
+// INSERT OR REPLACE relies on the unique index idx_perf_date_day on date(date)
+// added by migration 004_performance_upsert.sql.
 func (r *PerformanceRepository) SavePerformanceMetric(metric *domain.PerformanceMetric) error {
 	if metric.Date.IsZero() {
 		metric.Date = time.Now()
 	}
-	query := `INSERT INTO performance_metrics (date, total_return, daily_return, win_rate,
+	query := `INSERT OR REPLACE INTO performance_metrics (date, total_return, daily_return, win_rate,
 			  max_drawdown, sharpe_ratio, profit_factor, total_trades, winning_trades,
 			  losing_trades, average_win, average_loss, largest_win, largest_loss,
 			  consecutive_wins, consecutive_loss, total_pnl)
