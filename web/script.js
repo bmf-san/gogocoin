@@ -47,19 +47,12 @@ class GogocoinUI {
         document.querySelectorAll('.sidebar-link[data-target]').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                // Update active state
-                document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-                link.classList.add('active');
-                // Close sidebar on mobile
-                const toggle = document.getElementById('sidebar-toggle');
-                if (toggle) toggle.checked = false;
-                // Scroll to section
                 const target = document.getElementById(link.dataset.target);
                 if (target) {
-                    const scrollEl = document.querySelector('.dashboard-main') || document.documentElement;
-                    const offset = target.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop;
-                    scrollEl.scrollTo({ top: offset, behavior: 'smooth' });
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
+                document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
             });
         });
 
