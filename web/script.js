@@ -109,7 +109,7 @@ class GogocoinUI {
                 this.fetchAPI(`/api/status?symbol=${this.selectedSymbol}`),
                 this.fetchAPI('/api/balance'),
                 this.fetchAPI('/api/performance'),
-                this.fetchAPI('/api/trades?limit=50')
+                this.fetchAPI('/api/trades?limit=200')
             ]);
 
             const [statusResult, balanceResult, performanceResult, tradesResult] = results;
@@ -321,15 +321,13 @@ class GogocoinUI {
 
         // Calculate today's PnL from actual trade records (JST date match)
         if (todayPnlEl) {
-            const jstOffset = 9 * 60;
-            const now = new Date(Date.now() + (jstOffset + new Date().getTimezoneOffset()) * 60000);
-            const today = now.toISOString().split('T')[0];
+            const jstOffsetMs = 9 * 60 * 60 * 1000;
+            const today = new Date(Date.now() + jstOffsetMs).toISOString().split('T')[0];
             let todayPnL = 0;
             let hasTodayTrades = false;
             (trades || []).forEach(t => {
                 if (!t.executed_at) return;
-                const d = new Date(t.executed_at);
-                const jstDate = new Date(d.getTime() + (jstOffset + d.getTimezoneOffset()) * 60000)
+                const jstDate = new Date(new Date(t.executed_at).getTime() + jstOffsetMs)
                     .toISOString().split('T')[0];
                 if (jstDate === today && t.pnl !== undefined && t.pnl !== null) {
                     todayPnL += t.pnl;
