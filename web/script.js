@@ -584,18 +584,6 @@ class GogocoinUI {
         });
     }
 
-    // Format short datetime (MM/DD HH:mm) for compact table display
-    formatShortDateTime(dateString) {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        return date.toLocaleString('ja-JP', {
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-
     // Format date用のヘルパーメソッド
     formatDate(dateString) {
         if (!dateString) return '-';
