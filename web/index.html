@@ -20,26 +20,25 @@
         </a>
 
         <nav class="sidebar-nav">
-          <span class="sidebar-section-label">メイン</span>
-          <a href="#" class="sidebar-link active">
+          <a href="#" class="sidebar-link active" data-target="section-overview">
             <svg class="sidebar-link-icon" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10 2L2 9h2v9h4v-5h4v5h4V9h2L10 2z" />
             </svg>
             ダッシュボード
           </a>
-          <a href="#" class="sidebar-link">
+          <a href="#" class="sidebar-link" data-target="section-performance">
             <svg class="sidebar-link-icon" viewBox="0 0 20 20" fill="currentColor">
               <path d="M2 17V9h4v8H2zM8 17V5h4v12H8zM14 17v-6h4v6h-4z" />
             </svg>
             パフォーマンス
           </a>
-          <a href="#" class="sidebar-link">
+          <a href="#" class="sidebar-link" data-target="section-trades">
             <svg class="sidebar-link-icon" viewBox="0 0 20 20" fill="currentColor">
               <path d="M5 3h10v2H5zM3 7h14v2H3zM1 11h18v8H1z" />
             </svg>
             取引履歴
           </a>
-          <a href="#" class="sidebar-link">
+          <a href="#" class="sidebar-link" data-target="section-logs">
             <svg class="sidebar-link-icon" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M10 2a8 8 0 100 16A8 8 0 0010 2zM9 5h2v2H9zM9 8h2v6H9z" />
             </svg>
@@ -83,7 +82,7 @@
           </div>
 
           <!-- ── Stat Cards ── -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div id="section-overview" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <!-- 総損益 -->
             <div class="card stat-card">
               <div class="card-body p-4">
@@ -143,7 +142,7 @@
           <!-- /stat cards -->
 
           <!-- ── Middle: 取引履歴 + システム状態 ── -->
-          <div class="grid md:grid-cols-3 gap-4 mb-6">
+          <div id="section-trades" class="grid md:grid-cols-3 gap-4 mb-6">
             <!-- 取引履歴 (2/3) -->
             <div class="card md:col-span-2 flex flex-col">
               <div class="card-header">
@@ -202,7 +201,7 @@
           </div>
 
           <!-- ── Bottom: 残高 + 日別損益 ── -->
-          <div class="grid md:grid-cols-2 gap-4 mb-6">
+          <div id="section-performance" class="grid md:grid-cols-2 gap-4 mb-6">
             <!-- 残高 -->
             <div class="card flex flex-col">
               <div class="card-header">
@@ -248,7 +247,7 @@
           </div>
 
           <!-- ── Logs ── -->
-          <div class="card">
+          <div id="section-logs" class="card">
             <div class="card-header">
               <div class="flex items-center justify-between flex-wrap gap-2">
                 <h2 class="text-base font-semibold">システムログ</h2>
