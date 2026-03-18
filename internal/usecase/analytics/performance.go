@@ -30,6 +30,7 @@ var _ PerformanceAnalyticsService = (*PerformanceAnalytics)(nil)
 // TradingRepository defines database operations for trades
 type TradingRepository interface {
 	GetRecentTrades(limit int) ([]domain.Trade, error)
+	GetAllTrades() ([]domain.Trade, error)
 }
 
 // AnalyticsRepository defines database operations for metrics
@@ -59,13 +60,13 @@ func (pa *PerformanceAnalytics) UpdateMetrics(ctx context.Context) error {
 		pa.logger.System().Debug("Calculating performance metrics")
 	}
 
-	// Get recent trading data
-	trades, err := pa.tradingRepo.GetRecentTrades(1000) // Maximum 1000 trades
+	// Get all trades for accurate cumulative P&L
+	trades, err := pa.tradingRepo.GetAllTrades()
 	if err != nil {
 		if pa.logger != nil {
-			pa.logger.System().WithError(err).Error("Failed to get recent trades for performance calculation")
+			pa.logger.System().WithError(err).Error("Failed to get all trades for performance calculation")
 		}
-		return fmt.Errorf("failed to get recent trades for performance calculation: %w", err)
+		return fmt.Errorf("failed to get all trades for performance calculation: %w", err)
 	}
 
 	if len(trades) == 0 {

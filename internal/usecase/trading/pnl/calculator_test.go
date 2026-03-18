@@ -46,6 +46,10 @@ func (m *mockTradingRepo) GetRecentTrades(limit int) ([]domain.Trade, error) {
 	return nil, nil
 }
 
+func (m *mockTradingRepo) GetAllTrades() ([]domain.Trade, error) {
+	return nil, nil
+}
+
 func (m *mockTradingRepo) SavePosition(p *domain.Position) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

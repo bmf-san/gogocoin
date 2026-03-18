@@ -21,6 +21,10 @@ func (m *mockTradingRepo) GetRecentTrades(limit int) ([]domain.Trade, error) {
 	return m.trades[:limit], nil
 }
 
+func (m *mockTradingRepo) GetAllTrades() ([]domain.Trade, error) {
+	return m.trades, nil
+}
+
 type mockAnalyticsRepo struct {
 	savedMetrics []*domain.PerformanceMetric
 }
