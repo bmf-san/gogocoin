@@ -40,6 +40,9 @@ func (r *Repository) SaveTrade(trade *domain.Trade) error {
 func (r *Repository) GetRecentTrades(limit int) ([]domain.Trade, error) {
 	return r.trade.GetRecentTrades(limit)
 }
+func (r *Repository) GetAllTrades() ([]domain.Trade, error) {
+	return r.trade.GetAllTrades()
+}
 func (r *Repository) GetTradesCount() (int, error) {
 	return r.trade.GetTradesCount()
 }

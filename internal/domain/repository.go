@@ -4,6 +4,7 @@ package domain
 type TradeRepository interface {
 	SaveTrade(trade *Trade) error
 	GetRecentTrades(limit int) ([]Trade, error)
+	GetAllTrades() ([]Trade, error)
 }
 
 // PositionRepository is the interface for position data persistence

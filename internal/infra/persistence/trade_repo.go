@@ -65,6 +65,29 @@ func (r *TradeRepository) GetRecentTrades(limit int) ([]domain.Trade, error) {
 	return trades, rows.Err()
 }
 
+// GetAllTrades returns all trades ordered by executed_at ASC.
+func (r *TradeRepository) GetAllTrades() ([]domain.Trade, error) {
+	query := `SELECT id, symbol, side, type, size, price, fee, status, order_id,
+			  executed_at, created_at, updated_at, strategy_name, pnl
+			  FROM trades ORDER BY executed_at ASC`
+	rows, err := r.db.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+	var trades []domain.Trade
+	for rows.Next() {
+		var t domain.Trade
+		if err := rows.Scan(&t.ID, &t.Symbol, &t.Side, &t.Type, &t.Size, &t.Price, &t.Fee,
+			&t.Status, &t.OrderID, &t.ExecutedAt, &t.CreatedAt,
+			&t.UpdatedAt, &t.StrategyName, &t.PnL); err != nil {
+			return nil, err
+		}
+		trades = append(trades, t)
+	}
+	return trades, rows.Err()
+}
+
 // GetTradesCount returns the total number of trade records.
 func (r *TradeRepository) GetTradesCount() (int, error) {
 	var count int
