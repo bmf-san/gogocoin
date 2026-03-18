@@ -43,6 +43,19 @@ class GogocoinUI {
             this.loadLogs();
         });
 
+        // Sidebar navigation
+        document.querySelectorAll('.sidebar-link[data-target]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.getElementById(link.dataset.target);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+            });
+        });
+
         // Trading control button event listeners
         const startBtn = document.getElementById('start-trading-btn');
         const stopBtn = document.getElementById('stop-trading-btn');
