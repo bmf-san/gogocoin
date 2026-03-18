@@ -178,14 +178,14 @@ class GogocoinUI {
         const stopBtn = document.getElementById('stop-trading-btn');
 
         if (tradingStatusBadge) {
-            const statusText = tradingStatusBadge.querySelector('p:last-child');
+            const statusText = tradingStatusBadge.querySelector('p.font-semibold');
             if (statusText) {
                 if (status.trading_enabled) {
                     statusText.textContent = '取引中';
-                    tradingStatusBadge.className = 'p-3 glass rounded-lg text-center border-2 border-success bg-success bg-opacity-10 mb-3';
+                    statusText.className = 'text-sm font-semibold leading-tight text-success';
                 } else {
                     statusText.textContent = '停止中';
-                    tradingStatusBadge.className = 'p-3 glass rounded-lg text-center border-2 border-slate-300 mb-3';
+                    statusText.className = 'text-sm font-semibold leading-tight';
                 }
             }
         }
