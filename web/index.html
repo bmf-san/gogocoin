@@ -50,7 +50,7 @@
         <div class="sidebar-footer">
           <div id="trading-status-badge" class="sidebar-user">
             <div class="sidebar-user-avatar">
-              <svg viewBox="0 0 20 20" fill="currentColor" style="width:1rem;height:1rem;">
+              <svg class="icon-sm" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10 2L2 9h2v9h4v-5h4v5h4V9h2L10 2z" />
               </svg>
             </div>
@@ -171,7 +171,7 @@
           <!-- ── Middle: 取引履歴 + システム状態 ── -->
           <div class="grid md:grid-cols-3 gap-4 mb-6">
             <!-- 取引履歴 (2/3) -->
-            <div class="card md:col-span-2 flex flex-col" style="max-height:380px;">
+            <div class="card md:col-span-2 flex flex-col">
               <div class="card-header">
                 <h2 class="text-base font-semibold">取引履歴</h2>
               </div>
@@ -230,7 +230,7 @@
           <!-- ── Bottom: 残高 + 日別損益 ── -->
           <div class="grid md:grid-cols-2 gap-4 mb-6">
             <!-- 残高 -->
-            <div class="card flex flex-col" style="max-height:320px;">
+            <div class="card flex flex-col">
               <div class="card-header">
                 <h2 class="text-base font-semibold">残高</h2>
               </div>
@@ -251,7 +251,7 @@
             </div>
 
             <!-- 日別損益 -->
-            <div class="card flex flex-col" style="max-height:320px;">
+            <div class="card flex flex-col">
               <div class="card-header">
                 <h2 class="text-base font-semibold">日別損益</h2>
               </div>
@@ -298,7 +298,7 @@
                 </div>
               </div>
             </div>
-            <div class="card-body" style="max-height:320px;overflow-y:auto;">
+            <div class="card-body overflow-y-auto">
               <div id="logs-container" class="space-y-1 font-mono text-xs">
                 <div class="text-center text-secondary py-6">読み込み中...</div>
               </div>
