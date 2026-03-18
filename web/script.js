@@ -476,19 +476,45 @@ class GogocoinUI {
             return;
         }
 
-        // Display latest data first (max 10) - API data is already in newest-first order
-        const recentData = performance.slice(0, 10);
+        // Group by JST date, keep latest snapshot per day
+        const jstOffsetMs = 9 * 60 * 60 * 1000;
+        const byDate = {};
+        for (const p of performance) {
+            const jstDate = new Date(new Date(p.date).getTime() + jstOffsetMs).toISOString().split('T')[0];
+            if (!byDate[jstDate] || new Date(p.date) > new Date(byDate[jstDate].date)) {
+                byDate[jstDate] = p;
+            }
+        }
 
-        tbody.innerHTML = recentData.map(p => `
+        // Sort newest-first
+        const sorted = Object.keys(byDate)
+            .sort((a, b) => (a < b ? 1 : -1))
+            .map(d => ({ ...byDate[d], _jstDate: d }));
+
+        // Display up to 10 days, using sorted for delta calculation beyond the cutoff
+        const recentData = sorted.slice(0, 10);
+
+        tbody.innerHTML = recentData.map((p, i) => {
+            const prev = sorted[i + 1]; // older entry for delta
+            const dailyPnL = prev ? p.total_pnl - prev.total_pnl : p.total_pnl;
+            const dailyTrades = prev
+                ? (p.total_trades || 0) - (prev.total_trades || 0)
+                : (p.total_trades || 0);
+            const dailyWinning = prev
+                ? (p.winning_trades || 0) - (prev.winning_trades || 0)
+                : (p.winning_trades || 0);
+            const dailyWinRate = dailyTrades > 0 ? (dailyWinning / dailyTrades) * 100 : 0;
+            return `
             <tr>
-                <td class="text-sm">${this.escapeHtml(this.formatDate(p.date))}</td>
-                <td class="text-right font-semibold ${p.total_pnl >= 0 ? 'text-success' : 'text-danger'}">
-                    ${this.escapeHtml(this.formatCurrency(p.total_pnl))}
+                <td class="text-sm">${this.escapeHtml(p._jstDate)}</td>
+                <td class="text-right font-semibold ${dailyPnL >= 0 ? 'text-success' : 'text-danger'}">
+                    ${this.escapeHtml(this.formatCurrency(dailyPnL))}
                 </td>
-                <td class="text-right">${this.escapeHtml(this.formatPercent(p.win_rate))}</td>
-                <td class="text-right">${this.escapeHtml(String(p.total_trades || 0))}</td>
+                <td class="text-right">${this.escapeHtml(this.formatPercent(dailyWinRate))}</td>
+                <td class="text-right">${this.escapeHtml(String(dailyTrades))}</td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
     }
 
     escapeHtml(text) {
