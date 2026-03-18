@@ -20,25 +20,25 @@
         </a>
 
         <nav class="sidebar-nav">
-          <a href="#" class="sidebar-link active" data-target="section-overview">
+          <a href="#" class="sidebar-link active" data-target="page-dashboard">
             <svg class="sidebar-link-icon" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10 2L2 9h2v9h4v-5h4v5h4V9h2L10 2z" />
             </svg>
             ダッシュボード
           </a>
-          <a href="#" class="sidebar-link" data-target="section-performance">
+          <a href="#" class="sidebar-link" data-target="page-performance">
             <svg class="sidebar-link-icon" viewBox="0 0 20 20" fill="currentColor">
               <path d="M2 17V9h4v8H2zM8 17V5h4v12H8zM14 17v-6h4v6h-4z" />
             </svg>
             パフォーマンス
           </a>
-          <a href="#" class="sidebar-link" data-target="section-trades">
+          <a href="#" class="sidebar-link" data-target="page-trades">
             <svg class="sidebar-link-icon" viewBox="0 0 20 20" fill="currentColor">
               <path d="M5 3h10v2H5zM3 7h14v2H3zM1 11h18v8H1z" />
             </svg>
             取引履歴
           </a>
-          <a href="#" class="sidebar-link" data-target="section-logs">
+          <a href="#" class="sidebar-link" data-target="page-logs">
             <svg class="sidebar-link-icon" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M10 2a8 8 0 100 16A8 8 0 0010 2zM9 5h2v2H9zM9 8h2v6H9z" />
             </svg>
@@ -74,81 +74,156 @@
 
         <!-- Content -->
         <div class="dashboard-content">
-          <!-- Page Header -->
-          <div class="mb-6">
-            <div class="flex items-center justify-between">
-              <h1 class="text-2xl font-bold">Overview</h1>
-            </div>
-          </div>
 
-          <!-- ── Stat Cards ── -->
-          <div id="section-overview" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <!-- 総損益 -->
-            <div class="card stat-card">
-              <div class="card-body p-4">
-                <div class="flex items-center justify-between mb-3">
-                  <span class="text-sm text-secondary">総損益</span>
-                  <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2 16L7 9l3 4 4-7 4-1V16z" />
-                  </svg>
+          <!-- ── Page: ダッシュボード ── -->
+          <div id="page-dashboard" class="page-section">
+            <div class="mb-6">
+              <h1 class="text-2xl font-bold">ダッシュボード</h1>
+            </div>
+            <!-- Stat Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <!-- 総損益 -->
+              <div class="card stat-card">
+                <div class="card-body p-4">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm text-secondary">総損益</span>
+                    <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2 16L7 9l3 4 4-7 4-1V16z" />
+                    </svg>
+                  </div>
+                  <p id="total-pnl" class="text-2xl font-bold mb-1">¥0</p>
+                  <span class="text-xs text-secondary">累計</span>
                 </div>
-                <p id="total-pnl" class="text-2xl font-bold mb-1">¥0</p>
-                <span class="text-xs text-secondary">累計</span>
+              </div>
+              <!-- 本日損益 -->
+              <div class="card stat-card">
+                <div class="card-body p-4">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm text-secondary">本日損益</span>
+                    <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm1 5H9v5l4 2.5-.75-1.23L11 12V7z" />
+                    </svg>
+                  </div>
+                  <p id="today-pnl" class="text-2xl font-bold mb-1">¥0</p>
+                  <span class="text-xs text-secondary">本日</span>
+                </div>
+              </div>
+              <!-- 勝率 -->
+              <div class="card stat-card">
+                <div class="card-body p-4">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm text-secondary">勝率</span>
+                    <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 2l2.4 7h7.6l-6 4.5 2.3 7-6.3-4.6L3.7 20.5 6 13.5 0 9h7.6z" />
+                    </svg>
+                  </div>
+                  <p id="win-rate" class="text-2xl font-bold mb-1">0%</p>
+                  <span class="text-xs text-secondary">勝率</span>
+                </div>
+              </div>
+              <!-- 総取引回数 -->
+              <div class="card stat-card">
+                <div class="card-body p-4">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm text-secondary">取引回数</span>
+                    <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2 17V9h4v8H2zM8 17V5h4v12H8zM14 17v-6h4v6h-4z" />
+                    </svg>
+                  </div>
+                  <p id="total-trades" class="text-2xl font-bold mb-1">-</p>
+                  <span class="text-xs text-secondary">累計</span>
+                </div>
               </div>
             </div>
-
-            <!-- 本日損益 -->
-            <div class="card stat-card">
-              <div class="card-body p-4">
-                <div class="flex items-center justify-between mb-3">
-                  <span class="text-sm text-secondary">本日損益</span>
-                  <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm1 5H9v5l4 2.5-.75-1.23L11 12V7z" />
-                  </svg>
-                </div>
-                <p id="today-pnl" class="text-2xl font-bold mb-1">¥0</p>
-                <span class="text-xs text-secondary">本日</span>
-              </div>
-            </div>
-
-            <!-- 勝率 -->
-            <div class="card stat-card">
-              <div class="card-body p-4">
-                <div class="flex items-center justify-between mb-3">
-                  <span class="text-sm text-secondary">勝率</span>
-                  <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 2l2.4 7h7.6l-6 4.5 2.3 7-6.3-4.6L3.7 20.5 6 13.5 0 9h7.6z" />
-                  </svg>
-                </div>
-                <p id="win-rate" class="text-2xl font-bold mb-1">0%</p>
-                <span class="text-xs text-secondary">勝率</span>
-              </div>
-            </div>
-
-            <!-- 総取引回数 -->
-            <div class="card stat-card">
-              <div class="card-body p-4">
-                <div class="flex items-center justify-between mb-3">
-                  <span class="text-sm text-secondary">取引回数</span>
-                  <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2 17V9h4v8H2zM8 17V5h4v12H8zM14 17v-6h4v6h-4z" />
-                  </svg>
-                </div>
-                <p id="total-trades" class="text-2xl font-bold mb-1">-</p>
-                <span class="text-xs text-secondary">累計</span>
-              </div>
-            </div>
-          </div>
-          <!-- /stat cards -->
-
-          <!-- ── Middle: 取引履歴 + システム状態 ── -->
-          <div id="section-trades" class="grid md:grid-cols-3 gap-4 mb-6">
-            <!-- 取引履歴 (2/3) -->
-            <div class="card md:col-span-2 flex flex-col">
+            <!-- System Status -->
+            <div class="card">
               <div class="card-header">
-                <h2 class="text-base font-semibold">取引履歴</h2>
+                <h2 class="text-base font-semibold">システム状態</h2>
               </div>
-              <div class="card-body flex-1 overflow-y-auto">
+              <div class="card-body">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p class="text-xs text-secondary mb-1">接続状態</p>
+                    <p id="credentials-status" class="text-sm font-bold">-</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-secondary mb-1">戦略</p>
+                    <p id="strategy" class="text-sm font-bold">-</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-secondary mb-1">稼働時間</p>
+                    <p id="uptime" class="text-sm font-bold">-</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-secondary mb-2">監視中の通貨ペア</p>
+                    <div id="monitoring-prices" class="space-y-1">
+                      <div class="text-secondary text-xs">読み込み中...</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- /page-dashboard -->
+
+          <!-- ── Page: パフォーマンス ── -->
+          <div id="page-performance" class="page-section hidden">
+            <div class="mb-6">
+              <h1 class="text-2xl font-bold">パフォーマンス</h1>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <!-- 残高 -->
+              <div class="card flex flex-col">
+                <div class="card-header">
+                  <h2 class="text-base font-semibold">残高</h2>
+                </div>
+                <div class="card-body flex-1 overflow-y-auto">
+                  <table class="table table-sm w-full">
+                    <thead>
+                      <tr>
+                        <th>通貨</th>
+                        <th class="text-right">総量</th>
+                        <th class="text-right">利用可能</th>
+                      </tr>
+                    </thead>
+                    <tbody id="balance-table">
+                      <tr><td colspan="3" class="text-center text-secondary py-6">読み込み中...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <!-- 日別損益 -->
+              <div class="card flex flex-col">
+                <div class="card-header">
+                  <h2 class="text-base font-semibold">日別損益</h2>
+                </div>
+                <div class="card-body flex-1 overflow-y-auto">
+                  <table class="table table-sm w-full">
+                    <thead>
+                      <tr>
+                        <th>日付</th>
+                        <th class="text-right">損益</th>
+                        <th class="text-right">勝率</th>
+                        <th class="text-right">取引数</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pnl-history-table">
+                      <tr><td colspan="4" class="text-center text-secondary py-6">読み込み中...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- /page-performance -->
+
+          <!-- ── Page: 取引履歴 ── -->
+          <div id="page-trades" class="page-section hidden">
+            <div class="mb-6">
+              <h1 class="text-2xl font-bold">取引履歴</h1>
+            </div>
+            <div class="card">
+              <div class="card-body overflow-x-auto">
                 <table class="table table-sm w-full">
                   <thead>
                     <tr>
@@ -167,116 +242,46 @@
                 </table>
               </div>
             </div>
-
-            <!-- システム状態 (1/3) -->
-            <div class="flex flex-col gap-4">
-              <!-- 接続・稼働 -->
-              <div class="card">
-                <div class="card-header">
-                  <h2 class="text-base font-semibold">システム状態</h2>
-                </div>
-                <div class="card-body">
-                  <div class="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <p class="text-xs text-secondary mb-1">接続状態</p>
-                      <p id="credentials-status" class="text-sm font-bold">-</p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-secondary mb-1">戦略</p>
-                      <p id="strategy" class="text-sm font-bold">-</p>
-                    </div>
-                    <div class="col-span-2">
-                      <p class="text-xs text-secondary mb-1">稼働時間</p>
-                      <p id="uptime" class="text-sm font-bold">-</p>
-                    </div>
-                  </div>
-                  <!-- 監視通貨ペア -->
-                  <p class="text-xs text-secondary mb-2">監視中の通貨ペア</p>
-                  <div id="monitoring-prices" class="space-y-1">
-                    <div class="text-center text-secondary py-2 text-xs">読み込み中...</div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
+          <!-- /page-trades -->
 
-          <!-- ── Bottom: 残高 + 日別損益 ── -->
-          <div id="section-performance" class="grid md:grid-cols-2 gap-4 mb-6">
-            <!-- 残高 -->
-            <div class="card flex flex-col">
+          <!-- ── Page: システムログ ── -->
+          <div id="page-logs" class="page-section hidden">
+            <div class="mb-6">
+              <h1 class="text-2xl font-bold">システムログ</h1>
+            </div>
+            <div class="card">
               <div class="card-header">
-                <h2 class="text-base font-semibold">残高</h2>
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <h2 class="text-base font-semibold">ログ</h2>
+                  <div class="flex gap-2">
+                    <select id="log-level-filter" class="form-control form-select form-select-sm w-auto">
+                      <option value="">全レベル</option>
+                      <option value="DEBUG">デバッグ</option>
+                      <option value="INFO">情報</option>
+                      <option value="WARN">警告</option>
+                      <option value="ERROR">エラー</option>
+                    </select>
+                    <select id="log-category-filter" class="form-control form-select form-select-sm w-auto">
+                      <option value="">全カテゴリ</option>
+                      <option value="system">システム</option>
+                      <option value="trading">取引</option>
+                      <option value="api">API</option>
+                      <option value="strategy">戦略</option>
+                      <option value="ui">UI</option>
+                      <option value="data">データ</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div class="card-body flex-1 overflow-y-auto">
-                <table class="table table-sm w-full">
-                  <thead>
-                    <tr>
-                      <th>通貨</th>
-                      <th class="text-right">総量</th>
-                      <th class="text-right">利用可能</th>
-                    </tr>
-                  </thead>
-                  <tbody id="balance-table">
-                    <tr><td colspan="3" class="text-center text-secondary py-6">読み込み中...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- 日別損益 -->
-            <div class="card flex flex-col">
-              <div class="card-header">
-                <h2 class="text-base font-semibold">日別損益</h2>
-              </div>
-              <div class="card-body flex-1 overflow-y-auto">
-                <table class="table table-sm w-full">
-                  <thead>
-                    <tr>
-                      <th>日付</th>
-                      <th class="text-right">損益</th>
-                      <th class="text-right">勝率</th>
-                      <th class="text-right">取引数</th>
-                    </tr>
-                  </thead>
-                  <tbody id="pnl-history-table">
-                    <tr><td colspan="4" class="text-center text-secondary py-6">読み込み中...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- ── Logs ── -->
-          <div id="section-logs" class="card">
-            <div class="card-header">
-              <div class="flex items-center justify-between flex-wrap gap-2">
-                <h2 class="text-base font-semibold">システムログ</h2>
-                <div class="flex gap-2">
-                  <select id="log-level-filter" class="form-control form-select form-select-sm w-auto">
-                    <option value="">全レベル</option>
-                    <option value="DEBUG">デバッグ</option>
-                    <option value="INFO">情報</option>
-                    <option value="WARN">警告</option>
-                    <option value="ERROR">エラー</option>
-                  </select>
-                  <select id="log-category-filter" class="form-control form-select form-select-sm w-auto">
-                    <option value="">全カテゴリ</option>
-                    <option value="system">システム</option>
-                    <option value="trading">取引</option>
-                    <option value="api">API</option>
-                    <option value="strategy">戦略</option>
-                    <option value="ui">UI</option>
-                    <option value="data">データ</option>
-                  </select>
+              <div class="card-body overflow-y-auto">
+                <div id="logs-container" class="space-y-1 font-mono text-xs">
+                  <div class="text-center text-secondary py-6">読み込み中...</div>
                 </div>
               </div>
             </div>
-            <div class="card-body overflow-y-auto">
-              <div id="logs-container" class="space-y-1 font-mono text-xs">
-                <div class="text-center text-secondary py-6">読み込み中...</div>
-              </div>
-            </div>
           </div>
+          <!-- /page-logs -->
 
         </div>
         <!-- /dashboard-content -->

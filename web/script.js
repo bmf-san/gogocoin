@@ -43,22 +43,24 @@ class GogocoinUI {
             this.loadLogs();
         });
 
-        // Sidebar navigation
+        // Sidebar navigation - page switching
         document.querySelectorAll('.sidebar-link[data-target]').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
+                const pageId = link.dataset.target;
                 // Update active state
                 document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
                 link.classList.add('active');
                 // Close sidebar on mobile
                 const toggle = document.getElementById('sidebar-toggle');
                 if (toggle) toggle.checked = false;
-                // Scroll to section
-                const target = document.getElementById(link.dataset.target);
-                if (target) {
-                    const scrollEl = document.querySelector('.dashboard-main') || document.documentElement;
-                    const offset = target.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop;
-                    scrollEl.scrollTo({ top: offset, behavior: 'smooth' });
+                // Show target page, hide others
+                document.querySelectorAll('.page-section').forEach(p => p.classList.add('hidden'));
+                const page = document.getElementById(pageId);
+                if (page) {
+                    page.classList.remove('hidden');
+                    const scrollEl = document.querySelector('.dashboard-main');
+                    if (scrollEl) scrollEl.scrollTo({ top: 0 });
                 }
             });
         });
