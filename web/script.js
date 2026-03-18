@@ -128,17 +128,19 @@ class GogocoinUI {
                 this.updateBalance([], true);
             }
 
+            const trades = tradesResult.status === 'fulfilled' ? tradesResult.value : [];
+
             if (performanceResult.status === 'fulfilled') {
-                this.updatePerformance(performanceResult.value, false);
+                this.updatePerformance(performanceResult.value, false, trades);
                 this.updatePerformanceTable(performanceResult.value, false);
             } else {
                 console.error('Failed to load performance:', performanceResult.reason);
-                this.updatePerformance(null, true);
+                this.updatePerformance(null, true, trades);
                 this.updatePerformanceTable(null, true);
             }
 
             if (tradesResult.status === 'fulfilled') {
-                this.updateTrades(tradesResult.value, false);
+                this.updateTrades(trades, false);
             } else {
                 console.error('Failed to load trades:', tradesResult.reason);
                 this.updateTrades([], true);
@@ -275,7 +277,8 @@ class GogocoinUI {
     }
 
     // Update performance metrics
-    updatePerformance(performance, hasError) {
+    // trades: raw trade array used to compute today's PnL accurately
+    updatePerformance(performance, hasError, trades = []) {
         const totalPnlEl = document.getElementById('total-pnl');
         const winRateEl = document.getElementById('win-rate');
         const todayPnlEl = document.getElementById('today-pnl');
@@ -316,14 +319,26 @@ class GogocoinUI {
             winRateEl.className = 'text-lg font-bold';
         }
 
-        // Calculate today's PnL (latest entry should be today)
-        const today = new Date().toISOString().split('T')[0];
-        const todayData = performance.find(p => p.date && p.date.startsWith(today));
-
+        // Calculate today's PnL from actual trade records (JST date match)
         if (todayPnlEl) {
-            if (todayData && todayData.total_pnl !== undefined) {
-                todayPnlEl.textContent = this.formatCurrency(todayData.total_pnl);
-                todayPnlEl.className = todayData.total_pnl >= 0 ? 'text-lg font-bold text-success' : 'text-lg font-bold text-danger';
+            const jstOffset = 9 * 60;
+            const now = new Date(Date.now() + (jstOffset + new Date().getTimezoneOffset()) * 60000);
+            const today = now.toISOString().split('T')[0];
+            let todayPnL = 0;
+            let hasTodayTrades = false;
+            (trades || []).forEach(t => {
+                if (!t.executed_at) return;
+                const d = new Date(t.executed_at);
+                const jstDate = new Date(d.getTime() + (jstOffset + d.getTimezoneOffset()) * 60000)
+                    .toISOString().split('T')[0];
+                if (jstDate === today && t.pnl !== undefined && t.pnl !== null) {
+                    todayPnL += t.pnl;
+                    hasTodayTrades = true;
+                }
+            });
+            if (hasTodayTrades) {
+                todayPnlEl.textContent = this.formatCurrency(todayPnL);
+                todayPnlEl.className = todayPnL >= 0 ? 'text-lg font-bold text-success' : 'text-lg font-bold text-danger';
             } else {
                 todayPnlEl.textContent = '¥0';
                 todayPnlEl.className = 'text-lg font-bold';
