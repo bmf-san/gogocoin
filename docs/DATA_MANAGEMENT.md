@@ -36,13 +36,16 @@ gogocoinは軽量性を重視し、設定可能な日数分のデータのみを
 
 以下のテーブルが `retention_days` の設定日数分保持されます。
 
-| テーブル | 内容 |
-|---|---|
-| `logs` | ログ（全レベル） |
-| `trades` | 取引履歴 |
-| `market_data` | 市場データ |
-| `positions` | クローズ済みポジション |
-| `balances` | 残高スナップショット |
+| テーブル | 内容 | 削除基準カラム |
+|---|---|---|
+| `logs` | ログ（全レベル） | `timestamp` |
+| `market_data` | 市場データ | `timestamp` |
+| `balances` | 残高スナップショット | `timestamp` |
+| `trades` | 取引履歴 | `executed_at` |
+| `positions` | クローズ済みポジション（OPEN は保持） | `updated_at` |
+| `performance_metrics` | パフォーマンス指標（日次） | `date` |
+
+> `app_state` テーブルは固定キーの上書き更新のみ（2行）のため、クリーンアップ対象外です。
 
 ### 過去データの確認
 
