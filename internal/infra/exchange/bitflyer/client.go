@@ -296,6 +296,7 @@ type RateLimiter struct {
 	requests chan struct{}
 	ticker   *time.Ticker
 	done     chan struct{} // Signal to stop the goroutine
+	stopOnce sync.Once   // Ensures Stop() is safe to call more than once
 }
 
 // NewRateLimiter creates a new rate limiter
@@ -348,10 +349,12 @@ func (rl *RateLimiter) Wait(ctx context.Context) error {
 	}
 }
 
-// Stop stops the rate limiter
+// Stop stops the rate limiter. Safe to call multiple times.
 func (rl *RateLimiter) Stop() {
-	rl.ticker.Stop()
-	close(rl.done) // Signal goroutine to stop
+	rl.stopOnce.Do(func() {
+		rl.ticker.Stop()
+		close(rl.done) // Signal goroutine to stop
+	})
 }
 
 // RetryPolicy defines retry policy
