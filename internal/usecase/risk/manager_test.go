@@ -49,13 +49,13 @@ func (m *mockTrader) GetOrders(ctx context.Context) ([]*domain.OrderResult, erro
 	return nil, nil
 }
 
-func (m *mockTrader) SetDatabase(db domain.TradingRepository)            {}
+func (m *mockTrader) SetDatabase(db domain.TradingRepository)           {}
 func (m *mockTrader) SetMarketSpecService(svc domain.MarketSpecService) {}
-func (m *mockTrader) SetStrategyName(name string)                        {}
-func (m *mockTrader) SetOnOrderCompleted(fn func(*domain.OrderResult))   {}
-func (m *mockTrader) InvalidateBalanceCache()                            {}
-func (m *mockTrader) UpdateBalanceToDB(ctx context.Context)              {}
-func (m *mockTrader) Shutdown() error                                    { return nil }
+func (m *mockTrader) SetStrategyName(name string)                       {}
+func (m *mockTrader) SetOnOrderCompleted(fn func(*domain.OrderResult))  {}
+func (m *mockTrader) InvalidateBalanceCache()                           {}
+func (m *mockTrader) UpdateBalanceToDB(ctx context.Context)             {}
+func (m *mockTrader) Shutdown() error                                   { return nil }
 
 func TestCheckTradeAmount(t *testing.T) {
 	cfg := ManagerConfig{
