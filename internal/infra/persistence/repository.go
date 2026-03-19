@@ -46,6 +46,9 @@ func (r *Repository) GetAllTrades() ([]domain.Trade, error) {
 func (r *Repository) GetTradesCount() (int, error) {
 	return r.trade.GetTradesCount()
 }
+func (r *Repository) GetTodayTradesCount() (int, error) {
+	return r.trade.GetTodayTradesCount()
+}
 
 // --- domain.PositionRepository ---
 

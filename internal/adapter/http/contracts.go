@@ -18,6 +18,7 @@ type DatabaseService interface {
 	// Trade operations
 	GetRecentTrades(limit int) ([]domain.Trade, error)
 	GetTradesCount() (int, error)
+	GetTodayTradesCount() (int, error)
 
 	// Position operations
 	GetActivePositions() ([]domain.Position, error)

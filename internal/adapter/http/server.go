@@ -203,6 +203,11 @@ func (s *Server) getTotalTradesCount() (int, error) {
 	return s.db.GetTradesCount()
 }
 
+// getTodayTradesCount gets the number of trades executed today (JST)
+func (s *Server) getTodayTradesCount() (int, error) {
+	return s.db.GetTodayTradesCount()
+}
+
 // isRateLimitError checks if an error is a rate limit error using sentinel errors
 func isRateLimitError(err error) bool {
 	if err == nil {

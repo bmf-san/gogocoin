@@ -97,3 +97,16 @@ func (r *TradeRepository) GetTradesCount() (int, error) {
 	}
 	return count, nil
 }
+
+// GetTodayTradesCount returns the number of trades executed today (JST).
+func (r *TradeRepository) GetTodayTradesCount() (int, error) {
+	var count int
+	// Use JST (UTC+9) to determine today's date boundary
+	err := r.db.db.QueryRow(
+		"SELECT COUNT(*) FROM trades WHERE executed_at >= datetime('now', '+9 hours', 'start of day', '-9 hours')",
+	).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
