@@ -88,7 +88,11 @@ type ScalpingParams struct {
 	CooldownSec    int     `yaml:"cooldown_sec"`
 	MaxDailyTrades int     `yaml:"max_daily_trades"`
 	OrderNotional  float64 `yaml:"order_notional"`
-	FeeRate        float64 `yaml:"fee_rate"`
+	// Auto-scale buy order notional by current JPY balance.
+	AutoScaleEnabled     bool    `yaml:"auto_scale_enabled"`
+	AutoScaleBalancePct  float64 `yaml:"auto_scale_balance_pct"`
+	AutoScaleMaxNotional float64 `yaml:"auto_scale_max_notional"`
+	FeeRate              float64 `yaml:"fee_rate"`
 	// RSI filter (0 = disabled)
 	RSIPeriod     int     `yaml:"rsi_period"`
 	RSIOverbought float64 `yaml:"rsi_overbought"`

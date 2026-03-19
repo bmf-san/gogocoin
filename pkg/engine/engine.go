@@ -284,18 +284,21 @@ func strategyParamsToMap(name string, params interface{}) (map[string]interface{
 			}
 		}
 		return map[string]interface{}{
-			"ema_fast_period":  cp.EMAFastPeriod,
-			"ema_slow_period":  cp.EMASlowPeriod,
-			"take_profit_pct":  cp.TakeProfitPct,
-			"stop_loss_pct":    cp.StopLossPct,
-			"cooldown_sec":     cp.CooldownSec,
-			"max_daily_trades": cp.MaxDailyTrades,
-			"order_notional":   cp.OrderNotional,
-			"fee_rate":         cp.FeeRate,
-			"rsi_period":       cp.RSIPeriod,
-			"rsi_overbought":   cp.RSIOverbought,
-			"rsi_oversold":     cp.RSIOversold,
-			"symbol_params":    symParams,
+			"ema_fast_period":         cp.EMAFastPeriod,
+			"ema_slow_period":         cp.EMASlowPeriod,
+			"take_profit_pct":         cp.TakeProfitPct,
+			"stop_loss_pct":           cp.StopLossPct,
+			"cooldown_sec":            cp.CooldownSec,
+			"max_daily_trades":        cp.MaxDailyTrades,
+			"order_notional":          cp.OrderNotional,
+			"auto_scale_enabled":      cp.AutoScaleEnabled,
+			"auto_scale_balance_pct":  cp.AutoScaleBalancePct,
+			"auto_scale_max_notional": cp.AutoScaleMaxNotional,
+			"fee_rate":                cp.FeeRate,
+			"rsi_period":              cp.RSIPeriod,
+			"rsi_overbought":          cp.RSIOverbought,
+			"rsi_oversold":            cp.RSIOversold,
+			"symbol_params":           symParams,
 		}, nil
 	default:
 		// Unknown strategy: pass the YAML-decoded value as-is.
