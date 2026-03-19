@@ -34,10 +34,7 @@ func (v *Validator) ValidateTradingConfig(cfg *Config) error {
 func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 	minSize := getMinimumOrderSize(symbol)
 	if minSize == 0 {
-		if v.logger != nil {
-			v.logger.System().WithField("symbol", symbol).Warn("Unknown symbol, skipping validation")
-		}
-		return nil
+		return fmt.Errorf("unknown symbol: %s", symbol)
 	}
 
 	// Estimate current price (use rough estimates for validation)
@@ -56,10 +53,7 @@ func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 	case "BCH_JPY":
 		estimatedPrice = 50000 // 50K JPY/BCH
 	default:
-		if v.logger != nil {
-			v.logger.System().WithField("symbol", symbol).Warn("No price estimate available, skipping validation")
-		}
-		return nil
+		return fmt.Errorf("no price estimate available for symbol: %s", symbol)
 	}
 
 	// Calculate minimum notional required
@@ -68,30 +62,21 @@ func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 	// Get order_notional from strategy params using the configured strategy name.
 	strategyName := cfg.Trading.Strategy.Name
 	if strategyName == "" {
-		if v.logger != nil {
-			v.logger.System().Warn("No strategy name configured, skipping order_notional validation")
-		}
-		return nil
+		return fmt.Errorf("trading.strategy.name is required for symbol validation")
 	}
 	strategyParams, err := cfg.GetStrategyParams(strategyName)
 	if err != nil {
-		if v.logger != nil {
-			v.logger.System().Warn("Failed to get strategy params, using default 200 JPY")
-		}
-		return nil
+		return fmt.Errorf("failed to load strategy params for %s: %w", strategyName, err)
 	}
 
 	scalpingParams, ok := strategyParams.(ScalpingParams)
 	if !ok {
-		if v.logger != nil {
-			v.logger.System().Warn("Invalid scalping params type, using default 200 JPY")
-		}
-		return nil
+		return fmt.Errorf("invalid strategy params type for %s: %T", strategyName, strategyParams)
 	}
 
 	configOrderNotionalFloat := scalpingParams.OrderNotional
 	if configOrderNotionalFloat == 0 {
-		configOrderNotionalFloat = 200
+		return fmt.Errorf("strategy_params.%s.order_notional must be set and positive", strategyName)
 	}
 
 	if configOrderNotionalFloat < minNotional {

@@ -82,10 +82,10 @@ func TestValidateSymbol_UnknownSymbol(t *testing.T) {
 		},
 	}
 
-	// Should not error for unknown symbol (just skips validation)
+	// Unknown symbols must fail fast.
 	err := validator.ValidateSymbol(cfg, "UNKNOWN_JPY")
-	if err != nil {
-		t.Errorf("ValidateSymbol() for unknown symbol should not error, got: %v", err)
+	if err == nil {
+		t.Errorf("ValidateSymbol() for unknown symbol should error")
 	}
 }
 
@@ -116,9 +116,14 @@ func TestValidateTradingConfig(t *testing.T) {
 
 	cfg := &Config{
 		Trading: TradingConfig{
-			Symbols: []string{"UNKNOWN_JPY"}, // Use unknown symbol to skip actual validation
+			Symbols: []string{"XRP_JPY"},
 			Strategy: StrategyConfig{
 				Name: "scalping",
+			},
+		},
+		StrategyParams: StrategyParams{
+			Scalping: ScalpingParams{
+				OrderNotional: 500,
 			},
 		},
 	}
