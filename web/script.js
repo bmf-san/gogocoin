@@ -351,18 +351,21 @@ class GogocoinUI {
         }
         if (sharpeEl) {
             const v = latest.sharpe_ratio;
-            sharpeEl.textContent = (v != null && !isNaN(v)) ? parseFloat(v).toFixed(2) : '-';
-            sharpeEl.className = 'text-2xl font-bold' + (v >= 1.0 ? ' text-success' : v != null ? ' text-danger' : '');
+            const vValid = v != null && !isNaN(v);
+            sharpeEl.textContent = vValid ? parseFloat(v).toFixed(2) : '-';
+            sharpeEl.className = 'text-2xl font-bold' + (vValid ? (v >= 1.0 ? ' text-success' : ' text-danger') : '');
         }
         if (profitFactorEl) {
             const v = latest.profit_factor;
-            profitFactorEl.textContent = (v != null && !isNaN(v)) ? parseFloat(v).toFixed(2) : '-';
-            profitFactorEl.className = 'text-2xl font-bold' + (v >= 1.5 ? ' text-success' : v != null ? ' text-danger' : '');
+            const vValid = v != null && !isNaN(v);
+            profitFactorEl.textContent = vValid ? parseFloat(v).toFixed(2) : '-';
+            profitFactorEl.className = 'text-2xl font-bold' + (vValid ? (v >= 1.5 ? ' text-success' : ' text-danger') : '');
         }
         if (maxDrawdownEl) {
             const v = latest.max_drawdown;
-            maxDrawdownEl.textContent = (v != null && !isNaN(v)) ? parseFloat(v).toFixed(2) + '%' : '-';
-            maxDrawdownEl.className = 'text-2xl font-bold' + (v != null && v <= 10 ? ' text-success' : v != null ? ' text-danger' : '');
+            const vValid = v != null && !isNaN(v);
+            maxDrawdownEl.textContent = vValid ? parseFloat(v).toFixed(2) + '%' : '-';
+            maxDrawdownEl.className = 'text-2xl font-bold' + (vValid ? (v <= 10 ? ' text-success' : ' text-danger') : '');
         }
 
         // Calculate today's PnL from actual trade records (JST date match)
@@ -454,8 +457,8 @@ class GogocoinUI {
                 return;
             }
 
-            // Reverse to show newest first
-            const reversedLogs = logs.reverse();
+            // Reverse to show newest first (slice to avoid mutating original)
+            const reversedLogs = logs.slice().reverse();
 
             container.innerHTML = reversedLogs.map(log => {
                 const levelClass = log.level.toLowerCase();
@@ -757,8 +760,13 @@ class GogocoinUI {
             } catch (dashboardError) {
                 // ダッシュボードデータ取得失敗でも、最低限statusだけは取得
                 console.error('Dashboard load failed, fetching status only:', dashboardError);
-                const status = await this.fetchAPI(`/api/status?symbol=${this.selectedSymbol}`);
-                this.updateSystemStatus(status);
+                try {
+                    const status = await this.fetchAPI(`/api/status?symbol=${this.selectedSymbol}`);
+                    this.updateSystemStatus(status);
+                } catch (statusError) {
+                    // ダッシュボード更新失敗は取引停止の成否とは無関係。ログにとどめる。
+                    console.error('Status fetch also failed (trading was stopped successfully):', statusError);
+                }
             }
         } catch (error) {
             console.error('Error stopping trading:', error);
