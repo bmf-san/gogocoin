@@ -54,6 +54,7 @@ func (r *MaintenanceRepository) CleanupOldData(retentionDays int) error {
 		{"market_data", "timestamp"},
 		{"balances", "timestamp"},
 		{"trades", "executed_at"},
+		{"performance_metrics", "date"},
 	}
 	for _, s := range steps {
 		if _, err := deleteBeforeTx(tx, s.table, s.column, cutoff); err != nil {

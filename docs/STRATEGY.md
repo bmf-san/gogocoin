@@ -1,110 +1,21 @@
 # 取引戦略リファレンス
 
-## 概要
+## プラガブル戦略アーキテクチャ
 
 gogocoin の戦略は**プラガブル**設計になっており、`pkg/strategy.Strategy` インターフェースを実装することで独自戦略を差し込めます。
-カスタム戦略の実装手順は [docs/DESIGN_DOC.md § 5](DESIGN_DOC.md) を参照してください。
 
-本ドキュメントでは、同梱のデフォルト実装である **Scalping 戦略**を解説します。
+- カスタム戦略の実装手順: [DESIGN_DOC.md § 5](DESIGN_DOC.md)
+- Strategy インターフェース定義: `pkg/strategy/strategy.go`
 
----
+## 同梱戦略
 
-## Scalping 戦略
-
-EMAベースのステートレス・スキャルピング戦略です。
-
----
-
-## 特徴
-
-| 項目 | 内容 |
-|---|---|
-| 設計 | ステートレス設計: 再起動に強い（内部状態を最小限に保持） |
-| 最小取引額 | 200円から取引可能 |
-| インジケーター | 短期EMA（9バー）と中期EMA（21バー）のクロスオーバー |
-| リスク/リワード比 | 2:1（利確2.0% / 損切1.0%） |
-| 取引制限 | 1日の取引回数制限（設定可能、デフォルト3回） |
-| クールダウン | 取引後90秒間は次の取引を待機 |
-| 手数料考慮 | 取引手数料0.1%を考慮した損益計算 |
-
----
-
-## シグナル生成ロジック
-
-| シグナル | 条件 |
-|---|---|
-| 買い（BUY） | 短期EMA > 中期EMA かつ 現在価格 > 短期EMA |
-| 売り（SELL） | 短期EMA < 中期EMA かつ 現在価格 < 短期EMA |
-| 待機（HOLD） | 上記以外、またはクールダウン中、または日次制限到達時 |
-
-### RSI フィルタ（オプション）
-
-`rsi_period` を 0 以外に設定すると RSI フィルタが有効になります。上記 EMA 条件に加え、以下の条件も満たす場合のみシグナルが発行されます:
-
-| シグナル | RSI 条件 |
-|---|---|
-| BUY | RSI < `rsi_overbought`（買われ過ぎでない） |
-| SELL | RSI > `rsi_oversold`（売られ過ぎでない） |
-
-```yaml
-strategy_params:
-  scalping:
-    rsi_period: 14        # 0 = RSI フィルタ無効（デフォルト）
-    rsi_overbought: 70    # 買われ過ぎしきい値
-    rsi_oversold: 30      # 売られ過ぎしきい値
-```
-
----
-
-## 推奨設定
-
-| 項目 | 推奨値 | 理由 |
+| 戦略名 | パッケージ | 説明 |
 |---|---|---|
-| 初期資金 | 1,000円以上 | 最小注文サイズ（200円）に対応 |
-| 通貨ペア | XRP_JPY | 少額取引に最適 |
-| 稼働形態 | 24/7稼働 | 常時監視で機会を逃さない |
-| 取引頻度 | `max_daily_trades` で調整 | デフォルト3回は保守的な設定 |
+| `scalping` | `pkg/strategy/scalping` | EMA クロスオーバー + RSI フィルタによるスキャルピング戦略 |
 
-設定パラメータの詳細は [docs/CONFIG.md](CONFIG.md) の `strategy_params.scalping` セクションを参照してください。
+各戦略の設定パラメータ・シグナル生成ロジックの詳細は、パッケージ内の README を参照してください:
 
----
-
-## パラメータ調整ガイド
-
-### EMA期間
-
-```yaml
-strategy_params:
-  scalping:
-    ema_fast_period: 9   # 短期EMA: 値を小さくするほど反応が早い（ノイズも増える）
-    ema_slow_period: 21  # 中期EMA: 値を大きくするほどトレンド追従型になる
-```
-
-EMAの期間を変更する場合は `ema_fast_period < ema_slow_period` を必ず守ってください。
-
-### 利確・損切
-
-```yaml
-strategy_params:
-  scalping:
-    take_profit_pct: 2.0  # 利確: 購入価格から+2.0%で決済
-    stop_loss_pct: 1.0    # 損切: 購入価格から-1.0%で決済
-```
-
-リスク/リワード比を 2:1 以上に保つことを推奨します（`take_profit_pct >= stop_loss_pct * 2`）。
-
-### 取引頻度とクールダウン
-
-```yaml
-strategy_params:
-  scalping:
-    max_daily_trades: 3   # 1日の最大取引回数
-    cooldown_sec: 90      # 取引後のクールダウン（秒）
-```
-
-取引頻度を上げる場合は `max_daily_trades` を増やし、`cooldown_sec` を短くします。ただし手数料コストが増加するため、損益分岐点の試算を行ってください。
-
----
+- [pkg/strategy/scalping/README.md](../pkg/strategy/scalping/README.md)
 
 ## 免責事項
 

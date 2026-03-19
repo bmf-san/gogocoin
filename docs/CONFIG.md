@@ -54,49 +54,28 @@ BITFLYER_API_SECRET=your_api_secret_here
 | `max_daily_trades` | `100` | 1日の最大取引回数（リスク管理上限） |
 | `min_trade_interval` | `60s` | 取引間の最小インターバル |
 
-> `max_daily_trades` はリスク管理の上限値です。実際の取引頻度は `strategy_params.scalping.max_daily_trades` で制御します。
+> `max_daily_trades` はリスク管理の上限値です。実際の取引頻度は各戦略の `max_daily_trades` で制御します。
 
 ---
 
-## strategy_params.scalping
+## strategy_params
 
-EMAベースのスキャルピング戦略のパラメータです。
+`strategy_params.<strategy_name>` ブロックで戦略固有のパラメータを設定します。
+設定は `pkg/strategy.Strategy.Initialize()` 経由で各戦略に渡されます。
 
-| キー | デフォルト | 説明 |
-|---|---|---|
-| `ema_fast_period` | `9` | 短期EMAの期間（バー数） |
-| `ema_slow_period` | `21` | 中期EMAの期間（バー数） |
-| `take_profit_pct` | `2.0` | 利確ライン（%） |
-| `stop_loss_pct` | `1.0` | 損切ライン（%）。リスク/リワード比 = 1:2 |
-| `cooldown_sec` | `90` | 取引後のクールダウン時間（秒）。過剰取引を防止 |
-| `max_daily_trades` | `3` | 1日の最大取引回数（保守的運用のデフォルト） |
-| `min_notional` | `200` | 最小注文金額（JPY） |
-| `fee_rate` | `0.001` | 手数料率（損益計算に使用） |
-| `rsi_period` | `0` | RSIの期間。`0` で RSI フィルタは無効 |
-| `rsi_overbought` | `70` | RSI 買われ過ぎしきい値。超えると BUY をこの値以下に制限 |
-| `rsi_oversold` | `30` | RSI 売られ過ぎしきい値。下回ると SELL をこの値以上に制限 |
-
-### strategy_params.scalping.symbol_params
-
-通貨ペアごとに一部パラメータをオーバーライドできます。0 または未設定の場合はグローバル設定が有効になります。
-
-| キー | 説明 |
-|---|---|
-| `ema_fast_period` | 短期EMA期間（シンボル個別） |
-| `ema_slow_period` | 中期EMA期間（シンボル個別） |
-| `cooldown_sec` | クールダウン（シンボル個別） |
-| `min_notional` | 最小注文額（シンボル個別） |
-
-設定例:
+同梱の Scalping 戦略のパラメータ詳細は [pkg/strategy/scalping/README.md](../pkg/strategy/scalping/README.md) を参照してください。
 
 ```yaml
+# 例: 同梱のスキャルピング戦略
 strategy_params:
   scalping:
     ema_fast_period: 9
-    symbol_params:
-      XLM_JPY:
-        min_notional: 280   # XLMは最小発注額が高いため個別設定
-        cooldown_sec: 120
+    # ... 詳細は scalping/README.md を参照
+
+# 例: カスタム戦略
+strategy_params:
+  mystrategy:
+    my_param: 42
 ```
 
 ---

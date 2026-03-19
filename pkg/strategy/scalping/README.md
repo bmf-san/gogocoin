@@ -1,0 +1,129 @@
+# Scalping Strategy
+
+EMAベースのステートレス・スキャルピング戦略。gogocoin 同梱のデフォルト戦略として提供される。
+
+---
+
+## 特徴
+
+| 項目 | 内容 |
+|---|---|
+| 設計 | ステートレス設計: 再起動に強い（内部状態を最小限に保持） |
+| インジケーター | 短期EMA と中期EMA のクロスオーバー |
+| RSI フィルタ | オプション。`rsi_period > 0` で有効化 |
+| リスク/リワード比 | デフォルト 2:1（利確2.0% / 損切1.0%） |
+| クールダウン | 取引後のインターバル（デフォルト90秒） |
+| 手数料考慮 | 取引手数料を考慮した損益計算 |
+
+---
+
+## シグナル生成ロジック
+
+| シグナル | 条件 |
+|---|---|
+| 買い（BUY） | 短期EMA > 中期EMA かつ 現在価格 > 短期EMA |
+| 売り（SELL） | 短期EMA < 中期EMA かつ 現在価格 < 短期EMA |
+| 待機（HOLD） | 上記以外、またはクールダウン中、または日次制限到達時 |
+
+### RSI フィルタ（オプション）
+
+`rsi_period` を 0 以外に設定すると RSI フィルタが有効になる。上記 EMA 条件に加え、以下の条件も満たす場合のみシグナルが発行される:
+
+| シグナル | RSI 条件 |
+|---|---|
+| BUY | RSI < `rsi_overbought`（買われ過ぎでない） |
+| SELL | RSI > `rsi_oversold`（売られ過ぎでない） |
+
+---
+
+## 設定パラメータ（`strategy_params.scalping`）
+
+`config.yaml` の `strategy_params.scalping` ブロックで設定する。
+
+| キー | デフォルト | 説明 |
+|---|---|---|
+| `ema_fast_period` | `9` | 短期EMAの期間（バー数） |
+| `ema_slow_period` | `21` | 中期EMAの期間（バー数） |
+| `take_profit_pct` | `2.0` | 利確ライン（%） |
+| `stop_loss_pct` | `1.0` | 損切ライン（%）。リスク/リワード比 = 1:2 |
+| `cooldown_sec` | `90` | 取引後のクールダウン時間（秒）。過剰取引を防止 |
+| `max_daily_trades` | `3` | 1日の最大取引回数（保守的運用のデフォルト） |
+| `min_notional` | `200` | 注文金額（JPY）。**この値が実際の注文サイズになる** |
+| `fee_rate` | `0.001` | 手数料率（損益計算に使用） |
+| `rsi_period` | `0` | RSIの期間。`0` で RSI フィルタは無効 |
+| `rsi_overbought` | `70` | RSI 買われ過ぎしきい値。超えると BUY を抑制 |
+| `rsi_oversold` | `30` | RSI 売られ過ぎしきい値。下回ると SELL を抑制 |
+
+### `min_notional` について
+
+`min_notional` は「最小注文額」という名前だが、実際には**注文サイズそのもの**として機能する。
+戦略は `min_notional / 現在価格` で数量を計算する。残高の何%を使うかで自動算出する機能はない。
+
+利益の目安: `min_notional × take_profit_pct / 100 − 往復手数料`
+
+例（`min_notional: 200`, `take_profit_pct: 2.0`, `fee_rate: 0.001`）:
+- 利確時: 200 × 0.02 = 4 JPY（手数料差引前）
+
+### symbol_params（シンボル個別オーバーライド）
+
+通貨ペアごとに一部パラメータをオーバーライドできる。0 または未設定の場合はグローバル設定にフォールバックする。
+
+| キー | 説明 |
+|---|---|
+| `ema_fast_period` | 短期EMA期間 |
+| `ema_slow_period` | 中期EMA期間 |
+| `cooldown_sec` | クールダウン秒数 |
+| `min_notional` | 注文金額 |
+
+---
+
+## 設定例
+
+```yaml
+strategy_params:
+  scalping:
+    ema_fast_period: 9
+    ema_slow_period: 21
+    take_profit_pct: 2.0
+    stop_loss_pct: 1.0
+    cooldown_sec: 90
+    max_daily_trades: 3
+    min_notional: 200
+    fee_rate: 0.001
+    rsi_period: 0
+    rsi_overbought: 70
+    rsi_oversold: 30
+    symbol_params:
+      XLM_JPY:
+        min_notional: 280
+        cooldown_sec: 120
+```
+
+---
+
+## パラメータ調整ガイド
+
+### EMA期間
+
+`ema_fast_period < ema_slow_period` を必ず守ること。
+
+- `ema_fast_period` を小さくする → 反応が早い（ノイズも増える）
+- `ema_slow_period` を大きくする → トレンド追従型になる
+
+### 利確・損切
+
+リスク/リワード比を 2:1 以上に保つことを推奨（`take_profit_pct >= stop_loss_pct * 2`）。
+
+### 取引頻度
+
+取引頻度を上げる場合は `max_daily_trades` を増やし `cooldown_sec` を短くする。ただし手数料コストが増加するため、損益分岐点の試算を行うこと。
+
+---
+
+## 推奨設定
+
+| 項目 | 推奨値 | 理由 |
+|---|---|---|
+| 通貨ペア | XRP_JPY | 少額取引に最適（最小1 XRP） |
+| 稼働形態 | 24/7稼働 | 常時監視で機会を逃さない |
+| 取引頻度 | `max_daily_trades` で調整 | デフォルト3回は保守的な設定 |
