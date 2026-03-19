@@ -346,7 +346,7 @@ func (s *Strategy) validate() error {
 	}
 	if s.autoScaleEnabled {
 		if s.autoScaleBalancePct <= 0 || s.autoScaleBalancePct > 100 {
-			return fmt.Errorf("auto_scale_balance_pct must be between 0 and 100 when auto_scale_enabled is true")
+			return fmt.Errorf("auto_scale_balance_pct must be > 0 and <= 100 when auto_scale_enabled is true")
 		}
 		if s.autoScaleMaxNotional > 0 && s.autoScaleMaxNotional < s.orderNotional {
 			return fmt.Errorf("auto_scale_max_notional must be >= order_notional when set")
