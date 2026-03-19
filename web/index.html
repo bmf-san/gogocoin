@@ -199,17 +199,17 @@
                 </div>
                 <div class="card-body">
                   <div class="grid grid-cols-3 gap-4">
-                    <div>
+                    <div class="tooltip tooltip-bottom" data-tooltip="リスク調整後リターンの指標。&#10;1.0 以上で良好、2.0 以上で優秀。&#10;値が高いほどリスクに対して&#10;効率良くリターンを得ている。">
                       <p class="text-xs text-secondary mb-1">シャープレシオ</p>
                       <p id="sharpe-ratio" class="text-2xl font-bold">-</p>
                       <span class="text-xs text-secondary">目安: &gt;1.0</span>
                     </div>
-                    <div>
+                    <div class="tooltip tooltip-bottom" data-tooltip="総利益 ÷ 総損失の比率。&#10;1.5 以上で良好、2.0 以上で優秀。&#10;1.0 未満は損失が利益を上回る。">
                       <p class="text-xs text-secondary mb-1">プロフィットファクター</p>
                       <p id="profit-factor" class="text-2xl font-bold">-</p>
                       <span class="text-xs text-secondary">目安: &gt;1.5</span>
                     </div>
-                    <div>
+                    <div class="tooltip tooltip-bottom" data-tooltip="資産のピークからの最大下落率。&#10;5% 以下が理想、10% 超は要注意。&#10;小さいほどリスク管理が良好。">
                       <p class="text-xs text-secondary mb-1">最大ドローダウン</p>
                       <p id="max-drawdown" class="text-2xl font-bold">-</p>
                       <span class="text-xs text-secondary">小さいほど良い</span>
