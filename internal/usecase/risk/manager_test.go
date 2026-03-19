@@ -335,6 +335,24 @@ func TestCheckRiskManagement(t *testing.T) {
 			metrics:     []domain.PerformanceMetric{},
 			expectError: true,
 		},
+		{
+			// SELL orders must be allowed even when all capital is deployed in
+			// crypto (JPY balance == 0).  Without this, stop-loss SELL orders are
+			// silently blocked and the position cannot be unwound.
+			name: "SELL allowed with zero JPY balance",
+			signal: &strategy.Signal{
+				Action:   strategy.SignalSell,
+				Price:    5000000,
+				Quantity: 0.001,
+			},
+			balances: []domain.Balance{
+				{Currency: "JPY", Available: 0},
+				{Currency: "BTC", Available: 0.001},
+			},
+			trades:      []domain.Trade{{CreatedAt: now.Add(-10 * time.Minute), ExecutedAt: now.Add(-10 * time.Minute)}},
+			metrics:     []domain.PerformanceMetric{{TotalPnL: 0}},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
