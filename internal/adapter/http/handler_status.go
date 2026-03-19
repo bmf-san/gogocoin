@@ -38,9 +38,9 @@ func (s *Server) GetApiStatus(ctx context.Context, request GetApiStatusRequestOb
 
 	uptime := s.calculateUptime()
 
-	totalTrades, err := s.getTotalTradesCount()
+	totalTrades, err := s.getTodayTradesCount()
 	if err != nil {
-		s.logger.Error("Failed to get total trades count: " + err.Error())
+		s.logger.Error("Failed to get today's trades count: " + err.Error())
 		totalTrades = 0
 	}
 
