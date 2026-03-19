@@ -43,6 +43,8 @@ BITFLYER_API_SECRET=your_api_secret_here
 | `trading.symbols` | `["XRP_JPY"]` | 取引対象の通貨ペア。少額取引には XRP_JPY を推奨 |
 | `trading.strategy.name` | `"scalping"` | 使用する戦略名 |
 
+> 起動時の設定検証は fail-fast です。`trading.symbols` に未知シンボルを指定するとエラーで起動停止します。
+
 ### trading.risk_management
 
 | キー | デフォルト | 説明 |
@@ -70,6 +72,9 @@ BITFLYER_API_SECRET=your_api_secret_here
 strategy_params:
   scalping:
     ema_fast_period: 9
+    auto_scale_enabled: true
+    auto_scale_balance_pct: 80
+    auto_scale_max_notional: 20000
     # ... 詳細は scalping/README.md を参照
 
 # 例: カスタム戦略
@@ -77,6 +82,8 @@ strategy_params:
   mystrategy:
     my_param: 42
 ```
+
+> `strategy_params.scalping.order_notional` は明示必須です（暗黙デフォルト値はありません）。
 
 ---
 

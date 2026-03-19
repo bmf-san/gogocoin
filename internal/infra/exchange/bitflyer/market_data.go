@@ -12,10 +12,7 @@ import (
 	"github.com/bmf-san/gogocoin/internal/logger"
 )
 
-// Deprecated: This constant is now configured via config.yaml (worker.max_concurrent_saves)
-// It is kept for backward compatibility but will be removed in v2.0
 const (
-	// MaxConcurrentSaves is deprecated, use config.Worker.MaxConcurrentSaves
 	MaxConcurrentSaves = 10
 )
 
@@ -120,7 +117,7 @@ func NewMarketDataService(client *Client, log logger.LoggerInterface, db MarketD
 	}
 
 	if maxConcurrentSaves <= 0 {
-		maxConcurrentSaves = MaxConcurrentSaves // Use default if invalid
+		maxConcurrentSaves = MaxConcurrentSaves
 	}
 
 	return &MarketDataService{

@@ -29,14 +29,17 @@ type symbolEMAState struct {
 type Strategy struct {
 	*strategy.BaseStrategy
 
-	emaFastPeriod  int
-	emaSlowPeriod  int
-	takeProfitPct  float64
-	stopLossPct    float64
-	cooldownSec    int
-	maxDailyTrades int
-	orderNotional  float64
-	feeRate        float64
+	emaFastPeriod        int
+	emaSlowPeriod        int
+	takeProfitPct        float64
+	stopLossPct          float64
+	cooldownSec          int
+	maxDailyTrades       int
+	orderNotional        float64
+	autoScaleEnabled     bool
+	autoScaleBalancePct  float64
+	autoScaleMaxNotional float64
+	feeRate              float64
 
 	rsiPeriod     int
 	rsiOverbought float64
@@ -70,35 +73,45 @@ func New(cfg Params) *Strategy {
 	if rsiOversold == 0 {
 		rsiOversold = 30.0
 	}
+	autoScaleBalancePct := cfg.AutoScaleBalancePct
+	if autoScaleBalancePct == 0 {
+		autoScaleBalancePct = 80.0
+	}
 
 	return &Strategy{
-		BaseStrategy:   base,
-		emaFastPeriod:  cfg.EMAFastPeriod,
-		emaSlowPeriod:  cfg.EMASlowPeriod,
-		takeProfitPct:  cfg.TakeProfitPct,
-		stopLossPct:    cfg.StopLossPct,
-		cooldownSec:    cfg.CooldownSec,
-		maxDailyTrades: cfg.MaxDailyTrades,
-		orderNotional:  cfg.OrderNotional,
-		feeRate:        cfg.FeeRate,
-		rsiPeriod:      cfg.RSIPeriod,
-		rsiOverbought:  rsiOverbought,
-		rsiOversold:    rsiOversold,
-		symbolParams:   cfg.SymbolParams,
+		BaseStrategy:         base,
+		emaFastPeriod:        cfg.EMAFastPeriod,
+		emaSlowPeriod:        cfg.EMASlowPeriod,
+		takeProfitPct:        cfg.TakeProfitPct,
+		stopLossPct:          cfg.StopLossPct,
+		cooldownSec:          cfg.CooldownSec,
+		maxDailyTrades:       cfg.MaxDailyTrades,
+		orderNotional:        cfg.OrderNotional,
+		autoScaleEnabled:     cfg.AutoScaleEnabled,
+		autoScaleBalancePct:  autoScaleBalancePct,
+		autoScaleMaxNotional: cfg.AutoScaleMaxNotional,
+		feeRate:              cfg.FeeRate,
+		rsiPeriod:            cfg.RSIPeriod,
+		rsiOverbought:        rsiOverbought,
+		rsiOversold:          rsiOversold,
+		symbolParams:         cfg.SymbolParams,
 	}
 }
 
 // NewDefault creates a Strategy with conservative default parameters.
 func NewDefault() *Strategy {
 	return New(Params{
-		EMAFastPeriod:  9,
-		EMASlowPeriod:  21,
-		TakeProfitPct:  0.8,
-		StopLossPct:    0.4,
-		CooldownSec:    90,
-		MaxDailyTrades: 3,
-		OrderNotional:  200.0,
-		FeeRate:        0.001,
+		EMAFastPeriod:        9,
+		EMASlowPeriod:        21,
+		TakeProfitPct:        0.8,
+		StopLossPct:          0.4,
+		CooldownSec:          90,
+		MaxDailyTrades:       3,
+		OrderNotional:        200.0,
+		AutoScaleEnabled:     false,
+		AutoScaleBalancePct:  80.0,
+		AutoScaleMaxNotional: 0,
+		FeeRate:              0.001,
 	})
 }
 
@@ -137,6 +150,15 @@ func (s *Strategy) Initialize(config map[string]interface{}) error {
 	if v, ok := config["order_notional"].(float64); ok {
 		s.orderNotional = v
 	}
+	if v, ok := config["auto_scale_enabled"].(bool); ok {
+		s.autoScaleEnabled = v
+	}
+	if v, ok := config["auto_scale_balance_pct"].(float64); ok {
+		s.autoScaleBalancePct = v
+	}
+	if v, ok := config["auto_scale_max_notional"].(float64); ok {
+		s.autoScaleMaxNotional = v
+	}
 	if v, ok := config["fee_rate"].(float64); ok {
 		s.feeRate = v
 	}
@@ -160,18 +182,21 @@ func (s *Strategy) UpdateConfig(config map[string]interface{}) error {
 // GetConfig returns the current effective configuration.
 func (s *Strategy) GetConfig() map[string]interface{} {
 	return map[string]interface{}{
-		"ema_fast_period":  s.emaFastPeriod,
-		"ema_slow_period":  s.emaSlowPeriod,
-		"take_profit_pct":  s.takeProfitPct,
-		"stop_loss_pct":    s.stopLossPct,
-		"cooldown_sec":     s.cooldownSec,
-		"max_daily_trades": s.maxDailyTrades,
-		"order_notional":   s.orderNotional,
-		"fee_rate":         s.feeRate,
-		"rsi_period":       s.rsiPeriod,
-		"rsi_overbought":   s.rsiOverbought,
-		"rsi_oversold":     s.rsiOversold,
-		"symbol_params":    s.symbolParams,
+		"ema_fast_period":         s.emaFastPeriod,
+		"ema_slow_period":         s.emaSlowPeriod,
+		"take_profit_pct":         s.takeProfitPct,
+		"stop_loss_pct":           s.stopLossPct,
+		"cooldown_sec":            s.cooldownSec,
+		"max_daily_trades":        s.maxDailyTrades,
+		"order_notional":          s.orderNotional,
+		"auto_scale_enabled":      s.autoScaleEnabled,
+		"auto_scale_balance_pct":  s.autoScaleBalancePct,
+		"auto_scale_max_notional": s.autoScaleMaxNotional,
+		"fee_rate":                s.feeRate,
+		"rsi_period":              s.rsiPeriod,
+		"rsi_overbought":          s.rsiOverbought,
+		"rsi_oversold":            s.rsiOversold,
+		"symbol_params":           s.symbolParams,
 	}
 }
 
@@ -318,6 +343,14 @@ func (s *Strategy) validate() error {
 	}
 	if s.orderNotional <= 0 {
 		return fmt.Errorf("order_notional must be positive")
+	}
+	if s.autoScaleEnabled {
+		if s.autoScaleBalancePct <= 0 || s.autoScaleBalancePct > 100 {
+			return fmt.Errorf("auto_scale_balance_pct must be between 0 and 100 when auto_scale_enabled is true")
+		}
+		if s.autoScaleMaxNotional > 0 && s.autoScaleMaxNotional < s.orderNotional {
+			return fmt.Errorf("auto_scale_max_notional must be >= order_notional when set")
+		}
 	}
 	if s.feeRate < 0 || s.feeRate > 0.1 {
 		return fmt.Errorf("fee_rate must be between 0 and 0.1")

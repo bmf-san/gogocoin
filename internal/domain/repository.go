@@ -26,8 +26,7 @@ type LogRepository interface {
 
 // MarketDataRepository is the interface for market data persistence
 type MarketDataRepository interface {
-	SaveMarketData(data *MarketData) error // Save market data to database
-	SaveTicker(ticker *MarketData) error   // Alias for SaveMarketData (backward compatibility)
+	SaveMarketData(data *MarketData) error
 }
 
 // PerformanceRepository is the interface for performance metrics persistence

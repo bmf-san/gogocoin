@@ -13,7 +13,6 @@ type Position struct {
 	RemainingSize float64   `json:"remaining_size"` // Size available for matching
 	EntryPrice    float64   `json:"entry_price"`
 	CurrentPrice  float64   `json:"current_price"`
-	Price         float64   `json:"price"` // Alias for entry price (for compatibility)
 	UnrealizedPL  float64   `json:"unrealized_pl"`
 	PnL           float64   `json:"pnl"` // Realized PnL
 	Status        string    `json:"status"`   // OPEN, PARTIAL, CLOSED
