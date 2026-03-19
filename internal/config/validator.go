@@ -65,11 +65,11 @@ func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 	// Calculate minimum notional required
 	minNotional := minSize * estimatedPrice
 
-	// Get min_notional from strategy params using the configured strategy name.
+	// Get order_notional from strategy params using the configured strategy name.
 	strategyName := cfg.Trading.Strategy.Name
 	if strategyName == "" {
 		if v.logger != nil {
-			v.logger.System().Warn("No strategy name configured, skipping min_notional validation")
+			v.logger.System().Warn("No strategy name configured, skipping order_notional validation")
 		}
 		return nil
 	}
@@ -89,22 +89,22 @@ func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 		return nil
 	}
 
-	configMinNotionalFloat := scalpingParams.MinNotional
-	if configMinNotionalFloat == 0 {
-		configMinNotionalFloat = 200
+	configOrderNotionalFloat := scalpingParams.OrderNotional
+	if configOrderNotionalFloat == 0 {
+		configOrderNotionalFloat = 200
 	}
 
-	if configMinNotionalFloat < minNotional {
+	if configOrderNotionalFloat < minNotional {
 		return fmt.Errorf(
 			"CONFIGURATION ERROR for %s:\n"+
 				"   Minimum order size: %.8f %s\n"+
 				"   Estimated minimum cost: %.0f JPY (at ~%.0f JPY per unit)\n"+
-				"   Your config min_notional: %.0f JPY\n"+
+				"   Your config order_notional: %.0f JPY\n"+
 				"   \n"+
 				"   Your orders will be REJECTED by the exchange!\n"+
 				"   \n"+
 				"   Solutions:\n"+
-				"   1. Increase min_notional to at least %.0f JPY in config.yaml\n"+
+				"   1. Increase order_notional to at least %.0f JPY in config.yaml\n"+
 				"   2. Use a cheaper symbol like XRP_JPY (min ~100 JPY) or XLM_JPY (min ~500 JPY)\n"+
 				"   3. Remove %s from trading.symbols if you don't have enough capital",
 			symbol,
@@ -112,7 +112,7 @@ func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 			extractCurrency(symbol),
 			minNotional,
 			estimatedPrice,
-			configMinNotionalFloat,
+			configOrderNotionalFloat,
 			minNotional*1.1, // Add 10% buffer
 			symbol,
 		)
@@ -122,8 +122,8 @@ func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 		v.logger.System().
 			WithField("symbol", symbol).
 			WithField("min_size", minSize).
-			WithField("min_notional", minNotional).
-			WithField("config_min", configMinNotionalFloat).
+			WithField("order_notional", minNotional).
+			WithField("config_order_notional", configOrderNotionalFloat).
 			WithField("validation", "PASSED").
 			Info("Trading configuration validated for symbol")
 	}

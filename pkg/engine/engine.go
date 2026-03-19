@@ -280,7 +280,7 @@ func strategyParamsToMap(name string, params interface{}) (map[string]interface{
 				"ema_fast_period": ov.EMAFastPeriod,
 				"ema_slow_period": ov.EMASlowPeriod,
 				"cooldown_sec":    ov.CooldownSec,
-				"min_notional":    ov.MinNotional,
+				"order_notional":  ov.OrderNotional,
 			}
 		}
 		return map[string]interface{}{
@@ -290,7 +290,7 @@ func strategyParamsToMap(name string, params interface{}) (map[string]interface{
 			"stop_loss_pct":    cp.StopLossPct,
 			"cooldown_sec":     cp.CooldownSec,
 			"max_daily_trades": cp.MaxDailyTrades,
-			"min_notional":     cp.MinNotional,
+			"order_notional":   cp.OrderNotional,
 			"fee_rate":         cp.FeeRate,
 			"rsi_period":       cp.RSIPeriod,
 			"rsi_overbought":   cp.RSIOverbought,
