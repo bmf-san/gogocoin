@@ -82,9 +82,6 @@ func (r *Repository) GetLatestBalances() ([]domain.Balance, error) {
 func (r *Repository) SaveMarketData(data *domain.MarketData) error {
 	return r.marketData.SaveMarketData(data)
 }
-func (r *Repository) SaveTicker(ticker *domain.MarketData) error {
-	return r.marketData.SaveTicker(ticker)
-}
 func (r *Repository) GetLatestMarketData(symbol string, limit int) ([]domain.MarketData, error) {
 	return r.marketData.GetLatestMarketData(symbol, limit)
 }

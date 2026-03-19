@@ -27,11 +27,6 @@ func (r *MarketDataRepository) SaveMarketData(data *domain.MarketData) error {
 	return err
 }
 
-// SaveTicker is an alias for SaveMarketData (backward compatibility).
-func (r *MarketDataRepository) SaveTicker(ticker *domain.MarketData) error {
-	return r.SaveMarketData(ticker)
-}
-
 // GetLatestMarketData returns the limit most-recent rows for the given symbol.
 func (r *MarketDataRepository) GetLatestMarketData(symbol string, limit int) ([]domain.MarketData, error) {
 	query := `SELECT symbol, timestamp, open, high, low, close, volume

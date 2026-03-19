@@ -301,10 +301,7 @@ func strategyParamsToMap(name string, params interface{}) (map[string]interface{
 			"symbol_params":           symParams,
 		}, nil
 	default:
-		// Unknown strategy: pass the YAML-decoded value as-is.
-		// Implementations that register non-scalping strategies must handle
-		// their own param format in Initialize().
-		return map[string]interface{}{"_raw": params}, nil
+		return nil, fmt.Errorf("unknown strategy %q: no parameter mapping registered", name)
 	}
 }
 

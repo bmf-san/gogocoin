@@ -9,8 +9,6 @@ import (
 	"github.com/bmf-san/gogocoin/internal/logger"
 )
 
-// Deprecated: These constants are now configured via config.yaml (worker section)
-// They are kept for backward compatibility but will be removed in v2.0
 const (
 	defaultReconnectInterval       = 10 * time.Second
 	defaultMaxReconnectInterval    = 5 * time.Minute
