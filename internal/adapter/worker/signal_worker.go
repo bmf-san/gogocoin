@@ -10,6 +10,13 @@ import (
 	strategy "github.com/bmf-san/gogocoin/pkg/strategy"
 )
 
+type autoScaleConfig struct {
+	enabled     bool
+	balancePct  float64
+	maxNotional float64
+	feeRate     float64
+}
+
 // SignalWorker processes trading signals and executes trades
 type SignalWorker struct {
 	logger               logger.LoggerInterface
@@ -112,6 +119,12 @@ func (w *SignalWorker) processSignal(ctx context.Context, signal *strategy.Signa
 		return
 	}
 
+	if signal.Action == strategy.SignalBuy {
+		if ok := w.applyAutoScaleToBuySignal(ctx, signal); !ok {
+			return
+		}
+	}
+
 	// Risk management check (use parent context instead of Background)
 	if err := w.riskChecker.CheckRiskManagement(ctx, signal); err != nil {
 		w.logger.Trading().WithError(err).Warn("Risk management check failed - order rejected")
@@ -197,6 +210,144 @@ func (w *SignalWorker) createOrderFromSignal(ctx context.Context, signal *strate
 		Price:       signal.Price,
 		TimeInForce: "IOC", // Immediate or Cancel
 	}, false
+}
+
+func (w *SignalWorker) applyAutoScaleToBuySignal(ctx context.Context, signal *strategy.Signal) bool {
+	if signal.Price <= 0 || signal.Quantity <= 0 {
+		w.logger.Trading().WithField("symbol", signal.Symbol).
+			Warn("Skipping BUY signal - invalid price or quantity")
+		return false
+	}
+
+	cfg := w.getAutoScaleConfig()
+	if !cfg.enabled {
+		return true
+	}
+
+	availableJPY, ok := w.getAvailableBalance(ctx, "JPY")
+	if !ok {
+		w.logger.Trading().WithField("symbol", signal.Symbol).
+			Warn("Skipping BUY signal - failed to get JPY balance for auto scale")
+		return false
+	}
+
+	baseNotional := signal.Price * signal.Quantity
+	effectiveNotional := computeScaledNotional(baseNotional, availableJPY, cfg)
+	if effectiveNotional < baseNotional {
+		w.logger.Trading().
+			WithField("symbol", signal.Symbol).
+			WithField("base_notional", baseNotional).
+			WithField("available_jpy", availableJPY).
+			Warn("Skipping BUY signal - insufficient JPY for base order_notional")
+		return false
+	}
+
+	signal.Quantity = effectiveNotional / signal.Price
+	if signal.Metadata == nil {
+		signal.Metadata = make(map[string]interface{})
+	}
+	signal.Metadata["order_notional_effective"] = effectiveNotional
+	signal.Metadata["order_notional_base"] = baseNotional
+
+	return true
+}
+
+func computeScaledNotional(baseNotional, availableJPY float64, cfg autoScaleConfig) float64 {
+	if baseNotional <= 0 || availableJPY <= 0 {
+		return 0
+	}
+
+	effective := baseNotional
+	if cfg.enabled {
+		target := availableJPY * cfg.balancePct / 100.0
+		if target > effective {
+			effective = target
+		}
+	}
+
+	if cfg.maxNotional > 0 && effective > cfg.maxNotional {
+		effective = cfg.maxNotional
+	}
+
+	if cfg.feeRate < 0 {
+		cfg.feeRate = 0
+	}
+	affordable := availableJPY / (1.0 + cfg.feeRate)
+	if effective > affordable {
+		effective = affordable
+	}
+
+	if effective < 0 {
+		return 0
+	}
+	return effective
+}
+
+func (w *SignalWorker) getAutoScaleConfig() autoScaleConfig {
+	cfg := autoScaleConfig{enabled: false, balancePct: 80.0, maxNotional: 0, feeRate: 0}
+	if w.currentStrategy == nil {
+		return cfg
+	}
+
+	raw := w.currentStrategy.GetConfig()
+	if v, ok := asBool(raw["auto_scale_enabled"]); ok {
+		cfg.enabled = v
+	}
+	if v, ok := asFloat(raw["auto_scale_balance_pct"]); ok {
+		cfg.balancePct = v
+	}
+	if cfg.balancePct <= 0 || cfg.balancePct > 100 {
+		cfg.balancePct = 80.0
+	}
+	if v, ok := asFloat(raw["auto_scale_max_notional"]); ok {
+		cfg.maxNotional = v
+	}
+	if v, ok := asFloat(raw["fee_rate"]); ok {
+		cfg.feeRate = v
+	}
+
+	return cfg
+}
+
+func asFloat(v interface{}) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	case int:
+		return float64(n), true
+	case int32:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	default:
+		return 0, false
+	}
+}
+
+func asBool(v interface{}) (bool, bool) {
+	b, ok := v.(bool)
+	return b, ok
+}
+
+func (w *SignalWorker) getAvailableBalance(ctx context.Context, currency string) (float64, bool) {
+	balanceCtx, balanceCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer balanceCancel()
+
+	balances, err := w.trader.GetBalance(balanceCtx)
+	if err != nil {
+		w.logger.Trading().WithError(err).Error("Failed to get balance")
+		return 0, false
+	}
+
+	for i := range balances {
+		if balances[i].Currency == currency {
+			return balances[i].Available, true
+		}
+	}
+
+	return 0, false
 }
 
 // getAvailableSellSize gets the available size for selling
