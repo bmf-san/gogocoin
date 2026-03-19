@@ -219,6 +219,17 @@ func (rm *Manager) checkTotalLossLimit(ctx context.Context) error {
 		}
 	}
 
+	// If JPY balance is zero (all capital is deployed in crypto),
+	// fall back to InitialBalance to avoid a division-by-zero that would
+	// produce +Inf and incorrectly block SELL orders.
+	if totalAssets <= 0 {
+		totalAssets = rm.cfg.InitialBalance
+	}
+	if totalAssets <= 0 {
+		// InitialBalance also zero — cannot evaluate loss percentage, skip check.
+		return nil
+	}
+
 	// Calculate loss percentage against current assets.
 	// totalLoss is the absolute loss value; totalAssets is the current balance.
 	lossPercent := (totalLoss / totalAssets) * 100
