@@ -195,8 +195,9 @@ func (rm *Manager) checkTotalLossLimit(ctx context.Context) error {
 		return nil // OK if no data
 	}
 
-	// Check latest total PnL
-	latestMetric := metrics[len(metrics)-1]
+	// GetPerformanceMetrics returns rows ORDER BY date DESC, so metrics[0] is the
+	// most recent entry.  Using metrics[len-1] was a bug that read the oldest record.
+	latestMetric := metrics[0]
 	totalLoss := -latestMetric.TotalPnL // Negative value indicates loss
 
 	if totalLoss <= 0 {
