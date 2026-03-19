@@ -49,13 +49,13 @@ func (m *mockTrader) GetOrders(ctx context.Context) ([]*domain.OrderResult, erro
 	return nil, nil
 }
 
-func (m *mockTrader) SetDatabase(db domain.TradingRepository)            {}
+func (m *mockTrader) SetDatabase(db domain.TradingRepository)           {}
 func (m *mockTrader) SetMarketSpecService(svc domain.MarketSpecService) {}
-func (m *mockTrader) SetStrategyName(name string)                        {}
-func (m *mockTrader) SetOnOrderCompleted(fn func(*domain.OrderResult))   {}
-func (m *mockTrader) InvalidateBalanceCache()                            {}
-func (m *mockTrader) UpdateBalanceToDB(ctx context.Context)              {}
-func (m *mockTrader) Shutdown() error                                    { return nil }
+func (m *mockTrader) SetStrategyName(name string)                       {}
+func (m *mockTrader) SetOnOrderCompleted(fn func(*domain.OrderResult))  {}
+func (m *mockTrader) InvalidateBalanceCache()                           {}
+func (m *mockTrader) UpdateBalanceToDB(ctx context.Context)             {}
+func (m *mockTrader) Shutdown() error                                   { return nil }
 
 func TestCheckTradeAmount(t *testing.T) {
 	cfg := ManagerConfig{
@@ -334,6 +334,24 @@ func TestCheckRiskManagement(t *testing.T) {
 			},
 			metrics:     []domain.PerformanceMetric{},
 			expectError: true,
+		},
+		{
+			// SELL orders must be allowed even when all capital is deployed in
+			// crypto (JPY balance == 0).  Without this, stop-loss SELL orders are
+			// silently blocked and the position cannot be unwound.
+			name: "SELL allowed with zero JPY balance",
+			signal: &strategy.Signal{
+				Action:   strategy.SignalSell,
+				Price:    5000000,
+				Quantity: 0.001,
+			},
+			balances: []domain.Balance{
+				{Currency: "JPY", Available: 0},
+				{Currency: "BTC", Available: 0.001},
+			},
+			trades:      []domain.Trade{{CreatedAt: now.Add(-10 * time.Minute), ExecutedAt: now.Add(-10 * time.Minute)}},
+			metrics:     []domain.PerformanceMetric{{TotalPnL: 0}},
+			expectError: false,
 		},
 	}
 

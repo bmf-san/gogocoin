@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// GetHealth implements StrictServerInterface - ヘルスチェック
+// GetHealth implements StrictServerInterface - health check
 func (s *Server) GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error) {
 	now := time.Now()
 	uptime := s.calculateUptime()
@@ -19,7 +19,7 @@ func (s *Server) GetHealth(ctx context.Context, request GetHealthRequestObject) 
 	}, nil
 }
 
-// GetApiStatus implements StrictServerInterface - システム状態の取得
+// GetApiStatus implements StrictServerInterface - get system status
 func (s *Server) GetApiStatus(ctx context.Context, request GetApiStatusRequestObject) (GetApiStatusResponseObject, error) {
 	const (
 		APIKeyPlaceholder    = "${BITFLYER_API_KEY}"

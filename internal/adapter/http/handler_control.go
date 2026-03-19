@@ -13,7 +13,7 @@ func internalErr(msg string) InternalServerErrorJSONResponse {
 	return InternalServerErrorJSONResponse{Message: &msg}
 }
 
-// PostApiTradingStart implements StrictServerInterface - 取引開始
+// PostApiTradingStart implements StrictServerInterface - start trading
 func (s *Server) PostApiTradingStart(ctx context.Context, request PostApiTradingStartRequestObject) (PostApiTradingStartResponseObject, error) {
 	s.logger.UI().Info("Trading start requested via API")
 
@@ -48,7 +48,7 @@ func (s *Server) PostApiTradingStart(ctx context.Context, request PostApiTrading
 	}, nil
 }
 
-// PostApiTradingStop implements StrictServerInterface - 取引停止
+// PostApiTradingStop implements StrictServerInterface - stop trading
 func (s *Server) PostApiTradingStop(ctx context.Context, request PostApiTradingStopRequestObject) (PostApiTradingStopResponseObject, error) {
 	s.logger.UI().Info("Trading stop requested via API")
 
@@ -83,7 +83,7 @@ func (s *Server) PostApiTradingStop(ctx context.Context, request PostApiTradingS
 	}, nil
 }
 
-// GetApiTradingStatus implements StrictServerInterface - 取引状態の取得
+// GetApiTradingStatus implements StrictServerInterface - get trading status
 func (s *Server) GetApiTradingStatus(ctx context.Context, request GetApiTradingStatusRequestObject) (GetApiTradingStatusResponseObject, error) {
 	if s.app == nil {
 		return GetApiTradingStatus503JSONResponse{svcUnavailableErr("Application not initialized")}, nil
@@ -110,7 +110,7 @@ func (s *Server) GetApiTradingStatus(ctx context.Context, request GetApiTradingS
 	}, nil
 }
 
-// PostApiStrategyReset implements StrictServerInterface - 戦略状態のリセット
+// PostApiStrategyReset implements StrictServerInterface - reset strategy state
 func (s *Server) PostApiStrategyReset(ctx context.Context, request PostApiStrategyResetRequestObject) (PostApiStrategyResetResponseObject, error) {
 	s.logger.UI().Info("Strategy reset requested via API")
 

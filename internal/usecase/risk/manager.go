@@ -76,14 +76,16 @@ func (rm *Manager) CheckRiskManagement(ctx context.Context, signal *strategy.Sig
 		}
 	}
 
-	// Validate balance before risk checks
-	if totalBalanceJPY <= 0 {
-		return fmt.Errorf("insufficient JPY balance for risk check: %f", totalBalanceJPY)
-	}
-
-	// Check trade amount (including fees)
-	if err := rm.checkTradeAmount(signal, totalBalanceJPY); err != nil {
-		return fmt.Errorf("trade amount validation failed: %w", err)
+	// BUY orders require positive JPY balance and are subject to the trade-amount
+	// cap.  SELL orders liquidate crypto holdings back to JPY, so a zero JPY
+	// balance is expected and the cap does not apply.
+	if signal.Action == strategy.SignalBuy {
+		if totalBalanceJPY <= 0 {
+			return fmt.Errorf("insufficient JPY balance for BUY order: %f", totalBalanceJPY)
+		}
+		if err := rm.checkTradeAmount(signal, totalBalanceJPY); err != nil {
+			return fmt.Errorf("trade amount validation failed: %w", err)
+		}
 	}
 
 	// Check daily trade limit
@@ -195,8 +197,9 @@ func (rm *Manager) checkTotalLossLimit(ctx context.Context) error {
 		return nil // OK if no data
 	}
 
-	// Check latest total PnL
-	latestMetric := metrics[len(metrics)-1]
+	// GetPerformanceMetrics returns rows ORDER BY date DESC, so metrics[0] is the
+	// most recent entry.  Using metrics[len-1] was a bug that read the oldest record.
+	latestMetric := metrics[0]
 	totalLoss := -latestMetric.TotalPnL // Negative value indicates loss
 
 	if totalLoss <= 0 {
@@ -217,6 +220,17 @@ func (rm *Manager) checkTotalLossLimit(ctx context.Context) error {
 			totalAssets = bal.Available
 			break
 		}
+	}
+
+	// If JPY balance is zero (all capital is deployed in crypto),
+	// fall back to InitialBalance to avoid a division-by-zero that would
+	// produce +Inf and incorrectly block SELL orders.
+	if totalAssets <= 0 {
+		totalAssets = rm.cfg.InitialBalance
+	}
+	if totalAssets <= 0 {
+		// InitialBalance also zero — cannot evaluate loss percentage, skip check.
+		return nil
 	}
 
 	// Calculate loss percentage against current assets.

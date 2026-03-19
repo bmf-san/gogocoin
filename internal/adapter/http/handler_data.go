@@ -53,7 +53,7 @@ func maskedConfig(cfg *config.Config) *config.Config {
 	return &copy
 }
 
-// GetApiBalance implements StrictServerInterface - 残高取得
+// GetApiBalance implements StrictServerInterface - get balance
 func (s *Server) GetApiBalance(ctx context.Context, request GetApiBalanceRequestObject) (GetApiBalanceResponseObject, error) {
 	if s.app != nil {
 		balances, err := s.app.GetBalances(ctx)
@@ -101,7 +101,7 @@ func (s *Server) GetApiBalance(ctx context.Context, request GetApiBalanceRequest
 	return GetApiBalance200JSONResponse(domainBalancesToAPI(balances)), nil
 }
 
-// GetApiTrades implements StrictServerInterface - 取引履歴の取得
+// GetApiTrades implements StrictServerInterface - get trade history
 func (s *Server) GetApiTrades(ctx context.Context, request GetApiTradesRequestObject) (GetApiTradesResponseObject, error) {
 	limit := 50
 	if request.Params.Limit != nil {
@@ -119,7 +119,7 @@ func (s *Server) GetApiTrades(ctx context.Context, request GetApiTradesRequestOb
 	return GetApiTrades200JSONResponse(domainTradesToAPI(trades)), nil
 }
 
-// GetApiPerformance implements StrictServerInterface - パフォーマンス指標の取得
+// GetApiPerformance implements StrictServerInterface - get performance metrics
 func (s *Server) GetApiPerformance(ctx context.Context, request GetApiPerformanceRequestObject) (GetApiPerformanceResponseObject, error) {
 	metrics, err := s.db.GetPerformanceMetrics(30)
 	if err != nil {
@@ -132,13 +132,13 @@ func (s *Server) GetApiPerformance(ctx context.Context, request GetApiPerformanc
 	return GetApiPerformance200JSONResponse(domainMetricsToAPI(metrics)), nil
 }
 
-// GetApiConfig implements StrictServerInterface - 現在の設定を取得
+// GetApiConfig implements StrictServerInterface - get current config
 func (s *Server) GetApiConfig(ctx context.Context, request GetApiConfigRequestObject) (GetApiConfigResponseObject, error) {
 	s.logger.UI().WithField("strategy", s.config.Trading.Strategy.Name).Info("Returning config")
 	return customConfigResponse{cfg: maskedConfig(s.config)}, nil
 }
 
-// PostApiConfig implements StrictServerInterface - 設定を更新
+// PostApiConfig implements StrictServerInterface - update config
 func (s *Server) PostApiConfig(ctx context.Context, request PostApiConfigRequestObject) (PostApiConfigResponseObject, error) {
 	if request.Body == nil {
 		msg := "Request body is required"
@@ -189,7 +189,7 @@ func (s *Server) PostApiConfig(ctx context.Context, request PostApiConfigRequest
 	return customConfigUpdateResponse{cfg: maskedConfig(s.config), message: "Configuration saved"}, nil
 }
 
-// GetApiLogs implements StrictServerInterface - ログの取得
+// GetApiLogs implements StrictServerInterface - get logs
 func (s *Server) GetApiLogs(ctx context.Context, request GetApiLogsRequestObject) (GetApiLogsResponseObject, error) {
 	limit := 100
 	if request.Params.Limit != nil {
@@ -216,7 +216,7 @@ func (s *Server) GetApiLogs(ctx context.Context, request GetApiLogsRequestObject
 	return GetApiLogs200JSONResponse(domainLogsToAPI(logs)), nil
 }
 
-// GetApiOrders implements StrictServerInterface - 注文履歴の取得
+// GetApiOrders implements StrictServerInterface - get order history
 func (s *Server) GetApiOrders(ctx context.Context, request GetApiOrdersRequestObject) (GetApiOrdersResponseObject, error) {
 	// Orders are not stored in DB directly; return empty list
 	return GetApiOrders200JSONResponse{}, nil
@@ -381,6 +381,3 @@ func domainLogsToAPI(logs []domain.LogEntry) []LogEntry {
 	}
 	return result
 }
-
-
-

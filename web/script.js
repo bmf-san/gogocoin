@@ -90,7 +90,7 @@ class GogocoinUI {
             this.updateInterval = setTimeout(async () => {
                 try {
                     await this.loadDashboardData();
-                    // ログも更新
+                    // Also refresh logs
                     this.loadLogs().catch(err => {
                         console.error('Failed to load logs:', err);
                     });
@@ -112,7 +112,7 @@ class GogocoinUI {
     async loadInitialData() {
         try {
             await this.loadDashboardData();
-            // ダッシュボードにもログが表示されるので初期ロード
+            // Dashboard also shows logs, so load on init
             this.loadLogs().catch(err => {
                 console.error('Failed to load initial logs:', err);
             });
@@ -304,11 +304,17 @@ class GogocoinUI {
         const totalPnlEl = document.getElementById('total-pnl');
         const winRateEl = document.getElementById('win-rate');
         const todayPnlEl = document.getElementById('today-pnl');
+        const sharpeEl = document.getElementById('sharpe-ratio');
+        const profitFactorEl = document.getElementById('profit-factor');
+        const maxDrawdownEl = document.getElementById('max-drawdown');
 
         if (hasError) {
             if (totalPnlEl) { totalPnlEl.textContent = '取得エラー'; totalPnlEl.className = 'text-xl font-bold text-danger'; }
             if (winRateEl) { winRateEl.textContent = '-'; winRateEl.className = 'text-lg font-bold text-secondary'; }
             if (todayPnlEl) { todayPnlEl.textContent = '-'; todayPnlEl.className = 'text-lg font-bold text-secondary'; }
+            if (sharpeEl) { sharpeEl.textContent = '-'; }
+            if (profitFactorEl) { profitFactorEl.textContent = '-'; }
+            if (maxDrawdownEl) { maxDrawdownEl.textContent = '-'; }
             return;
         }
 
@@ -326,6 +332,9 @@ class GogocoinUI {
                 todayPnlEl.textContent = '¥0';
                 todayPnlEl.className = 'text-2xl font-black';
             }
+            if (sharpeEl) { sharpeEl.textContent = '-'; }
+            if (profitFactorEl) { profitFactorEl.textContent = '-'; }
+            if (maxDrawdownEl) { maxDrawdownEl.textContent = '-'; }
             return;
         }
 
@@ -339,6 +348,24 @@ class GogocoinUI {
         if (winRateEl) {
             winRateEl.textContent = this.formatPercent(latest.win_rate);
             winRateEl.className = 'text-lg font-bold';
+        }
+        if (sharpeEl) {
+            const v = latest.sharpe_ratio;
+            const vValid = v != null && !isNaN(v);
+            sharpeEl.textContent = vValid ? parseFloat(v).toFixed(2) : '-';
+            sharpeEl.className = 'text-2xl font-bold' + (vValid ? (v >= 1.0 ? ' text-success' : ' text-danger') : '');
+        }
+        if (profitFactorEl) {
+            const v = latest.profit_factor;
+            const vValid = v != null && !isNaN(v);
+            profitFactorEl.textContent = vValid ? parseFloat(v).toFixed(2) : '-';
+            profitFactorEl.className = 'text-2xl font-bold' + (vValid ? (v >= 1.5 ? ' text-success' : ' text-danger') : '');
+        }
+        if (maxDrawdownEl) {
+            const v = latest.max_drawdown;
+            const vValid = v != null && !isNaN(v);
+            maxDrawdownEl.textContent = vValid ? parseFloat(v).toFixed(2) + '%' : '-';
+            maxDrawdownEl.className = 'text-2xl font-bold' + (vValid ? (v <= 10 ? ' text-success' : ' text-danger') : '');
         }
 
         // Calculate today's PnL from actual trade records (JST date match)
@@ -415,7 +442,7 @@ class GogocoinUI {
                 url += `&category=${category}`;
             }
 
-            // 30秒タイムアウト（ログAPIが遅い可能性がある）
+            // 30s timeout (log API may be slow)
             const logs = await this.fetchAPI(url, 'GET', null, 30000);
 
             const container = document.getElementById('logs-container');
@@ -430,8 +457,8 @@ class GogocoinUI {
                 return;
             }
 
-            // Reverse to show newest first
-            const reversedLogs = logs.reverse();
+            // Reverse to show newest first (slice to avoid mutating original)
+            const reversedLogs = logs.slice().reverse();
 
             container.innerHTML = reversedLogs.map(log => {
                 const levelClass = log.level.toLowerCase();
@@ -523,13 +550,13 @@ class GogocoinUI {
         return div.innerHTML;
     }
 
-    // Format number用のヘルパーメソッド
+    // Format number helper
     formatNumber(value) {
         if (value === null || value === undefined) return '-';
         const num = parseFloat(value);
         if (isNaN(num)) return '-';
 
-        // -0を0に変換
+        // Convert -0 to 0
         if (num === 0) return '0';
 
         return new Intl.NumberFormat('ja-JP', {
@@ -538,16 +565,16 @@ class GogocoinUI {
         }).format(num);
     }
 
-    // Format currency用のヘルパーメソッド
+    // Format currency helper
     formatCurrency(value) {
         if (value === null || value === undefined) return '¥0';
         const num = parseFloat(value);
         if (isNaN(num)) return '¥0';
 
-        // -0を0に変換
+        // Convert -0 to 0
         if (num === 0) return '¥0';
 
-        // 市場価格やトレード価格の精度を保つため、小数点以下2桁まで表示
+        // Show up to 2 decimal places for market/trade price precision
         return new Intl.NumberFormat('ja-JP', {
             style: 'currency',
             currency: 'JPY',
@@ -556,16 +583,16 @@ class GogocoinUI {
         }).format(num);
     }
 
-    // Format fee (手数料) 用のヘルパーメソッド - 小数点以下も表示
+    // Format fee helper - show decimal places
     formatFee(value) {
         if (value === null || value === undefined) return '-';
         const num = parseFloat(value);
         if (isNaN(num)) return '-';
 
-        // -0を0に変換
+        // Convert -0 to 0
         if (num === 0) return '-';
 
-        // 小数点以下8桁まで表示（暗号通貨の精度に対応）
+        // Show up to 8 decimal places (for crypto precision)
         return new Intl.NumberFormat('ja-JP', {
             minimumFractionDigits: 0,
             maximumFractionDigits: 8
@@ -584,7 +611,7 @@ class GogocoinUI {
         });
     }
 
-    // Format date用のヘルパーメソッド
+    // Format date helper
     formatDate(dateString) {
         if (!dateString) return '-';
         const date = new Date(dateString);
@@ -595,7 +622,7 @@ class GogocoinUI {
         });
     }
 
-    // Format datetime用のヘルパーメソッド
+    // Format datetime helper
     formatDateTime(dateString) {
         if (!dateString) return '-';
         const date = new Date(dateString);
@@ -620,13 +647,13 @@ class GogocoinUI {
         });
     }
 
-    // Format percentage用のヘルパーメソッド
+    // Format percentage helper
     formatPercent(value) {
         if (value === null || value === undefined) return '-';
         const num = parseFloat(value);
         if (isNaN(num)) return '-';
 
-        // -0を0に変換
+        // Convert -0 to 0
         if (num === 0) return '0%';
 
         return new Intl.NumberFormat('ja-JP', {
@@ -636,7 +663,7 @@ class GogocoinUI {
         }).format(num / 100);
     }
 
-    // API呼び出し用のヘルパーメソッド
+    // API call helper
     async fetchAPI(url, method = 'GET', body = null, timeout = 10000) {
         try {
             const controller = new AbortController();
@@ -680,7 +707,7 @@ class GogocoinUI {
 
         if (!startBtn || !stopBtn) return;
 
-        // ボタンを無効化してローディング表示
+        // Disable button and show loading
         startBtn.disabled = true;
         startBtn.textContent = '開始中...';
 
@@ -688,17 +715,17 @@ class GogocoinUI {
             const response = await this.fetchAPI('/api/trading/start', 'POST', null, 10000);
             console.log('Start trading response:', response);
 
-            // 成功 - サーバーからの最新状態を取得してボタンを更新
+            // Success - fetch latest state from server and update buttons
             try {
                 await this.loadDashboardData();
             } catch (dashboardError) {
-                // ダッシュボードデータ取得失敗でも、最低限statusだけは取得
+                // Dashboard load failed; try to at least fetch status
                 console.error('Dashboard load failed, fetching status only:', dashboardError);
                 try {
                     const status = await this.fetchAPI(`/api/status?symbol=${this.selectedSymbol}`);
                     this.updateSystemStatus(status);
                 } catch (statusError) {
-                    // ダッシュボード更新失敗は取引開始の成否とは無関係。ログにとどめる。
+                    // Dashboard update failure is unrelated to trading start result. Log only.
                     console.error('Status fetch also failed (trading was started successfully):', statusError);
                 }
             }
@@ -706,7 +733,7 @@ class GogocoinUI {
             console.error('Error starting trading:', error);
             alert('取引開始に失敗しました: ' + error.message);
 
-            // エラー時はボタンを元に戻す
+            // Restore button on error
             startBtn.disabled = false;
             startBtn.textContent = '開始';
         }
@@ -719,7 +746,7 @@ class GogocoinUI {
 
         if (!startBtn || !stopBtn) return;
 
-        // ボタンを無効化してローディング表示
+        // Disable button and show loading
         stopBtn.disabled = true;
         stopBtn.textContent = '停止中...';
 
@@ -727,20 +754,25 @@ class GogocoinUI {
             const response = await this.fetchAPI('/api/trading/stop', 'POST', null, 10000);
             console.log('Stop trading response:', response);
 
-            // 成功 - サーバーからの最新状態を取得してボタンを更新
+            // Success - fetch latest state from server and update buttons
             try {
                 await this.loadDashboardData();
             } catch (dashboardError) {
-                // ダッシュボードデータ取得失敗でも、最低限statusだけは取得
+                // Dashboard load failed; try to at least fetch status
                 console.error('Dashboard load failed, fetching status only:', dashboardError);
-                const status = await this.fetchAPI(`/api/status?symbol=${this.selectedSymbol}`);
-                this.updateSystemStatus(status);
+                try {
+                    const status = await this.fetchAPI(`/api/status?symbol=${this.selectedSymbol}`);
+                    this.updateSystemStatus(status);
+                } catch (statusError) {
+                    // Dashboard update failure is unrelated to trading stop result. Log only.
+                    console.error('Status fetch also failed (trading was stopped successfully):', statusError);
+                }
             }
         } catch (error) {
             console.error('Error stopping trading:', error);
             alert('取引停止に失敗しました: ' + error.message);
 
-            // エラー時はボタンを元に戻す
+            // Restore button on error
             stopBtn.disabled = false;
             stopBtn.textContent = '停止';
         }
@@ -748,7 +780,7 @@ class GogocoinUI {
 
 }
 
-// アプリケーション初期化
+// Initialize application
 document.addEventListener('DOMContentLoaded', () => {
     new GogocoinUI();
 });

@@ -339,15 +339,18 @@ func (s *Strategy) calculateEMA(history []strategy.MarketData, period int) float
 	if len(history) < period {
 		return 0.0
 	}
-	data := history[len(history)-period:]
+	// Initialise with SMA of the first period points, then apply the EMA
+	// formula to every subsequent point.  Using the full history avoids the
+	// previous bug where SMA and EMA loop operated on the same slice,
+	// effectively double-counting the most-recent prices.
 	sum := 0.0
-	for i := range data {
-		sum += data[i].Price
+	for i := 0; i < period; i++ {
+		sum += history[i].Price
 	}
 	ema := sum / float64(period)
 	multiplier := 2.0 / float64(period+1)
-	for i := 1; i < len(data); i++ {
-		ema = (data[i].Price-ema)*multiplier + ema
+	for i := period; i < len(history); i++ {
+		ema = (history[i].Price-ema)*multiplier + ema
 	}
 	return ema
 }
