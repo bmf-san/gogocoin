@@ -372,6 +372,22 @@ func TestInitializeDailyTradeCount(t *testing.T) {
 	}
 }
 
+// TestInitializeDailyTradeCount_DoesNotTriggerCooldown verifies that
+// InitializeDailyTradeCount does NOT set lastTradeTime, so the cooldown
+// timer is not activated on startup (regression: engine used RecordTrade
+// which set lastTradeTime = time.Now(), blocking all trades for cooldownSec
+// seconds after every restart).
+func TestInitializeDailyTradeCount_DoesNotTriggerCooldown(t *testing.T) {
+	s := newTestStrategy()
+	s.InitializeDailyTradeCount(3)
+	s.mu.RLock()
+	last := s.lastTradeTime
+	s.mu.RUnlock()
+	if !last.IsZero() {
+		t.Errorf("InitializeDailyTradeCount must not set lastTradeTime (cooldown side-effect), got %v", last)
+	}
+}
+
 // ── Analyze ───────────────────────────────────────────────────────────────────
 
 func TestAnalyze_EmptyData(t *testing.T) {

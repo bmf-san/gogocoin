@@ -306,6 +306,8 @@ func strategyParamsToMap(name string, params interface{}) (map[string]interface{
 }
 
 // initDailyTradeCount restores today's trade count into the strategy.
+// Uses InitializeDailyTradeCount (not RecordTrade) so that the cooldown timer
+// is not reset to time.Now() on every restart.
 func initDailyTradeCount(repo *persistence.Repository, strat pkgstrategy.Strategy, log logger.LoggerInterface) {
 	trades, err := repo.GetRecentTrades(200)
 	if err != nil {
@@ -314,13 +316,15 @@ func initDailyTradeCount(repo *persistence.Repository, strat pkgstrategy.Strateg
 	}
 	now := utils.NowInJST()
 	todayY, todayM, todayD := now.Date()
+	count := 0
 	for i := range trades {
 		t := utils.ToJST(trades[i].ExecutedAt)
 		y, m, d := t.Date()
 		if y == todayY && m == todayM && d == todayD {
-			strat.RecordTrade()
+			count++
 		}
 	}
+	strat.InitializeDailyTradeCount(count)
 }
 
 // ── appServiceAdapter ────────────────────────────────────────────────────────
