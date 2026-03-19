@@ -35,7 +35,7 @@ type Strategy struct {
 	stopLossPct    float64
 	cooldownSec    int
 	maxDailyTrades int
-	minNotional    float64
+	orderNotional  float64
 	feeRate        float64
 
 	rsiPeriod     int
@@ -79,7 +79,7 @@ func New(cfg Params) *Strategy {
 		stopLossPct:    cfg.StopLossPct,
 		cooldownSec:    cfg.CooldownSec,
 		maxDailyTrades: cfg.MaxDailyTrades,
-		minNotional:    cfg.MinNotional,
+		orderNotional:  cfg.OrderNotional,
 		feeRate:        cfg.FeeRate,
 		rsiPeriod:      cfg.RSIPeriod,
 		rsiOverbought:  rsiOverbought,
@@ -97,7 +97,7 @@ func NewDefault() *Strategy {
 		StopLossPct:    0.4,
 		CooldownSec:    90,
 		MaxDailyTrades: 3,
-		MinNotional:    200.0,
+		OrderNotional:  200.0,
 		FeeRate:        0.001,
 	})
 }
@@ -134,8 +134,8 @@ func (s *Strategy) Initialize(config map[string]interface{}) error {
 	if v, ok := config["max_daily_trades"].(int); ok {
 		s.maxDailyTrades = v
 	}
-	if v, ok := config["min_notional"].(float64); ok {
-		s.minNotional = v
+	if v, ok := config["order_notional"].(float64); ok {
+		s.orderNotional = v
 	}
 	if v, ok := config["fee_rate"].(float64); ok {
 		s.feeRate = v
@@ -166,7 +166,7 @@ func (s *Strategy) GetConfig() map[string]interface{} {
 		"stop_loss_pct":    s.stopLossPct,
 		"cooldown_sec":     s.cooldownSec,
 		"max_daily_trades": s.maxDailyTrades,
-		"min_notional":     s.minNotional,
+		"order_notional":   s.orderNotional,
 		"fee_rate":         s.feeRate,
 		"rsi_period":       s.rsiPeriod,
 		"rsi_overbought":   s.rsiOverbought,
@@ -316,8 +316,8 @@ func (s *Strategy) validate() error {
 	if s.maxDailyTrades <= 0 {
 		return fmt.Errorf("max_daily_trades must be positive")
 	}
-	if s.minNotional <= 0 {
-		return fmt.Errorf("min_notional must be positive")
+	if s.orderNotional <= 0 {
+		return fmt.Errorf("order_notional must be positive")
 	}
 	if s.feeRate < 0 || s.feeRate > 0.1 {
 		return fmt.Errorf("fee_rate must be between 0 and 0.1")
@@ -397,20 +397,20 @@ func (s *Strategy) symbolEMAPeriods(symbol string) (fast, slow int) {
 	return
 }
 
-func (s *Strategy) symbolMinNotional(symbol string) float64 {
+func (s *Strategy) symbolOrderNotional(symbol string) float64 {
 	if s.symbolParams != nil {
-		if ov, ok := s.symbolParams[symbol]; ok && ov.MinNotional > 0 {
-			return ov.MinNotional
+		if ov, ok := s.symbolParams[symbol]; ok && ov.OrderNotional > 0 {
+			return ov.OrderNotional
 		}
 	}
-	return s.minNotional
+	return s.orderNotional
 }
 
 func (s *Strategy) quantityForSymbol(symbol string, price float64) float64 {
 	if price <= 0 {
 		return 0
 	}
-	notional := s.symbolMinNotional(symbol)
+	notional := s.symbolOrderNotional(symbol)
 	qty := math.Ceil((notional/price)*1e8) / 1e8
 	minSize := s.minimumOrderSize(symbol)
 	if qty < minSize {

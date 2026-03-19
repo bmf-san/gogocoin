@@ -43,7 +43,7 @@ strategy_params:
     stop_loss_pct: 1.0        # 1% stop loss
     cooldown_sec: 90          # 90 sec cooldown between trades
     max_daily_trades: 3       # Max 3 trades per day (conservative)
-    min_notional: 200         # Minimum 200 JPY per trade
+    order_notional: 200       # Order size in JPY (target notional per trade)
     fee_rate: 0.001           # 0.1% trading fee
     # RSI filter (optional; 0 = disabled)
     rsi_period: 0             # Set to e.g. 14 to enable RSI filter
@@ -52,7 +52,7 @@ strategy_params:
     # Per-symbol overrides (optional; omit to use global defaults)
     # symbol_params:
     #   XLM_JPY:
-    #     min_notional: 280
+    #     order_notional: 280
 
 data:
   market_data:

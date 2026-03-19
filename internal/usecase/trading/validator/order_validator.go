@@ -71,7 +71,7 @@ func (v *OrderValidator) ValidateOrder(order *domain.OrderRequest) error {
 				"   Estimated minimum cost: ~%.0f JPY\n"+
 				"   \n"+
 				"   💡 Solutions:\n"+
-				"   1. Increase min_notional in config.yaml to at least %.0f JPY\n"+
+				"   1. Increase order_notional in config.yaml to at least %.0f JPY\n"+
 				"   2. Use XRP_JPY (min ~100 JPY) or MONA_JPY (min ~20 JPY) for smaller trades\n"+
 				"   3. Ensure you have sufficient balance",
 			order.Size,

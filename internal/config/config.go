@@ -87,7 +87,7 @@ type ScalpingParams struct {
 	StopLossPct    float64 `yaml:"stop_loss_pct"`
 	CooldownSec    int     `yaml:"cooldown_sec"`
 	MaxDailyTrades int     `yaml:"max_daily_trades"`
-	MinNotional    float64 `yaml:"min_notional"`
+	OrderNotional  float64 `yaml:"order_notional"`
 	FeeRate        float64 `yaml:"fee_rate"`
 	// RSI filter (0 = disabled)
 	RSIPeriod     int     `yaml:"rsi_period"`
@@ -103,7 +103,7 @@ type ScalpingSymbolOverride struct {
 	EMAFastPeriod int     `yaml:"ema_fast_period"`
 	EMASlowPeriod int     `yaml:"ema_slow_period"`
 	CooldownSec   int     `yaml:"cooldown_sec"`
-	MinNotional   float64 `yaml:"min_notional"`
+	OrderNotional float64 `yaml:"order_notional"`
 }
 
 // DataConfig represents data management settings
