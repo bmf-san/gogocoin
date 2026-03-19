@@ -22,6 +22,8 @@ trading:
   fee_rate: 0.0015
   symbols:
     - "XRP_JPY"  # Recommended for low-budget trading (min 1 XRP)
+    # - "XLM_JPY"  # Low-budget option (min 10 XLM, requires order_notional >= 280)
+    # - "ETH_JPY"  # Higher volatility (min 0.01 ETH, requires order_notional >= 5000)
   strategy:
     name: "scalping"
   risk_management:
