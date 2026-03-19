@@ -304,11 +304,17 @@ class GogocoinUI {
         const totalPnlEl = document.getElementById('total-pnl');
         const winRateEl = document.getElementById('win-rate');
         const todayPnlEl = document.getElementById('today-pnl');
+        const sharpeEl = document.getElementById('sharpe-ratio');
+        const profitFactorEl = document.getElementById('profit-factor');
+        const maxDrawdownEl = document.getElementById('max-drawdown');
 
         if (hasError) {
             if (totalPnlEl) { totalPnlEl.textContent = '取得エラー'; totalPnlEl.className = 'text-xl font-bold text-danger'; }
             if (winRateEl) { winRateEl.textContent = '-'; winRateEl.className = 'text-lg font-bold text-secondary'; }
             if (todayPnlEl) { todayPnlEl.textContent = '-'; todayPnlEl.className = 'text-lg font-bold text-secondary'; }
+            if (sharpeEl) { sharpeEl.textContent = '-'; }
+            if (profitFactorEl) { profitFactorEl.textContent = '-'; }
+            if (maxDrawdownEl) { maxDrawdownEl.textContent = '-'; }
             return;
         }
 
@@ -326,6 +332,9 @@ class GogocoinUI {
                 todayPnlEl.textContent = '¥0';
                 todayPnlEl.className = 'text-2xl font-black';
             }
+            if (sharpeEl) { sharpeEl.textContent = '-'; }
+            if (profitFactorEl) { profitFactorEl.textContent = '-'; }
+            if (maxDrawdownEl) { maxDrawdownEl.textContent = '-'; }
             return;
         }
 
@@ -339,6 +348,21 @@ class GogocoinUI {
         if (winRateEl) {
             winRateEl.textContent = this.formatPercent(latest.win_rate);
             winRateEl.className = 'text-lg font-bold';
+        }
+        if (sharpeEl) {
+            const v = latest.sharpe_ratio;
+            sharpeEl.textContent = (v != null && !isNaN(v)) ? parseFloat(v).toFixed(2) : '-';
+            sharpeEl.className = 'text-2xl font-bold' + (v >= 1.0 ? ' text-success' : v != null ? ' text-danger' : '');
+        }
+        if (profitFactorEl) {
+            const v = latest.profit_factor;
+            profitFactorEl.textContent = (v != null && !isNaN(v)) ? parseFloat(v).toFixed(2) : '-';
+            profitFactorEl.className = 'text-2xl font-bold' + (v >= 1.5 ? ' text-success' : v != null ? ' text-danger' : '');
+        }
+        if (maxDrawdownEl) {
+            const v = latest.max_drawdown;
+            maxDrawdownEl.textContent = (v != null && !isNaN(v)) ? parseFloat(v).toFixed(2) + '%' : '-';
+            maxDrawdownEl.className = 'text-2xl font-bold' + (v != null && v <= 10 ? ' text-success' : v != null ? ' text-danger' : '');
         }
 
         // Calculate today's PnL from actual trade records (JST date match)
