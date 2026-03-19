@@ -335,7 +335,7 @@ func (a *appServiceAdapter) GetBalances(ctx context.Context) ([]domain.Balance, 
 	return a.trader.GetBalance(ctx)
 }
 func (a *appServiceAdapter) GetCurrentStrategy() pkgstrategy.Strategy { return a.strat }
-func (a *appServiceAdapter) IsTradingEnabled() bool                    { return a.tc.IsTradingEnabled() }
+func (a *appServiceAdapter) IsTradingEnabled() bool                   { return a.tc.IsTradingEnabled() }
 func (a *appServiceAdapter) SetTradingEnabled(enabled bool) error {
 	return a.tc.SetTradingEnabled(enabled)
 }

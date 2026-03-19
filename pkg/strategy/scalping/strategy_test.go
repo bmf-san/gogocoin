@@ -91,7 +91,7 @@ func TestCalculateEMA_FastSlowOrdering(t *testing.T) {
 // ── GenerateSignal ────────────────────────────────────────────────────────────
 
 func TestGenerateSignal_InsufficientHistory(t *testing.T) {
-	s := newTestStrategy() // slow period = 5
+	s := newTestStrategy()             // slow period = 5
 	hist := makeHistory(100, 100, 100) // only 3 < 5
 	data := &strategy.MarketData{Symbol: "BTC_JPY", Price: 100}
 	sig, err := s.GenerateSignal(context.Background(), data, hist)

@@ -296,7 +296,7 @@ type RateLimiter struct {
 	requests chan struct{}
 	ticker   *time.Ticker
 	done     chan struct{} // Signal to stop the goroutine
-	stopOnce sync.Once   // Ensures Stop() is safe to call more than once
+	stopOnce sync.Once     // Ensures Stop() is safe to call more than once
 }
 
 // NewRateLimiter creates a new rate limiter
