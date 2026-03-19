@@ -153,6 +153,20 @@ func (c *Client) SetDisconnected() {
 	c.mu.Unlock()
 }
 
+// Reconnect closes the existing WebSocket connection and establishes a new one.
+// Callers should also call MarketDataService.ResetCallbacks() after this.
+func (c *Client) Reconnect(ctx context.Context) error {
+	c.mu.Lock()
+	if c.wsClient != nil {
+		c.wsClient.Close(ctx)
+		c.wsClient = nil
+	}
+	c.isConnected = false
+	c.mu.Unlock()
+
+	return c.initWebSocketClient()
+}
+
 // Close closes the client
 func (c *Client) Close(ctx context.Context) error {
 	c.mu.Lock()

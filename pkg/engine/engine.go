@@ -348,7 +348,14 @@ type marketDataAdapter struct {
 }
 
 func (m *marketDataAdapter) IsConnected() bool { return m.client.IsConnected() }
-func (m *marketDataAdapter) ReconnectClient() error { return nil }
+func (m *marketDataAdapter) ReconnectClient() error {
+	ctx := context.Background()
+	if err := m.client.Reconnect(ctx); err != nil {
+		return fmt.Errorf("websocket reconnect failed: %w", err)
+	}
+	m.marketDataSvc.ResetCallbacks()
+	return nil
+}
 func (m *marketDataAdapter) SubscribeToTicker(ctx context.Context, symbol string, callback func(domain.MarketData)) error {
 	return m.marketDataSvc.SubscribeToTicker(ctx, symbol, func(bfd bitflyer.MarketData) {
 		callback(domain.MarketData{
