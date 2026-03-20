@@ -25,9 +25,10 @@ type Client struct {
 	config *Config
 
 	// State management
-	isConnected bool
-	closed      bool // set to true by Close(); prevents a racing Reconnect from storing a new wsClient
-	mu          sync.RWMutex
+	isConnected     bool
+	closed          bool // set to true by Close(); prevents a racing Reconnect from storing a new wsClient
+	heartbeatCancel context.CancelFunc // cancels the heartbeat goroutine on Close/Reconnect
+	mu              sync.RWMutex
 
 	// rate limiting
 	rateLimiter *RateLimiter
@@ -86,14 +87,14 @@ func (c *Client) initHTTPClient() error {
 	// timezone-less datetime strings returned by the bitFlyer API (e.g.
 	// "2026-03-31T13:08:33") are normalised to RFC3339 UTC ("...Z") before
 	// encoding/json tries to unmarshal them into time.Time fields.
-        httpTimeout := c.config.Timeout
-        if httpTimeout <= 0 {
-                httpTimeout = 30 * time.Second
-        }
-        customHTTPClient := &nethttp.Client{
-                Transport: newDateFixingTransport(nil),
-                Timeout:   httpTimeout,
-        }
+	httpTimeout := c.config.Timeout
+	if httpTimeout <= 0 {
+		httpTimeout = 30 * time.Second
+	}
+	customHTTPClient := &nethttp.Client{
+		Transport: newDateFixingTransport(nil),
+		Timeout:   httpTimeout,
+	}
 
         authClient, err := http.NewAuthenticatedClient(
                 credentials,
@@ -153,10 +154,45 @@ func (c *Client) initWebSocketClient() error {
 	}
 	c.wsClient = client
 	c.isConnected = true
+	hbCtx, hbCancel := context.WithCancel(context.Background())
+	c.heartbeatCancel = hbCancel
 	c.mu.Unlock()
+
+	go c.runHeartbeat(hbCtx)
 
 	c.logger.API().Info("WebSocket client initialized successfully")
 	return nil
+}
+
+// runHeartbeat sends a WebSocket ping every 60 seconds to prevent NAT firewalls
+// from silently dropping the idle TCP connection (typical NAT timeout: 2-5 min).
+// If a ping fails, the client is marked disconnected so the worker reconnects.
+func (c *Client) runHeartbeat(ctx context.Context) {
+	const interval = 60 * time.Second
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			c.mu.RLock()
+			ws := c.wsClient
+			c.mu.RUnlock()
+			if ws == nil {
+				return
+			}
+			pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			err := ws.Ping(pingCtx)
+			cancel()
+			if err != nil {
+				c.logger.API().WithError(err).Warn("WebSocket heartbeat ping failed - marking disconnected")
+				c.SetDisconnected()
+				return
+			}
+			c.logger.API().Debug("WebSocket heartbeat ping OK")
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // IsConnected returns the connection state
@@ -184,8 +220,13 @@ func (c *Client) Reconnect(ctx context.Context) error {
 	old := c.wsClient
 	c.wsClient = nil
 	c.isConnected = false
+	oldCancel := c.heartbeatCancel
+	c.heartbeatCancel = nil
 	c.mu.Unlock()
 
+	if oldCancel != nil {
+		oldCancel() // stop old heartbeat before closing
+	}
 	if old != nil {
 		old.Close(ctx)
 	}
@@ -195,6 +236,16 @@ func (c *Client) Reconnect(ctx context.Context) error {
 
 // Close closes the client
 func (c *Client) Close(ctx context.Context) error {
+	c.mu.Lock()
+	c.closed = true // prevent any concurrent Reconnect from storing a new wsClient
+	oldCancel := c.heartbeatCancel
+	c.heartbeatCancel = nil
+	c.mu.Unlock()
+
+	if oldCancel != nil {
+		oldCancel() // stop heartbeat before closing connection
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
