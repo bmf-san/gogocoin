@@ -166,9 +166,13 @@ func (c *Client) initWebSocketClient() error {
 
 // runHeartbeat sends a WebSocket ping every 60 seconds to prevent NAT firewalls
 // from silently dropping the idle TCP connection (typical NAT timeout: 2-5 min).
-// The ping frame itself resets the NAT timer even if the server does not reply
-// with a pong (bitflyer does not send pong frames). Dead connections are detected
-// by staleDataTimeout in the market data worker — not here.
+//
+// Error handling:
+//   - context.DeadlineExceeded: bitflyer does not send pong frames, so a 10s
+//     timeout is the expected response. The ping frame itself was sent successfully
+//     and resets the NAT timer — treat as healthy.
+//   - Any other error: indicates a genuine TCP-level failure (connection reset,
+//     broken pipe, etc.). Mark the client disconnected so the worker reconnects.
 func (c *Client) runHeartbeat(ctx context.Context) {
 	const interval = 60 * time.Second
 	ticker := time.NewTicker(interval)
@@ -186,11 +190,16 @@ func (c *Client) runHeartbeat(ctx context.Context) {
 			err := ws.Ping(pingCtx)
 			cancel()
 			if err != nil {
-				// bitflyer does not respond to WS ping frames, so a timeout here
-				// is expected and does not mean the connection is dead.
-				// Continue sending pings to keep the NAT entry alive.
-				c.logger.API().WithError(err).Debug("WebSocket heartbeat ping: no pong (expected for bitflyer)")
-				continue
+				if errors.Is(err, context.DeadlineExceeded) {
+					// No pong received within 10s — expected for bitflyer.
+					// The ping frame was still sent, so the NAT entry is reset.
+					c.logger.API().Debug("WebSocket heartbeat ping: no pong (expected for bitflyer, connection healthy)")
+					continue
+				}
+				// Any other error means the TCP connection is genuinely broken.
+				c.logger.API().WithError(err).Warn("WebSocket heartbeat ping: connection error - marking disconnected")
+				c.SetDisconnected()
+				return
 			}
 			c.logger.API().Debug("WebSocket heartbeat ping OK")
 		case <-ctx.Done():
