@@ -201,7 +201,12 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("risk_management.max_trade_amount_percent must be between 0 and 100")
 	}
 
-	// Validate API configuration
+        // Default API timeout to 30 s if not set in config.
+        if c.API.Timeout == 0 {
+                c.API.Timeout = 30 * time.Second
+        }
+
+        // Validate API configuration
 	if c.API.Endpoint == "" {
 		return fmt.Errorf("api.endpoint is required")
 	}

@@ -85,15 +85,20 @@ func (c *Client) initHTTPClient() error {
 	// timezone-less datetime strings returned by the bitFlyer API (e.g.
 	// "2026-03-31T13:08:33") are normalised to RFC3339 UTC ("...Z") before
 	// encoding/json tries to unmarshal them into time.Time fields.
-	customHTTPClient := &nethttp.Client{
-		Transport: newDateFixingTransport(nil),
-	}
+        httpTimeout := c.config.Timeout
+        if httpTimeout <= 0 {
+                httpTimeout = 30 * time.Second
+        }
+        customHTTPClient := &nethttp.Client{
+                Transport: newDateFixingTransport(nil),
+                Timeout:   httpTimeout,
+        }
 
-	authClient, err := http.NewAuthenticatedClient(
-		credentials,
-		c.config.Endpoint,
-		http.WithCustomHTTPClient(customHTTPClient),
-	)
+        authClient, err := http.NewAuthenticatedClient(
+                credentials,
+                c.config.Endpoint,
+                http.WithCustomHTTPClient(customHTTPClient),
+        )
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP client: %w", err)
 	}
