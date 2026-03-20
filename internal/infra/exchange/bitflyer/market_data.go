@@ -355,11 +355,10 @@ func (mds *MarketDataService) SubscribeToTicker(ctx context.Context, symbol stri
 		return fmt.Errorf("websocket client is not connected")
 	}
 
-	// Store shutdown context for background goroutines
-	mds.shutdownCtx = ctx
-
 	// Set up global handler only on first call
 	mds.mu.Lock()
+	// Store shutdown context under the lock to avoid data race
+	mds.shutdownCtx = ctx
 	if !mds.callbacksInit {
 		mds.callbacksInit = true
 		mds.tickerCallbacks = make(map[string]func(MarketData))

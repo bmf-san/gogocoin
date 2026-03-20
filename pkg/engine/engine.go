@@ -351,7 +351,8 @@ type marketDataAdapter struct {
 	marketDataSvc *bitflyer.MarketDataService
 }
 
-func (m *marketDataAdapter) IsConnected() bool { return m.client.IsConnected() }
+func (m *marketDataAdapter) IsConnected() bool    { return m.client.IsConnected() }
+func (m *marketDataAdapter) SetDisconnected()        { m.client.SetDisconnected() }
 func (m *marketDataAdapter) ReconnectClient() error {
 	ctx := context.Background()
 	if err := m.client.Reconnect(ctx); err != nil {

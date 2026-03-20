@@ -97,7 +97,14 @@ func (w *MarketDataWorker) Run(ctx context.Context) error {
 			// Reconnect bitFlyer client
 			if err := w.clientFactory.ReconnectClient(); err != nil {
 				reconnectAttempts++
-				wait := w.reconnectInterval * time.Duration(reconnectAttempts)
+				// Exponential backoff: interval * 2^(attempts-1), capped at max
+				wait := w.reconnectInterval
+				for i := 1; i < reconnectAttempts; i++ {
+					wait *= 2
+					if wait > w.maxReconnectInterval {
+						break
+					}
+				}
 				if wait > w.maxReconnectInterval {
 					wait = w.maxReconnectInterval
 				}
