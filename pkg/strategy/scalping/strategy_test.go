@@ -366,7 +366,10 @@ func TestInitializeDailyTradeCount(t *testing.T) {
 	if count != 7 {
 		t.Errorf("expected dailyTradeCount=7, got %d", count)
 	}
-	today := time.Now().Format("2006-01-02")
+	// InitializeDailyTradeCount uses JST (UTC+9), so the expected date must
+	// also be in JST to avoid mismatches in UTC CI environments after 15:00 UTC.
+	jst := time.FixedZone("JST", 9*60*60)
+	today := time.Now().In(jst).Format("2006-01-02")
 	if date != today {
 		t.Errorf("expected lastTradeDate=%s, got %s", today, date)
 	}
