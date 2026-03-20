@@ -143,7 +143,6 @@ func (w *SignalWorker) processSignal(ctx context.Context, signal *strategy.Signa
 	result, err := w.trader.PlaceOrder(ctx, &order)
 	if err != nil {
 		w.logger.Trading().WithError(err).Error("Failed to place order")
-		w.logger.Trading().Info("Check API credentials and account permissions")
 		return
 	}
 
