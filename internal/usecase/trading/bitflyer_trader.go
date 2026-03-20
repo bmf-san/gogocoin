@@ -129,11 +129,19 @@ func (t *BitflyerTrader) PlaceOrder(ctx context.Context, order *domain.OrderRequ
 	})
 
 	// 6. Start order monitoring (goroutine management is Facade responsibility)
+	//
+	// Guard against the WaitGroup panic: if Shutdown() has already called
+	// shutdownCancel() and its wg.Wait() goroutine is concurrently blocked with
+	// a counter of zero, calling wg.Add(1) here would trigger
+	// "sync: WaitGroup misuse: Add called concurrently with Wait".
+	// Skipping monitoring during shutdown is safe — the process is exiting.
 	t.mu.Lock()
 	orderMonitor := t.orderMonitor
 	shutdownCtx := t.shutdownCtx
-	if orderMonitor != nil {
+	if orderMonitor != nil && shutdownCtx.Err() == nil {
 		t.wg.Add(1)
+	} else {
+		orderMonitor = nil // skip monitoring if shutting down
 	}
 	t.mu.Unlock()
 
