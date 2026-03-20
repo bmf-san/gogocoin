@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -208,11 +207,6 @@ func (s *Server) generateSampleBalances() []domain.Balance {
 	}
 }
 
-// getTotalTradesCount gets total number of trades
-func (s *Server) getTotalTradesCount() (int, error) {
-	return s.db.GetTradesCount()
-}
-
 // getTodayTradesCount gets the number of trades executed today (JST)
 func (s *Server) getTodayTradesCount() (int, error) {
 	return s.db.GetTodayTradesCount()
@@ -257,28 +251,6 @@ func (s *Server) writeJSON(w http.ResponseWriter, data interface{}) {
 		s.logger.Error("Failed to encode JSON: " + err.Error())
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
-}
-
-// validateIntParam validates integer query parameter with min/max bounds
-func validateIntParam(paramStr string, defaultVal, min, max int) (int, error) {
-	if paramStr == "" {
-		return defaultVal, nil
-	}
-
-	val, err := strconv.Atoi(paramStr)
-	if err != nil {
-		return 0, fmt.Errorf("invalid integer value: %w", err)
-	}
-
-	if val < min {
-		return 0, fmt.Errorf("value %d is below minimum %d", val, min)
-	}
-
-	if val > max {
-		return 0, fmt.Errorf("value %d exceeds maximum %d", val, max)
-	}
-
-	return val, nil
 }
 
 // validateStringParam validates string parameter against allowed values

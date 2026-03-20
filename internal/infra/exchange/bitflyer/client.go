@@ -105,7 +105,12 @@ func (c *Client) initHTTPClient() error {
 
 // initWebSocketClient initializes the WebSocket client
 func (c *Client) initWebSocketClient() error {
-	ctx := context.Background()
+	// Use a bounded context so that a network outage or exchange maintenance
+	// window cannot block this call (and therefore the reconnect loop) forever.
+	// 30 s is well above the typical WS handshake RTT while still allowing the
+	// reconnect worker to apply its own exponential back-off promptly.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	c.logger.API().WithField("endpoint", c.config.WebSocketEndpoint).Info("Initializing WebSocket client")
 

@@ -67,13 +67,6 @@ var (
 		},
 	}
 
-	// slicePool provides pooling for slice allocations in field conversion
-	slicePool = sync.Pool{
-		New: func() any {
-			s := make([]any, 0, 16) // Pre-allocate for common case
-			return &s
-		},
-	}
 )
 
 // Logger is the logger used throughout the application
