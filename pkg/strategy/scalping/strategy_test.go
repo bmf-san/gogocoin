@@ -436,3 +436,46 @@ func TestSymbolEMAPeriods_Override(t *testing.T) {
 		t.Errorf("expected fast=3 slow=5 for BTC_JPY (global default), got fast=%d slow=%d", fast, slow)
 	}
 }
+
+// TestInitialize_SymbolParams verifies that symbol_params supplied as
+// map[string]map[string]interface{} (the format produced by strategyParamsToMap)
+// are applied correctly by Initialize.  Before this fix, Initialize silently
+// discarded the symbol_params key, so per-symbol EMA/notional overrides would
+// never take effect when the strategy was started via engine.Run.
+func TestInitialize_SymbolParams(t *testing.T) {
+	s := NewDefault()
+	err := s.Initialize(map[string]interface{}{
+		"ema_fast_period":  9,
+		"ema_slow_period":  21,
+		"take_profit_pct":  0.8,
+		"stop_loss_pct":    0.4,
+		"cooldown_sec":     90,
+		"max_daily_trades": 3,
+		"order_notional":   200.0,
+		"fee_rate":         0.001,
+		"symbol_params": map[string]map[string]interface{}{
+			"ETH_JPY": {
+				"ema_fast_period": 5,
+				"ema_slow_period": 15,
+				"order_notional":  500.0,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Initialize returned unexpected error: %v", err)
+	}
+
+	fast, slow := s.symbolEMAPeriods("ETH_JPY")
+	if fast != 5 || slow != 15 {
+		t.Errorf("ETH_JPY EMA override not applied: want fast=5 slow=15, got fast=%d slow=%d", fast, slow)
+	}
+	notional := s.symbolOrderNotional("ETH_JPY")
+	if notional != 500.0 {
+		t.Errorf("ETH_JPY order_notional override not applied: want 500.0, got %f", notional)
+	}
+	// Non-overridden symbol should still use global defaults.
+	fast, slow = s.symbolEMAPeriods("BTC_JPY")
+	if fast != 9 || slow != 21 {
+		t.Errorf("BTC_JPY should use global defaults: want fast=9 slow=21, got fast=%d slow=%d", fast, slow)
+	}
+}

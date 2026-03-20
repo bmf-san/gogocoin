@@ -171,6 +171,38 @@ func (s *Strategy) Initialize(config map[string]interface{}) error {
 	if v, ok := config["rsi_oversold"].(float64); ok {
 		s.rsiOversold = v
 	}
+	// Parse per-symbol overrides.  strategyParamsToMap provides
+	// map[string]map[string]interface{}; GetConfig/UpdateConfig roundtrip
+	// provides map[string]SymbolOverride.  Handle both.
+	if raw, ok := config["symbol_params"]; ok {
+		switch v := raw.(type) {
+		case map[string]map[string]interface{}:
+			if len(v) > 0 {
+				overrides := make(map[string]SymbolOverride, len(v))
+				for sym, m := range v {
+					var ov SymbolOverride
+					if f, ok2 := m["ema_fast_period"].(int); ok2 {
+						ov.EMAFastPeriod = f
+					}
+					if sl, ok2 := m["ema_slow_period"].(int); ok2 {
+						ov.EMASlowPeriod = sl
+					}
+					if c, ok2 := m["cooldown_sec"].(int); ok2 {
+						ov.CooldownSec = c
+					}
+					if n, ok2 := m["order_notional"].(float64); ok2 {
+						ov.OrderNotional = n
+					}
+					overrides[sym] = ov
+				}
+				s.symbolParams = overrides
+			}
+		case map[string]SymbolOverride:
+			if len(v) > 0 {
+				s.symbolParams = v
+			}
+		}
+	}
 	return s.validate()
 }
 
