@@ -6,6 +6,7 @@ import (
 
 	"github.com/bmf-san/gogocoin/internal/domain"
 	"github.com/bmf-san/gogocoin/internal/logger"
+	"github.com/bmf-san/gogocoin/internal/utils"
 )
 
 const maintenanceLastCleanupKey = "maintenance_last_cleanup_date"
@@ -59,12 +60,12 @@ func (w *MaintenanceWorker) Run(ctx context.Context) error {
 
 	select {
 	case <-startupDelay.C:
-		nowAfterDelay := time.Now()
+		nowAfterDelay := utils.NowInJST()
 		// If current time is after 00:10 (10 minute window), run missed cleanup
 		if nowAfterDelay.Hour() > 0 || (nowAfterDelay.Hour() == 0 && nowAfterDelay.Minute() >= 10) {
 			w.logger.System().Info("Running missed cleanup on startup")
 			w.runDailyCleanup()
-			today := time.Now().Format("20060102")
+			today := utils.NowInJST().Format("20060102")
 			lastCleanupDate = today
 			if w.appState != nil {
 				if err := w.appState.SaveAppState(maintenanceLastCleanupKey, today); err != nil {
@@ -88,10 +89,10 @@ func (w *MaintenanceWorker) Run(ctx context.Context) error {
 			w.logger.System().Info("Maintenance worker stopped")
 			return nil
 		case <-ticker.C:
-			now := time.Now()
-			currentDate := now.Format("20060102") // YYYYMMDD
+			now := utils.NowInJST()
+			currentDate := now.Format("20060102") // YYYYMMDD in JST
 
-			// Daily cleanup at midnight (00:00, within 10-minute window)
+			// Daily cleanup at JST midnight (00:00, within 10-minute window)
 			if now.Hour() == 0 && now.Minute() < 10 && currentDate != lastCleanupDate {
 				lastCleanupDate = currentDate
 				if w.appState != nil {
