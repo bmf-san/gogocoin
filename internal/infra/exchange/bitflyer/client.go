@@ -26,6 +26,7 @@ type Client struct {
 
 	// State management
 	isConnected bool
+	closed      bool // set to true by Close(); prevents a racing Reconnect from storing a new wsClient
 	mu          sync.RWMutex
 
 	// rate limiting
@@ -139,7 +140,17 @@ func (c *Client) initWebSocketClient() error {
 		c.logger.API().Info("Using public channels only (no credentials)")
 	}
 
+	// If Close() was called while we were connecting, discard the new client
+	// immediately to prevent: (1) a leaked connection and (2) a later ticker
+	// callback trying to send on an already-closed marketDataCh.
 	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		client.Close(closeCtx)
+		return fmt.Errorf("client already closed")
+	}
 	c.wsClient = client
 	c.isConnected = true
 	c.mu.Unlock()
@@ -186,6 +197,8 @@ func (c *Client) Reconnect(ctx context.Context) error {
 func (c *Client) Close(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	c.closed = true // prevent any concurrent Reconnect from storing a new wsClient
 
 	if c.rateLimiter != nil {
 		c.rateLimiter.Stop()
