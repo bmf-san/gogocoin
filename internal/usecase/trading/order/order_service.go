@@ -3,6 +3,7 @@ package order
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/bmf-san/go-bitflyer-api-client/client/http"
@@ -64,10 +65,9 @@ func (s *OrderService) PlaceOrder(ctx context.Context, order *domain.OrderReques
 		s.logger.LogAPICall("POST", "/v1/me/sendchildorder", callDuration, resp.HTTPResponse.StatusCode, nil)
 
 		if resp.HTTPResponse.StatusCode != 200 {
-			return fmt.Errorf("API error: status %d", resp.HTTPResponse.StatusCode)
-		}
-
-		if resp.JSON200 == nil {
+				body, _ := io.ReadAll(resp.HTTPResponse.Body)
+				s.logger.Trading().WithField("status", resp.HTTPResponse.StatusCode).WithField("response_body", string(body)).Error("bitflyer API rejected order")
+				return fmt.Errorf("API error: status %d, body: %s", resp.HTTPResponse.StatusCode, string(body))
 			return fmt.Errorf("empty response body")
 		}
 
