@@ -19,7 +19,7 @@ import (
 
 // Server is the API server for Web UI
 type Server struct {
-	configMu     sync.RWMutex   // guards config pointer and its mutable fields
+	configMu     sync.RWMutex // guards config pointer and its mutable fields
 	config       *config.Config
 	db           DatabaseService
 	logger       logger.LoggerInterface

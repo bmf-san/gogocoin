@@ -26,7 +26,7 @@ func newTestStrategy() *Strategy {
 		StopLossPct:    0.5,
 		CooldownSec:    0,
 		MaxDailyTrades: 1000,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 }
@@ -168,7 +168,7 @@ func TestIsInCooldown_AfterTrade(t *testing.T) {
 		StopLossPct:    0.5,
 		CooldownSec:    3600,
 		MaxDailyTrades: 1000,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 	s.RecordTrade()
@@ -187,7 +187,7 @@ func TestIsDailyLimitReached_BelowLimit(t *testing.T) {
 		StopLossPct:    0.5,
 		CooldownSec:    0,
 		MaxDailyTrades: 3,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 	s.RecordTrade()
@@ -205,7 +205,7 @@ func TestIsDailyLimitReached_AtLimit(t *testing.T) {
 		StopLossPct:    0.5,
 		CooldownSec:    0,
 		MaxDailyTrades: 3,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 	s.RecordTrade()
@@ -258,7 +258,7 @@ func TestGetTakeProfitPrice(t *testing.T) {
 		StopLossPct:    1.0,
 		CooldownSec:    0,
 		MaxDailyTrades: 10,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 	got := s.GetTakeProfitPrice(1000.0)
@@ -276,7 +276,7 @@ func TestGetStopLossPrice(t *testing.T) {
 		StopLossPct:    1.0,
 		CooldownSec:    0,
 		MaxDailyTrades: 10,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 	got := s.GetStopLossPrice(1000.0)
@@ -297,7 +297,7 @@ func TestInitialize_ValidParams(t *testing.T) {
 		"stop_loss_pct":    0.8,
 		"cooldown_sec":     60,
 		"max_daily_trades": 5,
-		"order_notional":     500.0,
+		"order_notional":   500.0,
 		"fee_rate":         0.001,
 	})
 	if err != nil {
@@ -314,7 +314,7 @@ func TestInitialize_FastPeriodGTSlow(t *testing.T) {
 		"stop_loss_pct":    0.5,
 		"cooldown_sec":     0,
 		"max_daily_trades": 10,
-		"order_notional":     100.0,
+		"order_notional":   100.0,
 		"fee_rate":         0.001,
 	})
 	if err == nil {
@@ -333,7 +333,7 @@ func TestGenerateSignal_RSIOverboughtBlocksBuy(t *testing.T) {
 		StopLossPct:    0.5,
 		CooldownSec:    0,
 		MaxDailyTrades: 1000,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 		RSIPeriod:      3,
 		RSIOverbought:  40.0, // very low — forces RSI>40 on a rising series
@@ -420,7 +420,7 @@ func TestSymbolEMAPeriods_Override(t *testing.T) {
 		StopLossPct:    0.5,
 		CooldownSec:    0,
 		MaxDailyTrades: 10,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 		SymbolParams: map[string]SymbolOverride{
 			"ETH_JPY": {EMAFastPeriod: 7, EMASlowPeriod: 21},

@@ -129,6 +129,12 @@ func (s *Strategy) Initialize(config map[string]interface{}) error {
 	if config == nil {
 		return nil
 	}
+	// Hold the write lock for the duration so that concurrent readers
+	// (GetConfig, GenerateSignal, GetTakeProfitPrice, …) see a consistent
+	// view. validate() is called while the lock is held; it is safe because
+	// it only reads struct fields and does not re-acquire the lock.
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if v, ok := config["ema_fast_period"].(int); ok {
 		s.emaFastPeriod = v
 	}
@@ -213,6 +219,8 @@ func (s *Strategy) UpdateConfig(config map[string]interface{}) error {
 
 // GetConfig returns the current effective configuration.
 func (s *Strategy) GetConfig() map[string]interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return map[string]interface{}{
 		"ema_fast_period":         s.emaFastPeriod,
 		"ema_slow_period":         s.emaSlowPeriod,
@@ -276,14 +284,22 @@ func (s *Strategy) GenerateSignal(ctx context.Context, data *strategy.MarketData
 			map[string]interface{}{"reason": "no_new_crossover", "ema_fast": emaFast, "ema_slow": emaSlow}), nil
 	}
 
+	// Snapshot RSI config under read lock (these fields may be updated concurrently
+	// by UpdateConfig called from the HTTP API handler).
+	s.mu.RLock()
+	rsiPeriod := s.rsiPeriod
+	rsiOverbought := s.rsiOverbought
+	rsiOversold := s.rsiOversold
+	s.mu.RUnlock()
+
 	// RSI filter
-	if action != strategy.SignalHold && s.rsiPeriod > 0 {
-		rsi := s.calculateRSI(history, s.rsiPeriod)
-		if action == strategy.SignalBuy && rsi > s.rsiOverbought {
+	if action != strategy.SignalHold && rsiPeriod > 0 {
+		rsi := s.calculateRSI(history, rsiPeriod)
+		if action == strategy.SignalBuy && rsi > rsiOverbought {
 			return s.CreateSignal(data.Symbol, strategy.SignalHold, 0, data.Price, 0,
 				map[string]interface{}{"reason": "rsi_overbought", "rsi": rsi, "ema_fast": emaFast, "ema_slow": emaSlow}), nil
 		}
-		if action == strategy.SignalSell && rsi < s.rsiOversold {
+		if action == strategy.SignalSell && rsi < rsiOversold {
 			return s.CreateSignal(data.Symbol, strategy.SignalHold, 0, data.Price, 0,
 				map[string]interface{}{"reason": "rsi_oversold", "rsi": rsi, "ema_fast": emaFast, "ema_slow": emaSlow}), nil
 		}
@@ -345,12 +361,18 @@ func (s *Strategy) InitializeDailyTradeCount(count int) {
 
 // GetTakeProfitPrice returns the take-profit price from an entry price.
 func (s *Strategy) GetTakeProfitPrice(entry float64) float64 {
-	return entry * (1.0 + s.takeProfitPct/100.0)
+	s.mu.RLock()
+	pct := s.takeProfitPct
+	s.mu.RUnlock()
+	return entry * (1.0 + pct/100.0)
 }
 
 // GetStopLossPrice returns the stop-loss price from an entry price.
 func (s *Strategy) GetStopLossPrice(entry float64) float64 {
-	return entry * (1.0 - s.stopLossPct/100.0)
+	s.mu.RLock()
+	pct := s.stopLossPct
+	s.mu.RUnlock()
+	return entry * (1.0 - pct/100.0)
 }
 
 // ── internal helpers ─────────────────────────────────────────────────────────
@@ -447,8 +469,13 @@ func (s *Strategy) calculateRSI(history []strategy.MarketData, period int) float
 }
 
 func (s *Strategy) symbolEMAPeriods(symbol string) (fast, slow int) {
-	if s.symbolParams != nil {
-		if ov, ok := s.symbolParams[symbol]; ok {
+	s.mu.RLock()
+	symbolParams := s.symbolParams
+	defaultFast := s.emaFastPeriod
+	defaultSlow := s.emaSlowPeriod
+	s.mu.RUnlock()
+	if symbolParams != nil {
+		if ov, ok := symbolParams[symbol]; ok {
 			if ov.EMAFastPeriod > 0 {
 				fast = ov.EMAFastPeriod
 			}
@@ -458,21 +485,25 @@ func (s *Strategy) symbolEMAPeriods(symbol string) (fast, slow int) {
 		}
 	}
 	if fast == 0 {
-		fast = s.emaFastPeriod
+		fast = defaultFast
 	}
 	if slow == 0 {
-		slow = s.emaSlowPeriod
+		slow = defaultSlow
 	}
 	return
 }
 
 func (s *Strategy) symbolOrderNotional(symbol string) float64 {
-	if s.symbolParams != nil {
-		if ov, ok := s.symbolParams[symbol]; ok && ov.OrderNotional > 0 {
+	s.mu.RLock()
+	symbolParams := s.symbolParams
+	orderNotional := s.orderNotional
+	s.mu.RUnlock()
+	if symbolParams != nil {
+		if ov, ok := symbolParams[symbol]; ok && ov.OrderNotional > 0 {
 			return ov.OrderNotional
 		}
 	}
-	return s.orderNotional
+	return orderNotional
 }
 
 func (s *Strategy) quantityForSymbol(symbol string, price float64) float64 {
