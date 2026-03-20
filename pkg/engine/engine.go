@@ -144,6 +144,16 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 
 	initDailyTradeCount(repo, strat, log)
 
+	// Wire RecordTrade so the strategy's internal cooldown timer and daily-trade
+	// counter are updated each time an order completes.  Without this, the
+	// strategy's isInCooldown() and isDailyLimitReached() always return false
+	// during a session (lastTradeTime stays zero; dailyTradeCount never grows).
+	trader.SetOnOrderCompleted(func(result *domain.OrderResult) {
+		if result != nil && result.Status == "COMPLETED" {
+			strat.RecordTrade()
+		}
+	})
+
 	// ── 6. Risk manager ───────────────────────────────────────────────────────
 	minInterval, _ := time.ParseDuration(cfg.Trading.RiskManagement.MinTradeInterval)
 	riskMgr := risk.NewRiskManager(
@@ -219,6 +229,12 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	defer shutdownCancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		log.System().WithError(err).Error("HTTP server shutdown error")
+	}
+	// Shut down the trader first so that in-flight order-monitoring goroutines
+	// (which use an independent context) are cancelled before we close channels.
+	// trader.Shutdown() waits up to 30 s for them to finish.
+	if err := trader.Shutdown(); err != nil {
+		log.System().WithError(err).Warn("Trader shutdown error")
 	}
 	// Close the WebSocket connection before stopping workers and closing channels.
 	// The WS library delivers ticker callbacks in its own goroutines; if we close
