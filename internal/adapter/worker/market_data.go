@@ -161,13 +161,22 @@ func (w *MarketDataWorker) Run(ctx context.Context) error {
 			}
 		}
 
-		if subscribedCount == 0 {
-			w.logger.Data().Error("No market data subscriptions successful - will retry connection")
-			// Force reconnect so next iteration creates a fresh WebSocket client
-			// whose subscribedChannels map is empty. Without this, the same client
-			// rejects re-subscription with "channel already subscribed".
+		if subscribedCount < len(w.symbols) {
+			// Some or all subscriptions failed. Force a reconnect so the next
+			// iteration creates a fresh WebSocket client (empty subscribedChannels
+			// map). Without this, partially-failed symbols are never recovered:
+			// the stale-data detector does not fire as long as the successfully
+			// subscribed symbols keep delivering data.
 			if rc, ok := w.clientFactory.(interface{ SetDisconnected() }); ok {
 				rc.SetDisconnected()
+			}
+			if subscribedCount == 0 {
+				w.logger.Data().Error("No market data subscriptions successful - will retry connection")
+			} else {
+				w.logger.Data().
+					WithField("subscribed_symbols", subscribedCount).
+					WithField("total_symbols", len(w.symbols)).
+					Warn("Partial subscription failure - forcing reconnect to recover missing symbols")
 			}
 			// Use Timer instead of time.After to prevent memory leak
 			timer := time.NewTimer(w.reconnectInterval)

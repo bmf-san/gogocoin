@@ -129,8 +129,8 @@ func (c *Client) initWebSocketClient() error {
 		c.logger.API().Info("Using public channels only (no credentials)")
 	}
 
-	c.wsClient = client
 	c.mu.Lock()
+	c.wsClient = client
 	c.isConnected = true
 	c.mu.Unlock()
 
@@ -178,6 +178,7 @@ func (c *Client) Close(ctx context.Context) error {
 
 	if c.wsClient != nil {
 		c.wsClient.Close(ctx)
+		c.wsClient = nil // idempotent: prevent double-close
 	}
 
 	c.isConnected = false

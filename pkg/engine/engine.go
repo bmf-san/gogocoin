@@ -220,6 +220,11 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		log.System().WithError(err).Error("HTTP server shutdown error")
 	}
+	// Close the WebSocket connection before stopping workers and closing channels.
+	// The WS library delivers ticker callbacks in its own goroutines; if we close
+	// the channels first those callbacks can panic with "send on closed channel".
+	// Close() is idempotent (nils wsClient), so the deferred Close below is safe.
+	_ = bfClient.Close(context.Background())
 	if err := wm.StopAll(); err != nil {
 		log.System().WithError(err).Warn("Worker manager shutdown error")
 	}
@@ -351,8 +356,8 @@ type marketDataAdapter struct {
 	marketDataSvc *bitflyer.MarketDataService
 }
 
-func (m *marketDataAdapter) IsConnected() bool    { return m.client.IsConnected() }
-func (m *marketDataAdapter) SetDisconnected()        { m.client.SetDisconnected() }
+func (m *marketDataAdapter) IsConnected() bool { return m.client.IsConnected() }
+func (m *marketDataAdapter) SetDisconnected()  { m.client.SetDisconnected() }
 func (m *marketDataAdapter) ReconnectClient() error {
 	ctx := context.Background()
 	if err := m.client.Reconnect(ctx); err != nil {
