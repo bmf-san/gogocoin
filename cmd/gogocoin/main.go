@@ -20,7 +20,9 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		err := engine.Run(ctx,
 			engine.WithStrategy("scalping", func() pkgstrategy.Strategy {
 				return pkgscalping.NewDefault()
@@ -36,4 +38,5 @@ func main() {
 	log.Println("gogocoin started. Press Ctrl+C to exit.")
 	<-sigChan
 	cancel()
+	<-done // wait for engine.Run to complete graceful shutdown
 }
