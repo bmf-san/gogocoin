@@ -156,6 +156,12 @@ func (w *MarketDataWorker) Run(ctx context.Context) error {
 
 		if subscribedCount == 0 {
 			w.logger.Data().Error("No market data subscriptions successful - will retry connection")
+			// Force reconnect so next iteration creates a fresh WebSocket client
+			// whose subscribedChannels map is empty. Without this, the same client
+			// rejects re-subscription with "channel already subscribed".
+			if rc, ok := w.clientFactory.(interface{ SetDisconnected() }); ok {
+				rc.SetDisconnected()
+			}
 			// Use Timer instead of time.After to prevent memory leak
 			timer := time.NewTimer(w.reconnectInterval)
 			select {

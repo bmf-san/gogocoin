@@ -92,6 +92,14 @@ func (m *mockClientFactory) setConnected(connected bool) {
 	m.connected = connected
 }
 
+// SetDisconnected implements the optional interface used by the worker
+// to force a reconnect when all subscriptions fail.
+func (m *mockClientFactory) SetDisconnected() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.connected = false
+}
+
 func (m *mockClientFactory) getReconnectCallCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -405,4 +413,60 @@ func TestMarketDataWorker_ChannelManagement(t *testing.T) {
 			t.Error("Worker did not stop after context cancellation")
 		}
 	})
+}
+
+// TestMarketDataWorker_SubscriptionFailureTriggersReconnect verifies that
+// when all subscriptions fail, the worker forces a reconnect instead of
+// retrying on the same (stale) WebSocket client indefinitely.
+// This is a regression test for the "channel already subscribed" bug.
+func TestMarketDataWorker_SubscriptionFailureTriggersReconnect(t *testing.T) {
+	log := createTestLogger(t)
+
+	failUntilReconnect := errors.New("channel already subscribed")
+	mockClient := &mockClientFactory{
+		connected:      true,
+		subscribeError: failUntilReconnect,
+	}
+
+	marketDataCh := make(chan domain.MarketData, 10)
+
+	worker := NewMarketDataWorker(
+		log,
+		[]string{"BTC_JPY"},
+		marketDataCh,
+		mockClient,
+		1, // 1s reconnect interval
+		300,
+		1,
+		0,
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+
+	// After ~2s clear the subscribe error so the 2nd attempt post-reconnect succeeds.
+	go func() {
+		time.Sleep(2 * time.Second)
+		mockClient.mu.Lock()
+		mockClient.subscribeError = nil
+		mockClient.mu.Unlock()
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		worker.Run(ctx)
+		close(done)
+	}()
+
+	// Wait long enough for: first subscribe fail → SetDisconnected → reconnect → succeed
+	time.Sleep(4 * time.Second)
+
+	// The worker must have called ReconnectClient at least once because
+	// SetDisconnected() marked the connection as lost.
+	if mockClient.getReconnectCallCount() == 0 {
+		t.Fatal("Expected ReconnectClient to be called after all subscriptions failed, but it was not")
+	}
+
+	cancel()
+	<-done
 }
