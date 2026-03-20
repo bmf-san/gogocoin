@@ -25,10 +25,9 @@ type Client struct {
 	config *Config
 
 	// State management
-	isConnected     bool
-	closed          bool               // set to true by Close(); prevents a racing Reconnect from storing a new wsClient
-	heartbeatCancel context.CancelFunc // cancels the heartbeat goroutine on Close/Reconnect
-	mu              sync.RWMutex
+	isConnected bool
+	closed      bool // set to true by Close(); prevents a racing Reconnect from storing a new wsClient
+	mu          sync.RWMutex
 
 	// rate limiting
 	rateLimiter *RateLimiter
@@ -154,58 +153,10 @@ func (c *Client) initWebSocketClient() error {
 	}
 	c.wsClient = client
 	c.isConnected = true
-	hbCtx, hbCancel := context.WithCancel(context.Background())
-	c.heartbeatCancel = hbCancel
 	c.mu.Unlock()
-
-	go c.runHeartbeat(hbCtx)
 
 	c.logger.API().Info("WebSocket client initialized successfully")
 	return nil
-}
-
-// runHeartbeat sends a WebSocket ping every 60 seconds to prevent NAT firewalls
-// from silently dropping the idle TCP connection (typical NAT timeout: 2-5 min).
-//
-// Error handling:
-//   - context.DeadlineExceeded: bitflyer does not send pong frames, so a 10s
-//     timeout is the expected response. The ping frame itself was sent successfully
-//     and resets the NAT timer — treat as healthy.
-//   - Any other error: indicates a genuine TCP-level failure (connection reset,
-//     broken pipe, etc.). Mark the client disconnected so the worker reconnects.
-func (c *Client) runHeartbeat(ctx context.Context) {
-	const interval = 60 * time.Second
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			c.mu.RLock()
-			ws := c.wsClient
-			c.mu.RUnlock()
-			if ws == nil {
-				return
-			}
-			pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			err := ws.Ping(pingCtx)
-			cancel()
-			if err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					// No pong received within 10s — expected for bitflyer.
-					// The ping frame was still sent, so the NAT entry is reset.
-					c.logger.API().Debug("WebSocket heartbeat ping: no pong (expected for bitflyer, connection healthy)")
-					continue
-				}
-				// Any other error means the TCP connection is genuinely broken.
-				c.logger.API().WithError(err).Warn("WebSocket heartbeat ping: connection error - marking disconnected")
-				c.SetDisconnected()
-				return
-			}
-			c.logger.API().Debug("WebSocket heartbeat ping OK")
-		case <-ctx.Done():
-			return
-		}
-	}
 }
 
 // IsConnected returns the connection state
@@ -233,13 +184,8 @@ func (c *Client) Reconnect(ctx context.Context) error {
 	old := c.wsClient
 	c.wsClient = nil
 	c.isConnected = false
-	oldCancel := c.heartbeatCancel
-	c.heartbeatCancel = nil
 	c.mu.Unlock()
 
-	if oldCancel != nil {
-		oldCancel() // stop old heartbeat before closing
-	}
 	if old != nil {
 		old.Close(ctx)
 	}
@@ -249,16 +195,6 @@ func (c *Client) Reconnect(ctx context.Context) error {
 
 // Close closes the client
 func (c *Client) Close(ctx context.Context) error {
-	c.mu.Lock()
-	c.closed = true // prevent any concurrent Reconnect from storing a new wsClient
-	oldCancel := c.heartbeatCancel
-	c.heartbeatCancel = nil
-	c.mu.Unlock()
-
-	if oldCancel != nil {
-		oldCancel() // stop heartbeat before closing connection
-	}
-
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
