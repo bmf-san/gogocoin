@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/bmf-san/gogocoin/internal/domain"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // LogEntry is removed - use domain.LogEntry instead
@@ -76,7 +77,7 @@ type Logger struct {
 	config     *Config
 	mu         sync.RWMutex
 	db         domain.LogRepository
-	file       *os.File // File handle for cleanup
+	file       io.Closer // File handle for cleanup (may be *os.File or *lumberjack.Logger)
 }
 
 // Verify that Logger implements LoggerInterface at compile time
@@ -278,39 +279,61 @@ func (l *Logger) saveToDatabase(level, category, message string, fields map[stri
 	}
 }
 
-// createWriter creates the output writer
-func createWriter(config *Config) (io.Writer, *os.File, error) {
+// createWriter creates the output writer.
+// Returns (writer, closer, error). closer must be called on shutdown when non-nil.
+func createWriter(config *Config) (io.Writer, io.Closer, error) {
 	switch strings.ToLower(config.Output) {
 	case "console":
 		return os.Stdout, nil, nil
 	case "file":
 		return createFileWriter(config)
 	case "both":
-		fileWriter, file, err := createFileWriter(config)
+		fileWriter, closer, err := createFileWriter(config)
 		if err != nil {
 			return nil, nil, err
 		}
-		return io.MultiWriter(os.Stdout, fileWriter), file, nil
+		return io.MultiWriter(os.Stdout, fileWriter), closer, nil
 	default:
 		return nil, nil, fmt.Errorf("unsupported log output: %s", config.Output)
 	}
 }
 
-// createFileWriter creates a Writer for file output
-func createFileWriter(config *Config) (io.Writer, *os.File, error) {
-	// Create directory
+// createFileWriter creates a Writer for file output using lumberjack for
+// automatic rotation based on max_size_mb, max_backups, and max_age_days.
+func createFileWriter(config *Config) (io.Writer, io.Closer, error) {
+	maxSize := config.MaxSizeMB
+	if maxSize <= 0 {
+		maxSize = 50 // 50 MB default
+	}
+	maxBackups := config.MaxBackups
+	if maxBackups <= 0 {
+		maxBackups = 3
+	}
+	maxAge := config.MaxAgeDays
+	if maxAge <= 0 {
+		maxAge = 7
+	}
+
+	rotator := &lumberjack.Logger{
+		Filename:   config.FilePath,
+		MaxSize:    maxSize,
+		MaxBackups: maxBackups,
+		MaxAge:     maxAge,
+		Compress:   true,
+		LocalTime:  false, // use UTC for backup suffix timestamps
+	}
+
+	// lumberjack opens the file lazily on first Write. Touch the file now so
+	// that it exists immediately (tests and monitoring tools may check for it).
 	dir := filepath.Dir(config.FilePath)
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
-
-	// Simple file output (rotation delegated to external tools)
-	file, err := os.OpenFile(config.FilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open log file: %w", err)
+	if f, err := os.OpenFile(config.FilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600); err == nil {
+		_ = f.Close()
 	}
 
-	return file, file, nil
+	return rotator, rotator, nil
 }
 
 // createHandler creates a slog.Handler
