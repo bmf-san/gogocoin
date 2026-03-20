@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bmf-san/gogocoin/internal/config"
@@ -19,6 +19,7 @@ import (
 
 // Server is the API server for Web UI
 type Server struct {
+	configMu     sync.RWMutex // guards config pointer and its mutable fields
 	config       *config.Config
 	db           DatabaseService
 	logger       logger.LoggerInterface
@@ -64,6 +65,14 @@ func NewServerWithConfig(cfg *config.Config, db DatabaseService, logger logger.L
 // SetApplication sets the application service
 func (s *Server) SetApplication(app ApplicationService) {
 	s.app = app
+}
+
+// getConfig returns the current config under a read lock.
+// Always use this instead of accessing s.config directly from handlers.
+func (s *Server) getConfig() *config.Config {
+	s.configMu.RLock()
+	defer s.configMu.RUnlock()
+	return s.config
 }
 
 // Start starts the API server
@@ -198,11 +207,6 @@ func (s *Server) generateSampleBalances() []domain.Balance {
 	}
 }
 
-// getTotalTradesCount gets total number of trades
-func (s *Server) getTotalTradesCount() (int, error) {
-	return s.db.GetTradesCount()
-}
-
 // getTodayTradesCount gets the number of trades executed today (JST)
 func (s *Server) getTodayTradesCount() (int, error) {
 	return s.db.GetTodayTradesCount()
@@ -247,28 +251,6 @@ func (s *Server) writeJSON(w http.ResponseWriter, data interface{}) {
 		s.logger.Error("Failed to encode JSON: " + err.Error())
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
-}
-
-// validateIntParam validates integer query parameter with min/max bounds
-func validateIntParam(paramStr string, defaultVal, min, max int) (int, error) {
-	if paramStr == "" {
-		return defaultVal, nil
-	}
-
-	val, err := strconv.Atoi(paramStr)
-	if err != nil {
-		return 0, fmt.Errorf("invalid integer value: %w", err)
-	}
-
-	if val < min {
-		return 0, fmt.Errorf("value %d is below minimum %d", val, min)
-	}
-
-	if val > max {
-		return 0, fmt.Errorf("value %d exceeds maximum %d", val, max)
-	}
-
-	return val, nil
 }
 
 // validateStringParam validates string parameter against allowed values

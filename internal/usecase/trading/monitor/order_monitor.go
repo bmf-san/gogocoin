@@ -32,9 +32,11 @@ type OrderMonitor struct {
 	monitorTimeout   time.Duration
 }
 
-// OrderGetter defines the interface for getting orders
+// OrderGetter defines the interface for getting orders.
+// GetOrdersBySymbol is used instead of GetOrders so that orders placed for
+// any symbol can be monitored correctly (not just the trader's default symbol).
 type OrderGetter interface {
-	GetOrders(ctx context.Context) ([]*domain.OrderResult, error)
+	GetOrdersBySymbol(ctx context.Context, symbol string) ([]*domain.OrderResult, error)
 }
 
 // BalanceUpdater defines the interface for updating balance
@@ -122,7 +124,7 @@ func (om *OrderMonitor) saveFinalOrderState(_ context.Context, result *domain.Or
 	finalCtx, cancel := context.WithTimeout(context.Background(), orderCallTimeout)
 	defer cancel()
 	// Try to get current order status one last time
-	orders, err := om.orderGetter.GetOrders(finalCtx)
+	orders, err := om.orderGetter.GetOrdersBySymbol(finalCtx, result.Symbol)
 	if err != nil {
 		if om.logger != nil {
 			om.logger.Trading().WithField("order_id", result.OrderID).
@@ -174,7 +176,7 @@ func (om *OrderMonitor) checkOrderStatus(ctx context.Context, result *domain.Ord
 	// Use a per-call context so a rate-limit delay doesn't burn the overall monitoring budget
 	callCtx, cancel := context.WithTimeout(ctx, orderCallTimeout)
 	defer cancel()
-	orders, err := om.orderGetter.GetOrders(callCtx)
+	orders, err := om.orderGetter.GetOrdersBySymbol(callCtx, result.Symbol)
 	if err != nil {
 		// Check if the error is an authentication error using proper error type checking
 		var apiErr *bitflyer.APIError

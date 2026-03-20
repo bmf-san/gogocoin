@@ -26,7 +26,7 @@ func newTestStrategy() *Strategy {
 		StopLossPct:    0.5,
 		CooldownSec:    0,
 		MaxDailyTrades: 1000,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 }
@@ -168,7 +168,7 @@ func TestIsInCooldown_AfterTrade(t *testing.T) {
 		StopLossPct:    0.5,
 		CooldownSec:    3600,
 		MaxDailyTrades: 1000,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 	s.RecordTrade()
@@ -187,7 +187,7 @@ func TestIsDailyLimitReached_BelowLimit(t *testing.T) {
 		StopLossPct:    0.5,
 		CooldownSec:    0,
 		MaxDailyTrades: 3,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 	s.RecordTrade()
@@ -205,7 +205,7 @@ func TestIsDailyLimitReached_AtLimit(t *testing.T) {
 		StopLossPct:    0.5,
 		CooldownSec:    0,
 		MaxDailyTrades: 3,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 	s.RecordTrade()
@@ -258,7 +258,7 @@ func TestGetTakeProfitPrice(t *testing.T) {
 		StopLossPct:    1.0,
 		CooldownSec:    0,
 		MaxDailyTrades: 10,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 	got := s.GetTakeProfitPrice(1000.0)
@@ -276,7 +276,7 @@ func TestGetStopLossPrice(t *testing.T) {
 		StopLossPct:    1.0,
 		CooldownSec:    0,
 		MaxDailyTrades: 10,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 	})
 	got := s.GetStopLossPrice(1000.0)
@@ -297,7 +297,7 @@ func TestInitialize_ValidParams(t *testing.T) {
 		"stop_loss_pct":    0.8,
 		"cooldown_sec":     60,
 		"max_daily_trades": 5,
-		"order_notional":     500.0,
+		"order_notional":   500.0,
 		"fee_rate":         0.001,
 	})
 	if err != nil {
@@ -314,7 +314,7 @@ func TestInitialize_FastPeriodGTSlow(t *testing.T) {
 		"stop_loss_pct":    0.5,
 		"cooldown_sec":     0,
 		"max_daily_trades": 10,
-		"order_notional":     100.0,
+		"order_notional":   100.0,
 		"fee_rate":         0.001,
 	})
 	if err == nil {
@@ -333,7 +333,7 @@ func TestGenerateSignal_RSIOverboughtBlocksBuy(t *testing.T) {
 		StopLossPct:    0.5,
 		CooldownSec:    0,
 		MaxDailyTrades: 1000,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 		RSIPeriod:      3,
 		RSIOverbought:  40.0, // very low — forces RSI>40 on a rising series
@@ -420,7 +420,7 @@ func TestSymbolEMAPeriods_Override(t *testing.T) {
 		StopLossPct:    0.5,
 		CooldownSec:    0,
 		MaxDailyTrades: 10,
-		OrderNotional:    100.0,
+		OrderNotional:  100.0,
 		FeeRate:        0.001,
 		SymbolParams: map[string]SymbolOverride{
 			"ETH_JPY": {EMAFastPeriod: 7, EMASlowPeriod: 21},
@@ -434,5 +434,48 @@ func TestSymbolEMAPeriods_Override(t *testing.T) {
 	fast, slow = s.symbolEMAPeriods("BTC_JPY")
 	if fast != 3 || slow != 5 {
 		t.Errorf("expected fast=3 slow=5 for BTC_JPY (global default), got fast=%d slow=%d", fast, slow)
+	}
+}
+
+// TestInitialize_SymbolParams verifies that symbol_params supplied as
+// map[string]map[string]interface{} (the format produced by strategyParamsToMap)
+// are applied correctly by Initialize.  Before this fix, Initialize silently
+// discarded the symbol_params key, so per-symbol EMA/notional overrides would
+// never take effect when the strategy was started via engine.Run.
+func TestInitialize_SymbolParams(t *testing.T) {
+	s := NewDefault()
+	err := s.Initialize(map[string]interface{}{
+		"ema_fast_period":  9,
+		"ema_slow_period":  21,
+		"take_profit_pct":  0.8,
+		"stop_loss_pct":    0.4,
+		"cooldown_sec":     90,
+		"max_daily_trades": 3,
+		"order_notional":   200.0,
+		"fee_rate":         0.001,
+		"symbol_params": map[string]map[string]interface{}{
+			"ETH_JPY": {
+				"ema_fast_period": 5,
+				"ema_slow_period": 15,
+				"order_notional":  500.0,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Initialize returned unexpected error: %v", err)
+	}
+
+	fast, slow := s.symbolEMAPeriods("ETH_JPY")
+	if fast != 5 || slow != 15 {
+		t.Errorf("ETH_JPY EMA override not applied: want fast=5 slow=15, got fast=%d slow=%d", fast, slow)
+	}
+	notional := s.symbolOrderNotional("ETH_JPY")
+	if notional != 500.0 {
+		t.Errorf("ETH_JPY order_notional override not applied: want 500.0, got %f", notional)
+	}
+	// Non-overridden symbol should still use global defaults.
+	fast, slow = s.symbolEMAPeriods("BTC_JPY")
+	if fast != 9 || slow != 21 {
+		t.Errorf("BTC_JPY should use global defaults: want fast=9 slow=21, got fast=%d slow=%d", fast, slow)
 	}
 }

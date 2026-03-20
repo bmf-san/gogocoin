@@ -129,11 +129,19 @@ func (t *BitflyerTrader) PlaceOrder(ctx context.Context, order *domain.OrderRequ
 	})
 
 	// 6. Start order monitoring (goroutine management is Facade responsibility)
+	//
+	// Guard against the WaitGroup panic: if Shutdown() has already called
+	// shutdownCancel() and its wg.Wait() goroutine is concurrently blocked with
+	// a counter of zero, calling wg.Add(1) here would trigger
+	// "sync: WaitGroup misuse: Add called concurrently with Wait".
+	// Skipping monitoring during shutdown is safe — the process is exiting.
 	t.mu.Lock()
 	orderMonitor := t.orderMonitor
 	shutdownCtx := t.shutdownCtx
-	if orderMonitor != nil {
+	if orderMonitor != nil && shutdownCtx.Err() == nil {
 		t.wg.Add(1)
+	} else {
+		orderMonitor = nil // skip monitoring if shutting down
 	}
 	t.mu.Unlock()
 
@@ -162,9 +170,16 @@ func (t *BitflyerTrader) CancelOrder(ctx context.Context, orderID string) error 
 	return t.orderService.CancelOrder(ctx, orderID)
 }
 
-// GetOrders retrieves the list of orders
+// GetOrders retrieves the list of orders for the default symbol.
 func (t *BitflyerTrader) GetOrders(ctx context.Context) ([]*domain.OrderResult, error) {
 	return t.orderService.GetOrders(ctx)
+}
+
+// GetOrdersBySymbol retrieves orders for an explicit symbol.
+// Implements monitor.OrderGetter so that the order monitor can correctly
+// track orders for all traded symbols, not just the default one (Symbols[0]).
+func (t *BitflyerTrader) GetOrdersBySymbol(ctx context.Context, symbol string) ([]*domain.OrderResult, error) {
+	return t.orderService.GetOrdersBySymbol(ctx, symbol)
 }
 
 // InvalidateBalanceCache invalidates the balance cache

@@ -26,8 +26,9 @@ func (s *Server) GetApiStatus(ctx context.Context, request GetApiStatusRequestOb
 		APISecretPlaceholder = "${BITFLYER_API_SECRET}"
 	)
 
-	hasAPIKey := s.config.API.Credentials.APIKey != "" && s.config.API.Credentials.APIKey != APIKeyPlaceholder
-	hasAPISecret := s.config.API.Credentials.APISecret != "" && s.config.API.Credentials.APISecret != APISecretPlaceholder
+	cfg := s.getConfig()
+	hasAPIKey := cfg.API.Credentials.APIKey != "" && cfg.API.Credentials.APIKey != APIKeyPlaceholder
+	hasAPISecret := cfg.API.Credentials.APISecret != "" && cfg.API.Credentials.APISecret != APISecretPlaceholder
 
 	var statusDisplay string
 	if hasAPIKey && hasAPISecret {
@@ -50,9 +51,9 @@ func (s *Server) GetApiStatus(ctx context.Context, request GetApiStatusRequestOb
 	}
 
 	runningStatus := "running"
-	strategyName := s.config.Trading.Strategy.Name
+	strategyName := cfg.Trading.Strategy.Name
 	now := time.Now()
-	symbols := s.config.Trading.Symbols
+	symbols := cfg.Trading.Symbols
 
 	resp := StatusResponse{
 		Status:            &runningStatus,
@@ -66,7 +67,7 @@ func (s *Server) GetApiStatus(ctx context.Context, request GetApiStatusRequestOb
 	}
 
 	monitoringPrices := make(map[string]float32)
-	latestMarketData, err := s.db.GetLatestMarketDataForSymbols(s.config.Trading.Symbols)
+	latestMarketData, err := s.db.GetLatestMarketDataForSymbols(cfg.Trading.Symbols)
 	if err == nil {
 		for symbol, data := range latestMarketData {
 			monitoringPrices[symbol] = float32(data.Close)
@@ -81,8 +82,8 @@ func (s *Server) GetApiStatus(ctx context.Context, request GetApiStatusRequestOb
 		primarySymbol = *request.Params.Symbol
 	}
 	if primarySymbol == "" {
-		if len(s.config.Trading.Symbols) > 0 {
-			primarySymbol = s.config.Trading.Symbols[0]
+		if len(cfg.Trading.Symbols) > 0 {
+			primarySymbol = cfg.Trading.Symbols[0]
 		} else {
 			primarySymbol = "BTC_JPY"
 		}

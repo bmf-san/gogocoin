@@ -26,6 +26,7 @@ type Client struct {
 
 	// State management
 	isConnected bool
+	closed      bool // set to true by Close(); prevents a racing Reconnect from storing a new wsClient
 	mu          sync.RWMutex
 
 	// rate limiting
@@ -85,15 +86,20 @@ func (c *Client) initHTTPClient() error {
 	// timezone-less datetime strings returned by the bitFlyer API (e.g.
 	// "2026-03-31T13:08:33") are normalised to RFC3339 UTC ("...Z") before
 	// encoding/json tries to unmarshal them into time.Time fields.
-	customHTTPClient := &nethttp.Client{
-		Transport: newDateFixingTransport(nil),
-	}
+        httpTimeout := c.config.Timeout
+        if httpTimeout <= 0 {
+                httpTimeout = 30 * time.Second
+        }
+        customHTTPClient := &nethttp.Client{
+                Transport: newDateFixingTransport(nil),
+                Timeout:   httpTimeout,
+        }
 
-	authClient, err := http.NewAuthenticatedClient(
-		credentials,
-		c.config.Endpoint,
-		http.WithCustomHTTPClient(customHTTPClient),
-	)
+        authClient, err := http.NewAuthenticatedClient(
+                credentials,
+                c.config.Endpoint,
+                http.WithCustomHTTPClient(customHTTPClient),
+        )
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP client: %w", err)
 	}
@@ -105,7 +111,12 @@ func (c *Client) initHTTPClient() error {
 
 // initWebSocketClient initializes the WebSocket client
 func (c *Client) initWebSocketClient() error {
-	ctx := context.Background()
+	// Use a bounded context so that a network outage or exchange maintenance
+	// window cannot block this call (and therefore the reconnect loop) forever.
+	// 30 s is well above the typical WS handshake RTT while still allowing the
+	// reconnect worker to apply its own exponential back-off promptly.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	c.logger.API().WithField("endpoint", c.config.WebSocketEndpoint).Info("Initializing WebSocket client")
 
@@ -129,8 +140,18 @@ func (c *Client) initWebSocketClient() error {
 		c.logger.API().Info("Using public channels only (no credentials)")
 	}
 
-	c.wsClient = client
+	// If Close() was called while we were connecting, discard the new client
+	// immediately to prevent: (1) a leaked connection and (2) a later ticker
+	// callback trying to send on an already-closed marketDataCh.
 	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		client.Close(closeCtx)
+		return fmt.Errorf("client already closed")
+	}
+	c.wsClient = client
 	c.isConnected = true
 	c.mu.Unlock()
 
@@ -156,13 +177,18 @@ func (c *Client) SetDisconnected() {
 // Reconnect closes the existing WebSocket connection and establishes a new one.
 // Callers should also call MarketDataService.ResetCallbacks() after this.
 func (c *Client) Reconnect(ctx context.Context) error {
+	// Grab and nil the old client under lock, then Close outside the lock.
+	// Holding the lock during Close() (which may block on WS handshake) would
+	// prevent concurrent IsConnected() / SetDisconnected() calls from proceeding.
 	c.mu.Lock()
-	if c.wsClient != nil {
-		c.wsClient.Close(ctx)
-		c.wsClient = nil
-	}
+	old := c.wsClient
+	c.wsClient = nil
 	c.isConnected = false
 	c.mu.Unlock()
+
+	if old != nil {
+		old.Close(ctx)
+	}
 
 	return c.initWebSocketClient()
 }
@@ -172,12 +198,15 @@ func (c *Client) Close(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.closed = true // prevent any concurrent Reconnect from storing a new wsClient
+
 	if c.rateLimiter != nil {
 		c.rateLimiter.Stop()
 	}
 
 	if c.wsClient != nil {
 		c.wsClient.Close(ctx)
+		c.wsClient = nil // idempotent: prevent double-close
 	}
 
 	c.isConnected = false

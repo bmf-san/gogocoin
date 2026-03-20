@@ -97,7 +97,14 @@ func (w *MarketDataWorker) Run(ctx context.Context) error {
 			// Reconnect bitFlyer client
 			if err := w.clientFactory.ReconnectClient(); err != nil {
 				reconnectAttempts++
-				wait := w.reconnectInterval * time.Duration(reconnectAttempts)
+				// Exponential backoff: interval * 2^(attempts-1), capped at max
+				wait := w.reconnectInterval
+				for i := 1; i < reconnectAttempts; i++ {
+					wait *= 2
+					if wait > w.maxReconnectInterval {
+						break
+					}
+				}
 				if wait > w.maxReconnectInterval {
 					wait = w.maxReconnectInterval
 				}
@@ -154,8 +161,23 @@ func (w *MarketDataWorker) Run(ctx context.Context) error {
 			}
 		}
 
-		if subscribedCount == 0 {
-			w.logger.Data().Error("No market data subscriptions successful - will retry connection")
+		if subscribedCount < len(w.symbols) {
+			// Some or all subscriptions failed. Force a reconnect so the next
+			// iteration creates a fresh WebSocket client (empty subscribedChannels
+			// map). Without this, partially-failed symbols are never recovered:
+			// the stale-data detector does not fire as long as the successfully
+			// subscribed symbols keep delivering data.
+			if rc, ok := w.clientFactory.(interface{ SetDisconnected() }); ok {
+				rc.SetDisconnected()
+			}
+			if subscribedCount == 0 {
+				w.logger.Data().Error("No market data subscriptions successful - will retry connection")
+			} else {
+				w.logger.Data().
+					WithField("subscribed_symbols", subscribedCount).
+					WithField("total_symbols", len(w.symbols)).
+					Warn("Partial subscription failure - forcing reconnect to recover missing symbols")
+			}
 			// Use Timer instead of time.After to prevent memory leak
 			timer := time.NewTimer(w.reconnectInterval)
 			select {

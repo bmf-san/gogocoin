@@ -1,12 +1,14 @@
 package logger
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -66,14 +68,6 @@ var (
 			return make(map[string]any, 8) // Pre-allocate for common case
 		},
 	}
-
-	// slicePool provides pooling for slice allocations in field conversion
-	slicePool = sync.Pool{
-		New: func() any {
-			s := make([]any, 0, 16) // Pre-allocate for common case
-			return &s
-		},
-	}
 )
 
 // Logger is the logger used throughout the application
@@ -83,7 +77,7 @@ type Logger struct {
 	config     *Config
 	mu         sync.RWMutex
 	db         domain.LogRepository
-	file       *os.File // File handle for cleanup
+	file       io.Closer // File handle for cleanup (rotatingWriter or nil for console output)
 }
 
 // Verify that Logger implements LoggerInterface at compile time
@@ -285,39 +279,267 @@ func (l *Logger) saveToDatabase(level, category, message string, fields map[stri
 	}
 }
 
-// createWriter creates the output writer
-func createWriter(config *Config) (io.Writer, *os.File, error) {
+// createWriter creates the output writer.
+// Returns (writer, closer, error). closer must be called on shutdown when non-nil.
+func createWriter(config *Config) (io.Writer, io.Closer, error) {
 	switch strings.ToLower(config.Output) {
 	case "console":
 		return os.Stdout, nil, nil
 	case "file":
 		return createFileWriter(config)
 	case "both":
-		fileWriter, file, err := createFileWriter(config)
+		fileWriter, closer, err := createFileWriter(config)
 		if err != nil {
 			return nil, nil, err
 		}
-		return io.MultiWriter(os.Stdout, fileWriter), file, nil
+		return io.MultiWriter(os.Stdout, fileWriter), closer, nil
 	default:
 		return nil, nil, fmt.Errorf("unsupported log output: %s", config.Output)
 	}
 }
 
-// createFileWriter creates a Writer for file output
-func createFileWriter(config *Config) (io.Writer, *os.File, error) {
-	// Create directory
-	dir := filepath.Dir(config.FilePath)
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return nil, nil, fmt.Errorf("failed to create log directory: %w", err)
+// createFileWriter creates a Writer for file output using the stdlib-only
+// rotatingWriter for automatic rotation based on max_size_mb, max_backups,
+// and max_age_days.  No external dependency is required.
+func createFileWriter(config *Config) (io.Writer, io.Closer, error) {
+	maxSize := config.MaxSizeMB
+	if maxSize <= 0 {
+		maxSize = 50 // 50 MB default
 	}
-
-	// Simple file output (rotation delegated to external tools)
-	file, err := os.OpenFile(config.FilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	maxBackups := config.MaxBackups
+	if maxBackups <= 0 {
+		maxBackups = 3
+	}
+	maxAge := config.MaxAgeDays
+	if maxAge <= 0 {
+		maxAge = 7
+	}
+	rw, err := newRotatingWriter(config.FilePath, maxSize, maxBackups, maxAge)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open log file: %w", err)
+		return nil, nil, err
+	}
+	return rw, rw, nil
+}
+
+// ── rotatingWriter ────────────────────────────────────────────────────────────
+// rotatingWriter is a thread-safe, self-rotating log file writer implemented
+// entirely with the Go standard library.  It is a drop-in replacement for
+// gopkg.in/natefinch/lumberjack.v2.
+//
+// Rotation is triggered when the current file would exceed maxBytes on the
+// next Write.  The current file is renamed to a timestamped backup, then a
+// fresh file is opened.  Backup files are gzip-compressed and old backups
+// (beyond maxBackups count or older than maxAgeDays) are removed – both in a
+// background goroutine so the Write path is never blocked.
+type rotatingWriter struct {
+	mu         sync.Mutex
+	filename   string
+	maxBytes   int64
+	maxBackups int
+	maxAgeDays int
+	file       *os.File
+	size       int64
+}
+
+func newRotatingWriter(filename string, maxSizeMB, maxBackups, maxAgeDays int) (*rotatingWriter, error) {
+	rw := &rotatingWriter{
+		filename:   filename,
+		maxBytes:   int64(maxSizeMB) * 1024 * 1024,
+		maxBackups: maxBackups,
+		maxAgeDays: maxAgeDays,
+	}
+	if err := rw.openOrCreate(); err != nil {
+		return nil, err
+	}
+	return rw, nil
+}
+
+// openOrCreate opens the log file for appending (creating it if absent) and
+// records the current size so the rotation threshold is tracked accurately.
+func (rw *rotatingWriter) openOrCreate() error {
+	dir := filepath.Dir(rw.filename)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("failed to create log directory: %w", err)
+	}
+	f, err := os.OpenFile(rw.filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
+	info, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return fmt.Errorf("failed to stat log file: %w", err)
+	}
+	rw.file = f
+	rw.size = info.Size()
+	return nil
+}
+
+// Write implements io.Writer.  It rotates the file when the size threshold
+// would be exceeded, then writes p to the current file.
+func (rw *rotatingWriter) Write(p []byte) (int, error) {
+	rw.mu.Lock()
+	defer rw.mu.Unlock()
+
+	if rw.file == nil {
+		if err := rw.openOrCreate(); err != nil {
+			return 0, err
+		}
 	}
 
-	return file, file, nil
+	if rw.maxBytes > 0 && rw.size+int64(len(p)) > rw.maxBytes {
+		if err := rw.rotate(); err != nil {
+			// Rotation failed; keep writing to the existing file so no log
+			// entries are lost.
+			_ = err
+		}
+	}
+
+	n, err := rw.file.Write(p)
+	rw.size += int64(n)
+	return n, err
+}
+
+// Close implements io.Closer.
+func (rw *rotatingWriter) Close() error {
+	rw.mu.Lock()
+	defer rw.mu.Unlock()
+	if rw.file != nil {
+		err := rw.file.Close()
+		rw.file = nil
+		return err
+	}
+	return nil
+}
+
+// rotate closes the current file, renames it to a timestamped backup, opens a
+// fresh log file, and launches a goroutine to gzip-compress the backup and
+// remove old backups.  Caller must hold rw.mu.
+func (rw *rotatingWriter) rotate() error {
+	if rw.file != nil {
+		if err := rw.file.Close(); err != nil {
+			return err
+		}
+		rw.file = nil
+	}
+
+	backupPath := rw.backupFilename()
+	if err := os.Rename(rw.filename, backupPath); err != nil && !os.IsNotExist(err) {
+		// Rename failed; attempt to reopen the original file so logging can
+		// continue even though rotation did not happen.
+		_ = rw.openOrCreate()
+		return fmt.Errorf("rotate: rename failed: %w", err)
+	}
+
+	if err := rw.openOrCreate(); err != nil {
+		return err
+	}
+
+	// Compress the backup and remove stale files in a background goroutine so
+	// the Write path does not block on potentially slow disk operations.
+	go func(bp string) {
+		if gz, err := compressLogFile(bp); err == nil {
+			_ = os.Remove(bp)
+			bp = gz
+		}
+		rw.cleanupBackups(bp)
+	}(backupPath)
+
+	return nil
+}
+
+// backupFilename returns a unique timestamped path for the rotated-away file.
+func (rw *rotatingWriter) backupFilename() string {
+	ext := filepath.Ext(rw.filename)
+	base := strings.TrimSuffix(rw.filename, ext)
+	// Millisecond precision makes same-second collisions extremely unlikely.
+	ts := time.Now().UTC().Format("2006-01-02T15-04-05.000")
+	return fmt.Sprintf("%s-%s%s", base, ts, ext)
+}
+
+// backupGlob returns a glob pattern that matches all backup files (both
+// compressed and uncompressed) for the managed log file.
+func (rw *rotatingWriter) backupGlob() string {
+	ext := filepath.Ext(rw.filename)
+	base := strings.TrimSuffix(filepath.Base(rw.filename), ext)
+	dir := filepath.Dir(rw.filename)
+	return filepath.Join(dir, base+"-*")
+}
+
+// compressLogFile gzip-compresses src into src+".gz" using stdlib compress/gzip
+// and returns the path of the compressed file.  It does NOT remove src.
+func compressLogFile(src string) (string, error) {
+	dst := src + ".gz"
+	in, err := os.Open(src)
+	if err != nil {
+		return "", err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	gw := gzip.NewWriter(out)
+	if _, err := io.Copy(gw, in); err != nil {
+		_ = os.Remove(dst)
+		return "", err
+	}
+	if err := gw.Close(); err != nil {
+		_ = os.Remove(dst)
+		return "", err
+	}
+	return dst, nil
+}
+
+// cleanupBackups removes old backup files respecting maxBackups and maxAgeDays.
+// It reads only immutable fields and is safe to call without holding rw.mu.
+// currentBackup is the backup file just created; it is always retained.
+func (rw *rotatingWriter) cleanupBackups(currentBackup string) {
+	matches, err := filepath.Glob(rw.backupGlob())
+	if err != nil {
+		return
+	}
+
+	type entry struct {
+		path    string
+		modTime time.Time
+	}
+
+	var backups []entry
+	now := time.Now()
+	maxAge := time.Duration(rw.maxAgeDays) * 24 * time.Hour
+
+	for _, m := range matches {
+		if m == rw.filename {
+			continue // never remove the active log file
+		}
+		info, err := os.Stat(m)
+		if err != nil {
+			continue
+		}
+		if rw.maxAgeDays > 0 && now.Sub(info.ModTime()) > maxAge {
+			_ = os.Remove(m)
+			continue
+		}
+		backups = append(backups, entry{m, info.ModTime()})
+	}
+
+	// Sort newest-first so we keep the most recent maxBackups entries.
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].modTime.After(backups[j].modTime)
+	})
+
+	// Delete entries beyond maxBackups, but never the file we just created.
+	if rw.maxBackups > 0 && len(backups) > rw.maxBackups {
+		for _, b := range backups[rw.maxBackups:] {
+			if b.path != currentBackup {
+				_ = os.Remove(b.path)
+			}
+		}
+	}
 }
 
 // createHandler creates a slog.Handler
@@ -590,6 +812,8 @@ func (l *Logger) SetLevel(level string) error {
 
 // GetLevel gets the current log level
 func (l *Logger) GetLevel() string {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	return l.config.Level
 }
 

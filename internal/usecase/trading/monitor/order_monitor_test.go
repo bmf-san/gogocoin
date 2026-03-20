@@ -20,7 +20,7 @@ type mockOrderGetter struct {
 	errs    []error
 }
 
-func (m *mockOrderGetter) GetOrders(_ context.Context) ([]*domain.OrderResult, error) {
+func (m *mockOrderGetter) GetOrdersBySymbol(_ context.Context, _ string) ([]*domain.OrderResult, error) {
 	idx := int(m.calls.Add(1)) - 1
 	if idx >= len(m.results) {
 		idx = len(m.results) - 1

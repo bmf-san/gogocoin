@@ -355,11 +355,10 @@ func (mds *MarketDataService) SubscribeToTicker(ctx context.Context, symbol stri
 		return fmt.Errorf("websocket client is not connected")
 	}
 
-	// Store shutdown context for background goroutines
-	mds.shutdownCtx = ctx
-
 	// Set up global handler only on first call
 	mds.mu.Lock()
+	// Store shutdown context under the lock to avoid data race
+	mds.shutdownCtx = ctx
 	if !mds.callbacksInit {
 		mds.callbacksInit = true
 		mds.tickerCallbacks = make(map[string]func(MarketData))
@@ -643,7 +642,10 @@ func (mds *MarketDataService) saveMarketDataToDB(marketData *MarketData) {
 
 	now := time.Now()
 
-	// Check last save time (save at 1-minute intervals per symbol)
+	// Check last save time (save at 1-minute intervals per symbol).
+	// Also snapshot shutdownCtx under the same lock to avoid a data race:
+	// SubscribeToTicker writes mds.shutdownCtx under mds.mu, so reads must
+	// also be protected.
 	mds.mu.Lock()
 	lastSave, exists := mds.lastSaveTime[marketData.Symbol]
 	if exists && now.Sub(lastSave) < time.Minute {
@@ -653,6 +655,7 @@ func (mds *MarketDataService) saveMarketDataToDB(marketData *MarketData) {
 	}
 	// Update save time
 	mds.lastSaveTime[marketData.Symbol] = now
+	shutdownCtx := mds.shutdownCtx // snapshot while holding mu (race-safe)
 	mds.mu.Unlock()
 
 	// Convert MarketData to domain.MarketData
@@ -669,13 +672,13 @@ func (mds *MarketDataService) saveMarketDataToDB(marketData *MarketData) {
 
 	// Save to database asynchronously (with semaphore to limit concurrent saves)
 	// Check if shutdown context is still active before spawning goroutine
-	if mds.shutdownCtx == nil {
+	if shutdownCtx == nil {
 		// Context not initialized, skip save
 		return
 	}
 
 	select {
-	case <-mds.shutdownCtx.Done():
+	case <-shutdownCtx.Done():
 		// Shutdown in progress, skip save
 		return
 	case mds.saveSemaphore <- struct{}{}:
@@ -684,7 +687,7 @@ func (mds *MarketDataService) saveMarketDataToDB(marketData *MarketData) {
 
 			// Check context again before database operation
 			select {
-			case <-mds.shutdownCtx.Done():
+			case <-shutdownCtx.Done():
 				return
 			default:
 			}
