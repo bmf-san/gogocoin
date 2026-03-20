@@ -134,8 +134,9 @@ func (s *Server) GetApiPerformance(ctx context.Context, request GetApiPerformanc
 
 // GetApiConfig implements StrictServerInterface - get current config
 func (s *Server) GetApiConfig(ctx context.Context, request GetApiConfigRequestObject) (GetApiConfigResponseObject, error) {
-	s.logger.UI().WithField("strategy", s.config.Trading.Strategy.Name).Info("Returning config")
-	return customConfigResponse{cfg: maskedConfig(s.config)}, nil
+	cfg := s.getConfig()
+	s.logger.UI().WithField("strategy", cfg.Trading.Strategy.Name).Info("Returning config")
+	return customConfigResponse{cfg: maskedConfig(cfg)}, nil
 }
 
 // PostApiConfig implements StrictServerInterface - update config
@@ -146,6 +147,13 @@ func (s *Server) PostApiConfig(ctx context.Context, request PostApiConfigRequest
 	}
 	req := request.Body
 
+	// Build a local copy of the current config to mutate and save.
+	// This avoids holding the lock during disk I/O and prevents a data race
+	// on s.config against concurrent read-only handlers.
+	s.configMu.RLock()
+	cfgSnapshot := *s.config // shallow copy is safe for value-type fields
+	s.configMu.RUnlock()
+
 	if req.Strategy != nil && req.Strategy.Name != nil {
 		name := string(*req.Strategy.Name)
 		allowedStrategies := []string{"scalping", "simple"}
@@ -153,7 +161,7 @@ func (s *Server) PostApiConfig(ctx context.Context, request PostApiConfigRequest
 			msg := fmt.Sprintf("Invalid strategy name: %v", err)
 			return PostApiConfig400JSONResponse{BadRequestJSONResponse{Message: &msg}}, nil
 		}
-		s.config.Trading.Strategy.Name = name
+		cfgSnapshot.Trading.Strategy.Name = name
 	}
 
 	if req.Risk != nil {
@@ -167,9 +175,9 @@ func (s *Server) PostApiConfig(ctx context.Context, request PostApiConfigRequest
 		}
 	}
 
-	s.logger.UI().WithField("strategy", s.config.Trading.Strategy.Name).Info("Updating configuration")
+	s.logger.UI().WithField("strategy", cfgSnapshot.Trading.Strategy.Name).Info("Updating configuration")
 
-	if err := s.saveConfigToFile(); err != nil {
+	if err := s.saveConfigToFile(&cfgSnapshot); err != nil {
 		s.logger.Error("Failed to save config to file: " + err.Error())
 		msg := "Failed to save configuration"
 		return PostApiConfig500JSONResponse{InternalServerErrorJSONResponse{Message: &msg}}, nil
@@ -182,11 +190,13 @@ func (s *Server) PostApiConfig(ctx context.Context, request PostApiConfigRequest
 	if err != nil {
 		s.logger.Error("Failed to reload config from file: " + err.Error())
 	} else {
+		s.configMu.Lock()
 		s.config = reloadedConfig
+		s.configMu.Unlock()
 		s.logger.UI().Info("Configuration reloaded from file successfully")
 	}
 
-	return customConfigUpdateResponse{cfg: maskedConfig(s.config), message: "Configuration saved"}, nil
+	return customConfigUpdateResponse{cfg: maskedConfig(s.getConfig()), message: "Configuration saved"}, nil
 }
 
 // GetApiLogs implements StrictServerInterface - get logs
@@ -225,10 +235,12 @@ func (s *Server) GetApiOrders(ctx context.Context, request GetApiOrdersRequestOb
 // saveConfigToFile saves configuration to file.
 // API credentials are replaced with environment variable placeholders
 // so that secrets are never written to disk in plain text.
-func (s *Server) saveConfigToFile() error {
+// cfg is the desired state to persist; it must be a caller-owned copy,
+// not the shared s.config pointer (to avoid holding the lock during disk I/O).
+func (s *Server) saveConfigToFile(cfg *config.Config) error {
 	configPath := s.serverConfig.ConfigPath
 
-	cfgCopy := *s.config
+	cfgCopy := *cfg
 	apiCopy := cfgCopy.API
 	apiCopy.Credentials = config.CredentialsConfig{
 		APIKey:    "${BITFLYER_API_KEY}",

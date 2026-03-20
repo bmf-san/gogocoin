@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bmf-san/gogocoin/internal/config"
@@ -19,6 +20,7 @@ import (
 
 // Server is the API server for Web UI
 type Server struct {
+	configMu     sync.RWMutex   // guards config pointer and its mutable fields
 	config       *config.Config
 	db           DatabaseService
 	logger       logger.LoggerInterface
@@ -64,6 +66,14 @@ func NewServerWithConfig(cfg *config.Config, db DatabaseService, logger logger.L
 // SetApplication sets the application service
 func (s *Server) SetApplication(app ApplicationService) {
 	s.app = app
+}
+
+// getConfig returns the current config under a read lock.
+// Always use this instead of accessing s.config directly from handlers.
+func (s *Server) getConfig() *config.Config {
+	s.configMu.RLock()
+	defer s.configMu.RUnlock()
+	return s.config
 }
 
 // Start starts the API server
