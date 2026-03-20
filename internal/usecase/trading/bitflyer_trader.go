@@ -162,9 +162,16 @@ func (t *BitflyerTrader) CancelOrder(ctx context.Context, orderID string) error 
 	return t.orderService.CancelOrder(ctx, orderID)
 }
 
-// GetOrders retrieves the list of orders
+// GetOrders retrieves the list of orders for the default symbol.
 func (t *BitflyerTrader) GetOrders(ctx context.Context) ([]*domain.OrderResult, error) {
 	return t.orderService.GetOrders(ctx)
+}
+
+// GetOrdersBySymbol retrieves orders for an explicit symbol.
+// Implements monitor.OrderGetter so that the order monitor can correctly
+// track orders for all traded symbols, not just the default one (Symbols[0]).
+func (t *BitflyerTrader) GetOrdersBySymbol(ctx context.Context, symbol string) ([]*domain.OrderResult, error) {
+	return t.orderService.GetOrdersBySymbol(ctx, symbol)
 }
 
 // InvalidateBalanceCache invalidates the balance cache

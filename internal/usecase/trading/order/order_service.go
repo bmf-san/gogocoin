@@ -129,8 +129,19 @@ func (s *OrderService) CancelOrder(ctx context.Context, orderID string) error {
 	return nil
 }
 
-// GetOrders retrieves the list of orders
+// GetOrders retrieves the list of orders for the default symbol (s.symbol).
 func (s *OrderService) GetOrders(ctx context.Context) ([]*domain.OrderResult, error) {
+	return s.getOrdersForSymbol(ctx, s.symbol)
+}
+
+// GetOrdersBySymbol retrieves orders for an explicit symbol.
+// Use this instead of GetOrders when monitoring orders placed for symbols
+// other than the trader's default symbol (Symbols[0]).
+func (s *OrderService) GetOrdersBySymbol(ctx context.Context, symbol string) ([]*domain.OrderResult, error) {
+	return s.getOrdersForSymbol(ctx, symbol)
+}
+
+func (s *OrderService) getOrdersForSymbol(ctx context.Context, symbol string) ([]*domain.OrderResult, error) {
 	// Wait for rate limiter before making API request
 	if err := s.client.WaitForRateLimit(ctx); err != nil {
 		return nil, fmt.Errorf("rate limit error: %w", err)
@@ -144,7 +155,7 @@ func (s *OrderService) GetOrders(ctx context.Context) ([]*domain.OrderResult, er
 	// Get last orders
 	count := http.Count(DefaultOrderLimit)
 	params := http.GetV1MeGetchildordersParams{
-		ProductCode: s.symbol,
+		ProductCode: symbol,
 		Count:       &count,
 	}
 
