@@ -96,11 +96,11 @@ func (c *Client) initHTTPClient() error {
 		Timeout:   httpTimeout,
 	}
 
-	authClient, err := http.NewAuthenticatedClient(
-		credentials,
-		c.config.Endpoint,
-		http.WithCustomHTTPClient(customHTTPClient),
-	)
+        authClient, err := http.NewAuthenticatedClient(
+                credentials,
+                c.config.Endpoint,
+                http.WithCustomHTTPClient(customHTTPClient),
+        )
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP client: %w", err)
 	}
@@ -248,6 +248,8 @@ func (c *Client) Close(ctx context.Context) error {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	c.closed = true // prevent any concurrent Reconnect from storing a new wsClient
 
 	if c.rateLimiter != nil {
 		c.rateLimiter.Stop()
