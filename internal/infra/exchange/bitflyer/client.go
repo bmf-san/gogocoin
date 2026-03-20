@@ -26,7 +26,7 @@ type Client struct {
 
 	// State management
 	isConnected     bool
-	closed          bool // set to true by Close(); prevents a racing Reconnect from storing a new wsClient
+	closed          bool               // set to true by Close(); prevents a racing Reconnect from storing a new wsClient
 	heartbeatCancel context.CancelFunc // cancels the heartbeat goroutine on Close/Reconnect
 	mu              sync.RWMutex
 
@@ -96,11 +96,11 @@ func (c *Client) initHTTPClient() error {
 		Timeout:   httpTimeout,
 	}
 
-        authClient, err := http.NewAuthenticatedClient(
-                credentials,
-                c.config.Endpoint,
-                http.WithCustomHTTPClient(customHTTPClient),
-        )
+	authClient, err := http.NewAuthenticatedClient(
+		credentials,
+		c.config.Endpoint,
+		http.WithCustomHTTPClient(customHTTPClient),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP client: %w", err)
 	}
@@ -166,7 +166,9 @@ func (c *Client) initWebSocketClient() error {
 
 // runHeartbeat sends a WebSocket ping every 60 seconds to prevent NAT firewalls
 // from silently dropping the idle TCP connection (typical NAT timeout: 2-5 min).
-// If a ping fails, the client is marked disconnected so the worker reconnects.
+// The ping frame itself resets the NAT timer even if the server does not reply
+// with a pong (bitflyer does not send pong frames). Dead connections are detected
+// by staleDataTimeout in the market data worker — not here.
 func (c *Client) runHeartbeat(ctx context.Context) {
 	const interval = 60 * time.Second
 	ticker := time.NewTicker(interval)
@@ -184,9 +186,11 @@ func (c *Client) runHeartbeat(ctx context.Context) {
 			err := ws.Ping(pingCtx)
 			cancel()
 			if err != nil {
-				c.logger.API().WithError(err).Warn("WebSocket heartbeat ping failed - marking disconnected")
-				c.SetDisconnected()
-				return
+				// bitflyer does not respond to WS ping frames, so a timeout here
+				// is expected and does not mean the connection is dead.
+				// Continue sending pings to keep the NAT entry alive.
+				c.logger.API().WithError(err).Debug("WebSocket heartbeat ping: no pong (expected for bitflyer)")
+				continue
 			}
 			c.logger.API().Debug("WebSocket heartbeat ping OK")
 		case <-ctx.Done():
