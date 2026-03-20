@@ -258,9 +258,16 @@ func (s *Server) saveConfigToFile(cfg *config.Config) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// 0600: owner read/write only — config may contain sensitive info
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
+	// Write to a temp file then rename atomically so a crash between truncation
+	// and write completion cannot leave an empty/corrupt config on disk.
+	// 0600: owner read/write only — config may contain sensitive info.
+	tmpPath := configPath + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write temp config: %w", err)
+	}
+	if err := os.Rename(tmpPath, configPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to atomically replace config: %w", err)
 	}
 
 	return nil

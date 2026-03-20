@@ -67,7 +67,6 @@ var (
 			return make(map[string]any, 8) // Pre-allocate for common case
 		},
 	}
-
 )
 
 // Logger is the logger used throughout the application
@@ -606,6 +605,8 @@ func (l *Logger) SetLevel(level string) error {
 
 // GetLevel gets the current log level
 func (l *Logger) GetLevel() string {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	return l.config.Level
 }
 

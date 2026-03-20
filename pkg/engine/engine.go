@@ -2,7 +2,9 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -178,7 +180,7 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	httpServer := adapterhttp.NewServer(cfg, repo, log)
 	httpServer.SetApplication(appSvc)
 	go func() {
-		if err := httpServer.Start(); err != nil {
+		if err := httpServer.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.System().Error("HTTP server error", "error", err)
 		}
 	}()

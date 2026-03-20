@@ -322,7 +322,10 @@ func (s *Strategy) RecordTrade() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lastTradeTime = time.Now()
-	today := s.lastTradeTime.Format("2006-01-02")
+	// Use JST date so the daily counter resets at midnight JST, not UTC midnight.
+	// On a UTC VPS, UTC midnight = 09:00 JST which would reset the counter 9 hours
+	// early and allow double the intended trades in a single JST day.
+	today := time.Now().UTC().Add(9 * time.Hour).Format("2006-01-02")
 	if s.lastTradeDate != today {
 		s.dailyTradeCount = 1
 		s.lastTradeDate = today
@@ -336,7 +339,8 @@ func (s *Strategy) InitializeDailyTradeCount(count int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.dailyTradeCount = count
-	s.lastTradeDate = time.Now().Format("2006-01-02")
+	// Use JST date to be consistent with RecordTrade.
+	s.lastTradeDate = time.Now().UTC().Add(9 * time.Hour).Format("2006-01-02")
 }
 
 // GetTakeProfitPrice returns the take-profit price from an entry price.
@@ -530,7 +534,8 @@ func (s *Strategy) isInCooldown() bool {
 func (s *Strategy) isDailyLimitReached() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	today := time.Now().Format("2006-01-02")
+	// Use JST date to be consistent with RecordTrade.
+	today := time.Now().UTC().Add(9 * time.Hour).Format("2006-01-02")
 	if s.lastTradeDate != today {
 		return false
 	}

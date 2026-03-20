@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bmf-san/gogocoin/internal/domain"
+	"github.com/bmf-san/gogocoin/internal/utils"
 )
 
 // MaintenanceRepository implements domain.MaintenanceRepository over *DB.
@@ -36,9 +37,9 @@ func (r *MaintenanceRepository) CleanupOldData(retentionDays int) error {
 	if retentionDays <= 0 {
 		return fmt.Errorf("retentionDays must be greater than 0, got %d", retentionDays)
 	}
-	today := time.Now()
+	today := utils.NowInJST()
 	cutoff := today.AddDate(0, 0, -(retentionDays - 1))
-	cutoff = time.Date(cutoff.Year(), cutoff.Month(), cutoff.Day(), 0, 0, 0, 0, time.Local)
+	cutoff = time.Date(cutoff.Year(), cutoff.Month(), cutoff.Day(), 0, 0, 0, 0, today.Location())
 
 	tx, err := r.db.db.Begin()
 	if err != nil {
