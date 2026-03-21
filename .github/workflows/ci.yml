@@ -15,7 +15,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.25.x'
+        go-version: '1.26.x'
         cache: true
 
     - name: Download dependencies
@@ -40,7 +40,6 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: true  # golangci-lint doesn't support Go 1.25 yet
 
     steps:
     - name: Checkout code
@@ -49,7 +48,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.25.x'
+        go-version: '1.26.x'
         cache: true
 
     - name: Download dependencies
@@ -63,7 +62,6 @@ jobs:
       with:
         version: latest
         args: --timeout=5m
-      continue-on-error: true  # Ignore errors until golangci-lint supports Go 1.25
 
   codegen:
     name: OpenAPI Codegen Check
@@ -76,7 +74,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.25.x'
+        go-version: '1.26.x'
         cache: true
 
     - name: Install oapi-codegen
@@ -97,7 +95,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.25.x'
+        go-version: '1.26.x'
         cache: true
 
     - name: Download dependencies
@@ -126,7 +124,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.25.x'
+        go-version: '1.26.x'
         cache: true
 
     - name: Run Gosec Security Scanner

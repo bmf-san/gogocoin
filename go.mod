@@ -1,6 +1,6 @@
 module github.com/bmf-san/gogocoin
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/bmf-san/go-bitflyer-api-client v1.1.2
