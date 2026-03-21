@@ -58,7 +58,7 @@ type Strategy struct {
 }
 
 // New creates a new scalping Strategy with the given Params.
-func New(cfg Params) *Strategy {
+func New(cfg Params) *Strategy { //nolint:gocritic // hugeParam: Params is passed by value intentionally (immutable config)
 	base := strategy.NewBaseStrategy(
 		"scalping",
 		"Stateless EMA-crossover scalping strategy with RSI filter",
@@ -430,7 +430,7 @@ func (s *Strategy) calculateEMA(history []strategy.MarketData, period int) float
 	if len(history) < period {
 		return 0.0
 	}
-	// Initialise with SMA of the first period points, then apply the EMA
+		// Initialize with SMA of the first period points, then apply the EMA
 	// formula to every subsequent point.  Using the full history avoids the
 	// previous bug where SMA and EMA loop operated on the same slice,
 	// effectively double-counting the most-recent prices.
@@ -511,13 +511,14 @@ func (s *Strategy) quantityForSymbol(symbol string, price float64) float64 {
 		return 0
 	}
 	notional := s.symbolOrderNotional(symbol)
-	qty := math.Ceil((notional/price)*1e8) / 1e8
-	minSize := s.minimumOrderSize(symbol)
-	if qty < minSize {
-		qty = minSize
+	lotSize := s.minimumOrderSize(symbol)
+	if lotSize <= 0 {
+		lotSize = fallbackMinOrderSize(symbol)
 	}
-	if qty*price < notional {
-		qty += 1.0 / 1e8
+	// Round UP to nearest lot to cover at least the required notional
+	qty := math.Ceil(notional/price/lotSize) * lotSize
+	if qty < lotSize {
+		qty = lotSize
 	}
 	return qty
 }

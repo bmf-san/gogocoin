@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"math"
 	"sync"
 	"time"
 
@@ -26,6 +27,7 @@ type SignalWorker struct {
 	trader               Trader
 	currentStrategy      strategy.Strategy
 	performanceUpdater   PerformanceUpdater
+	lotSizeSvc           LotSizeService
 	// sellSizePercentage is the fraction of available balance used when selling
 	// (< 1.0 to avoid rounding errors). Loaded from config at startup.
 	sellSizePercentage float64
@@ -53,6 +55,11 @@ type PerformanceUpdater interface {
 	UpdateMetrics(ctx context.Context) error
 }
 
+// LotSizeService returns the minimum order size (lot size) for a symbol.
+type LotSizeService interface {
+	GetMinimumOrderSize(symbol string) (float64, error)
+}
+
 // NewSignalWorker creates a new signal worker
 func NewSignalWorker(
 	logger logger.LoggerInterface,
@@ -62,6 +69,7 @@ func NewSignalWorker(
 	trader Trader,
 	currentStrategy strategy.Strategy,
 	performanceUpdater PerformanceUpdater,
+	lotSizeSvc LotSizeService,
 	sellSizePercentage float64,
 ) *SignalWorker {
 	return &SignalWorker{
@@ -72,6 +80,7 @@ func NewSignalWorker(
 		trader:               trader,
 		currentStrategy:      currentStrategy,
 		performanceUpdater:   performanceUpdater,
+		lotSizeSvc:           lotSizeSvc,
 		sellSizePercentage:   sellSizePercentage,
 	}
 }
@@ -241,7 +250,17 @@ func (w *SignalWorker) applyAutoScaleToBuySignal(ctx context.Context, signal *st
 		return false
 	}
 
-	signal.Quantity = effectiveNotional / signal.Price
+	rawQty := effectiveNotional / signal.Price
+	lotSize := w.resolveLotsSize(signal.Symbol)
+	signal.Quantity = math.Floor(rawQty/lotSize) * lotSize
+	if signal.Quantity <= 0 {
+		w.logger.Trading().
+			WithField("symbol", signal.Symbol).
+			WithField("raw_qty", rawQty).
+			WithField("lot_size", lotSize).
+			Warn("Skipping BUY signal - scaled quantity below minimum lot size after rounding")
+		return false
+	}
 	if signal.Metadata == nil {
 		signal.Metadata = make(map[string]interface{})
 	}
@@ -394,6 +413,43 @@ func (w *SignalWorker) getAvailableSellSize(ctx context.Context, symbol string, 
 		return requestedSize
 	}
 
-	// Sell 95% of holdings (to avoid rounding errors with full amount)
-	return availableBalance * w.sellSizePercentage
+	// Sell a portion of holdings rounded down to the nearest lot size
+	lotSize := w.resolveLotsSize(symbol)
+	result := math.Floor(availableBalance*w.sellSizePercentage/lotSize) * lotSize
+	if result <= 0 {
+		return availableBalance * w.sellSizePercentage
+	}
+	return result
+}
+
+// resolveLotsSize returns the minimum lot size for a symbol using the injected
+// LotSizeService when available, falling back to hardcoded values otherwise.
+func (w *SignalWorker) resolveLotsSize(symbol string) float64 {
+	if w.lotSizeSvc != nil {
+		if size, err := w.lotSizeSvc.GetMinimumOrderSize(symbol); err == nil && size > 0 {
+			return size
+		}
+	}
+	return fallbackLotSize(symbol)
+}
+
+// fallbackLotSize returns hardcoded lot sizes used when the LotSizeService is
+// unavailable. Values match BitFlyer's documented minimums.
+func fallbackLotSize(symbol string) float64 {
+	switch symbol {
+	case "BTC_JPY":
+		return 0.001
+	case "ETH_JPY":
+		return 0.01
+	case "XRP_JPY":
+		return 1.0
+	case "XLM_JPY":
+		return 10.0
+	case "MONA_JPY":
+		return 1.0
+	case "BCH_JPY":
+		return 0.01
+	default:
+		return 0.001
+	}
 }

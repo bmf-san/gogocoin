@@ -296,7 +296,8 @@ func domainBalancesToAPI(balances []domain.Balance) []Balance {
 // domainTradesToAPI converts []domain.Trade to []Trade (generated API type).
 func domainTradesToAPI(trades []domain.Trade) []Trade {
 	result := make([]Trade, len(trades))
-	for i, t := range trades {
+	for i := range trades {
+		t := &trades[i]
 		id := t.ID
 		symbol := t.Symbol
 		productCode := t.ProductCode
@@ -338,7 +339,8 @@ func domainTradesToAPI(trades []domain.Trade) []Trade {
 // domainMetricsToAPI converts []domain.PerformanceMetric to []PerformanceMetric (generated API type).
 func domainMetricsToAPI(metrics []domain.PerformanceMetric) []PerformanceMetric {
 	result := make([]PerformanceMetric, len(metrics))
-	for i, m := range metrics {
+	for i := range metrics {
+		m := &metrics[i]
 		date := m.Date
 		totalReturn := float32(m.TotalReturn)
 		dailyReturn := float32(m.DailyReturn)

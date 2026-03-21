@@ -22,7 +22,7 @@ import (
 	pkgstrategy "github.com/bmf-san/gogocoin/pkg/strategy"
 )
 
-// Run loads configuration, wires all components, and blocks until ctx is cancelled.
+// Run loads configuration, wires all components, and blocks until ctx is canceled.
 // Callers register their strategy implementation(s) via WithStrategy() options.
 func Run(ctx context.Context, opts ...Option) error {
 	ec := newEngineConfig()
@@ -56,7 +56,7 @@ func Run(ctx context.Context, opts ...Option) error {
 }
 
 // RunWithLogger is like Run but uses a pre-created logger (useful when the
-// caller wants to initialise logging before Run, e.g. for startup messages).
+// caller wants to initialize logging before Run, e.g. for startup messages).
 func RunWithLogger(ctx context.Context, log logger.LoggerInterface, opts ...Option) error {
 	ec := newEngineConfig()
 	for _, o := range opts {
@@ -202,6 +202,7 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	strategyWorker := adapterworker.NewStrategyWorker(log, strat, marketDataCh, signalCh)
 	signalWorker := adapterworker.NewSignalWorker(
 		log, signalCh, tradingCtrl, riskMgr, trader, strat, perfAnalytics,
+		bfMarketSpecSvc,
 		cfg.Runtime.SellSizePercentage,
 	)
 	strategyMonitor := adapterworker.NewStrategyMonitorWorker(log, &strategyGetter{strat: strat})
@@ -233,7 +234,7 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 		log.System().WithError(err).Error("HTTP server shutdown error")
 	}
 	// Shut down the trader first so that in-flight order-monitoring goroutines
-	// (which use an independent context) are cancelled before we close channels.
+	// (which use an independent context) are canceled before we close channels.
 	// trader.Shutdown() waits up to 30 s for them to finish.
 	if err := trader.Shutdown(); err != nil {
 		log.System().WithError(err).Warn("Trader shutdown error")
@@ -253,7 +254,7 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	return nil
 }
 
-// buildStrategy creates and initialises the strategy from the registry.
+// buildStrategy creates and initializes the strategy from the registry.
 func buildStrategy(cfg *config.Config, registry *pkgstrategy.Registry) (pkgstrategy.Strategy, error) {
 	name := cfg.Trading.Strategy.Name
 
@@ -416,13 +417,14 @@ const appStateKeyTradingEnabled = "trading_enabled"
 func newTradingController(db domain.AppStateRepository, log logger.LoggerInterface) (*tradingController, error) {
 	tc := &tradingController{db: db, log: log}
 	val, err := db.GetAppState(appStateKeyTradingEnabled)
-	if err != nil {
+	switch {
+	case err != nil:
 		log.System().WithError(err).Warn("Failed to read trading state at startup")
-	} else if val == "" {
+	case val == "":
 		if saveErr := db.SaveAppState(appStateKeyTradingEnabled, "false"); saveErr != nil {
 			log.System().WithError(saveErr).Warn("Failed to initialize trading state at startup")
 		}
-	} else if val == "true" {
+	case val == "true":
 		tc.enabled = true
 	}
 	return tc, nil

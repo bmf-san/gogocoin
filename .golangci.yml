@@ -28,10 +28,16 @@ linters:
       - "testdata/.*"
     rules:
       - path: "_test\\.go"
-        linters: [gocritic]          # *_test.go では gocritic を無効化
+        linters: [gocritic, errcheck]  # test files: gocritic & errcheck suppressed
+      - path: "_test\\.go"
+        linters: [staticcheck]
+        text: "^QF"                    # test files: QF style suggestions suppressed
       - text: "Statuser"
-        linters: [misspell]          # misspell の誤検知ワードを無視
-
+        linters: [misspell]
+      - text: "`strat`"
+        linters: [misspell]          # strat は strategy の略（false positive）
+      - text: 'Error return value of.*[.]Close.*is not checked'
+        linters: [errcheck]          # defer Close() エラーは安全に無視
 issues:
   # これらは v2 でも有効なまま
   max-issues-per-linter: 0

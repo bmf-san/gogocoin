@@ -215,7 +215,7 @@ func TestOrderMonitor_IntermittentErrors(t *testing.T) {
 }
 
 // TestOrderMonitor_ContextCancellation verifies that the monitor stops promptly
-// when the context is cancelled.
+// when the context is canceled.
 func TestOrderMonitor_ContextCancellation(t *testing.T) {
 	// GetOrders always returns "OPEN" (never terminates naturally)
 	getter := &mockOrderGetter{

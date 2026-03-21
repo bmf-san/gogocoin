@@ -135,7 +135,7 @@ func (w *StrategyWorker) Run(ctx context.Context) error {
 			case w.processingPool <- struct{}{}:
 				// Slot acquired, proceed with processing
 			case <-ctx.Done():
-				// Context cancelled while waiting for pool slot
+				// Context canceled while waiting for pool slot
 				return nil
 			}
 

@@ -15,13 +15,13 @@ const (
 
 // Calculator calculates profit and loss for trades
 type Calculator struct {
-	db           domain.TradingRepository
+	db           domain.TradingRepository //nolint:staticcheck // SA1019: migrating to individual repos in Phase 5
 	logger       logger.LoggerInterface
 	strategyName string
 }
 
 // NewCalculator creates a new PnL calculator
-func NewCalculator(db domain.TradingRepository, logger logger.LoggerInterface, strategyName string) *Calculator {
+func NewCalculator(db domain.TradingRepository, logger logger.LoggerInterface, strategyName string) *Calculator { //nolint:staticcheck // SA1019: migrating to individual repos in Phase 5
 	return &Calculator{
 		db:           db,
 		logger:       logger,
@@ -64,10 +64,11 @@ func (pc *Calculator) CalculateAndSave(result *domain.OrderResult) (float64, err
 		effectivePrice = result.Price
 	}
 
-	if result.Side == "BUY" {
+	switch result.Side {
+	case "BUY":
 		// For buys, PnL is just the negative of the fee (cost to enter position)
 		pnl = -result.Fee
-	} else if result.Side == "SELL" {
+	case "SELL":
 		// Compute PnL and collect positions that need updating (no writes yet)
 		var sellErr error
 		pnl, positionsToUpdate, sellErr = pc.prepareSellData(result)
@@ -160,7 +161,8 @@ func (pc *Calculator) calculateAndSaveWithoutTx(result *domain.OrderResult, stra
 		effectivePrice = result.Price
 	}
 
-	if result.Side == "BUY" {
+	switch result.Side {
+	case "BUY":
 		position := &domain.Position{
 			Symbol:        result.Symbol,
 			Side:          "BUY",
@@ -182,7 +184,7 @@ func (pc *Calculator) calculateAndSaveWithoutTx(result *domain.OrderResult, stra
 		}
 
 		pnl = -result.Fee
-	} else if result.Side == "SELL" {
+	case "SELL":
 		var positionsToUpdate []*domain.Position
 		var sellErr error
 		pnl, positionsToUpdate, sellErr = pc.prepareSellData(result)

@@ -86,12 +86,6 @@ func (m *mockClientFactory) SubscribeToTicker(ctx context.Context, symbol string
 	return nil
 }
 
-func (m *mockClientFactory) setConnected(connected bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.connected = connected
-}
-
 // SetDisconnected implements the optional interface used by the worker
 // to force a reconnect when all subscriptions fail.
 func (m *mockClientFactory) SetDisconnected() {
