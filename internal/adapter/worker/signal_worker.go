@@ -413,11 +413,24 @@ func (w *SignalWorker) getAvailableSellSize(ctx context.Context, symbol string, 
 		return requestedSize
 	}
 
-	// Sell a portion of holdings rounded down to the nearest lot size
+	// Sell a portion of holdings rounded down to the nearest lot size.
 	lotSize := w.resolveLotsSize(symbol)
 	result := math.Floor(availableBalance*w.sellSizePercentage/lotSize) * lotSize
 	if result <= 0 {
-		return availableBalance * w.sellSizePercentage
+		// The percentage-adjusted balance rounds down to zero lots (e.g. dust just
+		// below a lot boundary with sell_size_percentage < 1.0).  Fall back to
+		// selling exactly one lot when the raw balance covers it, rather than
+		// sending a non-lot-rounded quantity that the exchange would reject.
+		if availableBalance >= lotSize {
+			return lotSize
+		}
+		// Balance is below the minimum lot size; cannot place a valid sell order.
+		w.logger.Trading().
+			WithField("symbol", symbol).
+			WithField("available", availableBalance).
+			WithField("lot_size", lotSize).
+			Warn("Available balance below minimum lot size – cannot place SELL order")
+		return 0
 	}
 	return result
 }

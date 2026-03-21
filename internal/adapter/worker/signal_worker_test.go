@@ -499,3 +499,105 @@ func TestGetAutoScaleConfig_InvalidBalancePctClamped(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Tests: getAvailableSellSize
+// ---------------------------------------------------------------------------
+
+func newSellWorker(t *testing.T, balances []domain.Balance, sellPct float64) *SignalWorker {
+	t.Helper()
+	log := createTestLogger(t)
+	trader := &mockTrader{balances: balances}
+	return &SignalWorker{
+		logger:               log,
+		signalCh:             make(chan *strategy.Signal),
+		tradingEnabledGetter: &mockTradingEnabledGetter{enabled: true},
+		riskChecker:          &mockRiskChecker{},
+		trader:               trader,
+		currentStrategy:      newMockStrategy(nil),
+		performanceUpdater:   &mockPerformanceUpdater{},
+		lotSizeSvc: &mockLotSizeService{sizes: map[string]float64{
+			"ETH_JPY": 0.01,
+			"XRP_JPY": 1.0,
+			"BTC_JPY": 0.001,
+		}},
+		sellSizePercentage: sellPct,
+	}
+}
+
+func TestGetAvailableSellSize(t *testing.T) {
+	tests := []struct {
+		name          string
+		symbol        string
+		balances      []domain.Balance
+		requestedSize float64
+		sellPct       float64
+		want          float64
+	}{
+		{
+			name:          "no holdings returns 0",
+			symbol:        "ETH_JPY",
+			balances:      []domain.Balance{{Currency: "JPY", Available: 100000}},
+			requestedSize: 0.01,
+			sellPct:       0.95,
+			want:          0,
+		},
+		{
+			name:          "requestedSize < available returns requestedSize",
+			symbol:        "ETH_JPY",
+			balances:      []domain.Balance{{Currency: "ETH", Available: 0.05}},
+			requestedSize: 0.01,
+			sellPct:       0.95,
+			want:          0.01,
+		},
+		{
+			name:          "requestedSize > available applies lot-floor",
+			symbol:        "ETH_JPY",
+			balances:      []domain.Balance{{Currency: "ETH", Available: 0.029964}},
+			requestedSize: 0.03,
+			sellPct:       0.95,
+			// floor(0.029964 * 0.95 / 0.01) * 0.01 = floor(2.84658) * 0.01 = 0.02
+			want: 0.02,
+		},
+		{
+			name:          "XRP full balance > requestedSize applies lot-floor",
+			symbol:        "XRP_JPY",
+			balances:      []domain.Balance{{Currency: "XRP", Available: 7}},
+			requestedSize: 100,
+			sellPct:       0.95,
+			// floor(7 * 0.95 / 1.0) * 1.0 = floor(6.65) = 6
+			want: 6,
+		},
+		{
+			// When percentage rounding floors to 0 lots but balance >= 1 lot,
+			// fall back to exactly 1 lot rather than sending a non-lot-rounded
+			// quantity that the exchange would reject.
+			name:    "sell_size_pct rounds to 0 lots but balance covers 1 lot – returns 1 lot",
+			symbol:  "ETH_JPY",
+			balances: []domain.Balance{{Currency: "ETH", Available: 0.0105}},
+			// 0.0105 * 0.95 = 0.009975 → floor(0.009975/0.01)*0.01 = 0
+			requestedSize: 0.03,
+			sellPct:       0.95,
+			want:          0.01, // 1 lot
+		},
+		{
+			// Balance below minimum lot size – must return 0 (can't place valid order).
+			name:          "balance below lot size returns 0",
+			symbol:        "ETH_JPY",
+			balances:      []domain.Balance{{Currency: "ETH", Available: 0.009}},
+			requestedSize: 0.03,
+			sellPct:       0.95,
+			want:          0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newSellWorker(t, tc.balances, tc.sellPct)
+			got := w.getAvailableSellSize(context.Background(), tc.symbol, tc.requestedSize)
+			if math.Abs(got-tc.want) > 1e-9 {
+				t.Errorf("getAvailableSellSize(%s, %v) = %v; want %v", tc.symbol, tc.requestedSize, got, tc.want)
+			}
+		})
+	}
+}
