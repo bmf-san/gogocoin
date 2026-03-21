@@ -16,8 +16,6 @@ linters:
   settings:
     misspell:
       locale: US
-      ignore-words:
-        - strat      # short for "strategy" throughout the codebase
     gocritic:
       enabled-checks:
         - hugeParam
