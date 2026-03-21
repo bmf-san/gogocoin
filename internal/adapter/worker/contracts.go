@@ -8,7 +8,7 @@ import (
 // Worker defines the standard interface for all background workers
 // All workers should implement this interface for consistent lifecycle management
 type Worker interface {
-	// Run starts the worker (blocking until context is cancelled)
+	// Run starts the worker (blocking until context is canceled)
 	Run(ctx context.Context) error
 
 	// Name returns the worker name for logging and identification

@@ -69,8 +69,8 @@ func (s *Server) GetApiStatus(ctx context.Context, request GetApiStatusRequestOb
 	monitoringPrices := make(map[string]float32)
 	latestMarketData, err := s.db.GetLatestMarketDataForSymbols(cfg.Trading.Symbols)
 	if err == nil {
-		for symbol, data := range latestMarketData {
-			monitoringPrices[symbol] = float32(data.Close)
+		for symbol := range latestMarketData {
+			monitoringPrices[symbol] = float32(latestMarketData[symbol].Close)
 		}
 	}
 	if len(monitoringPrices) > 0 {

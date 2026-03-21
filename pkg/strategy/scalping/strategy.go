@@ -58,7 +58,7 @@ type Strategy struct {
 }
 
 // New creates a new scalping Strategy with the given Params.
-func New(cfg Params) *Strategy {
+func New(cfg Params) *Strategy { //nolint:gocritic // hugeParam: Params is passed by value intentionally (immutable config)
 	base := strategy.NewBaseStrategy(
 		"scalping",
 		"Stateless EMA-crossover scalping strategy with RSI filter",
@@ -430,7 +430,7 @@ func (s *Strategy) calculateEMA(history []strategy.MarketData, period int) float
 	if len(history) < period {
 		return 0.0
 	}
-	// Initialise with SMA of the first period points, then apply the EMA
+		// Initialize with SMA of the first period points, then apply the EMA
 	// formula to every subsequent point.  Using the full history avoids the
 	// previous bug where SMA and EMA loop operated on the same slice,
 	// effectively double-counting the most-recent prices.

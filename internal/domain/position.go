@@ -24,11 +24,12 @@ type Position struct {
 // UpdateStatus updates the position status based on remaining size
 // Business logic: CLOSED if fully matched, PARTIAL if partially matched, OPEN otherwise
 func (p *Position) UpdateStatus() {
-	if p.RemainingSize <= 0 {
+	switch {
+	case p.RemainingSize <= 0:
 		p.Status = "CLOSED"
-	} else if p.UsedSize > 0 {
+	case p.UsedSize > 0:
 		p.Status = "PARTIAL"
-	} else {
+	default:
 		p.Status = "OPEN"
 	}
 }

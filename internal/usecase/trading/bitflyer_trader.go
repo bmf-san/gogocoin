@@ -48,7 +48,7 @@ type BitflyerTrader struct {
 	// Collaborating dependencies
 	client             *bitflyer.Client
 	logger             logger.LoggerInterface
-	db                 domain.TradingRepository
+	db                 domain.TradingRepository //nolint:staticcheck // SA1019: migrating to individual repos in Phase 5
 	strategyName       string
 	onOrderCompletedFn func(*domain.OrderResult)
 	mu                 sync.RWMutex
@@ -63,7 +63,7 @@ type BitflyerTrader struct {
 func NewTraderWithDependencies(
 	client *bitflyer.Client,
 	logger logger.LoggerInterface,
-	db domain.TradingRepository,
+	db domain.TradingRepository, //nolint:staticcheck // SA1019: migrating to individual repos in Phase 5
 	marketSpecSvc domain.MarketSpecService,
 	strategyName string,
 	symbol string,

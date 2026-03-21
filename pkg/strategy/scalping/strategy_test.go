@@ -138,7 +138,7 @@ func TestGenerateSignal_HoldOnRepeatDirection(t *testing.T) {
 	hist := buildBuyHistory()
 	data := &strategy.MarketData{Symbol: "BTC_JPY", Price: hist[len(hist)-1].Price}
 
-	// First call initialises the EMA state.
+	// First call initializes the EMA state.
 	s.GenerateSignal(context.Background(), data, hist) //nolint:errcheck
 
 	// Second call with same rising history — no new crossover → HOLD.
