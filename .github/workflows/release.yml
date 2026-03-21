@@ -40,8 +40,12 @@ jobs:
     - name: Run tests
       run: make test
 
-    - name: Run lint
-      run: make lint
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v9
+      with:
+        version: latest
+        args: --timeout=5m
+      continue-on-error: true  # golangci-lint doesn't support Go 1.25 yet
 
     - name: Build for multiple platforms
       run: |
