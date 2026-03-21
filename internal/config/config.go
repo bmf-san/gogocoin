@@ -282,6 +282,28 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("worker.max_concurrent_saves must be positive")
 	}
 
+	// Apply default runtime configuration when fields are zero / not present in YAML.
+	// Without this, omitting the [runtime] section causes sell_size_percentage to be
+	// 0.0 (Go zero value), which makes getAvailableSellSize always return 0 and every
+	// SELL signal to be skipped with "no crypto holdings available".
+	{
+		runtimeDefaults := DefaultStrategyRuntimeConfig()
+		if c.Runtime.SellSizePercentage == 0 {
+			c.Runtime.SellSizePercentage = runtimeDefaults.SellSizePercentage
+		}
+		if c.Runtime.HistoryLimit == 0 {
+			c.Runtime.HistoryLimit = runtimeDefaults.HistoryLimit
+		}
+		if c.Runtime.SignalStrengthThreshold == 0 {
+			c.Runtime.SignalStrengthThreshold = runtimeDefaults.SignalStrengthThreshold
+		}
+	}
+
+	// Validate runtime configuration
+	if c.Runtime.SellSizePercentage <= 0 || c.Runtime.SellSizePercentage > 1 {
+		return fmt.Errorf("runtime.sell_size_percentage must be between 0 (exclusive) and 1 (inclusive), got %v", c.Runtime.SellSizePercentage)
+	}
+
 	return nil
 }
 

@@ -353,3 +353,83 @@ func TestExpandEnvVars_UndefinedVariable(t *testing.T) {
 		t.Errorf("Expected '%s', got '%s'", expected, result)
 	}
 }
+
+// TestValidate_RuntimeDefaultsApplied verifies that omitting the [runtime]
+// section from the config YAML results in sell_size_percentage being set to
+// the default value (0.95) rather than the Go zero value (0.0).
+// A zero sell_size_percentage causes getAvailableSellSize to always return 0,
+// which silently skips every SELL signal with "no crypto holdings available".
+func TestValidate_RuntimeDefaultsApplied(t *testing.T) {
+	cfg := &Config{
+		App: AppConfig{Name: "test"},
+		API: APIConfig{
+			Endpoint:          "https://api.example.com",
+			WebSocketEndpoint: "wss://ws.example.com",
+			Credentials:       CredentialsConfig{APIKey: "k", APISecret: "s"},
+		},
+		Trading: TradingConfig{
+			InitialBalance: 10000,
+			Symbols:        []string{"BTC_JPY"},
+			Strategy:       StrategyConfig{Name: "scalping"},
+			RiskManagement: RiskManagementConfig{
+				MaxTotalLossPercent:   10,
+				MaxTradeAmountPercent: 5,
+			},
+		},
+		UI: UIConfig{Port: 8080},
+		// Runtime intentionally left as zero value (as if absent from YAML).
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+
+	got := cfg.Runtime.SellSizePercentage
+	want := DefaultStrategyRuntimeConfig().SellSizePercentage
+	if got != want {
+		t.Errorf("SellSizePercentage after Validate() = %v; want %v (default)", got, want)
+	}
+}
+
+// TestValidate_RuntimeInvalidSellSizePercentage verifies that an explicitly
+// invalid sell_size_percentage (out of range) is rejected at startup.
+func TestValidate_RuntimeInvalidSellSizePercentage(t *testing.T) {
+	base := func() *Config {
+		return &Config{
+			App: AppConfig{Name: "test"},
+			API: APIConfig{
+				Endpoint:          "https://api.example.com",
+				WebSocketEndpoint: "wss://ws.example.com",
+				Credentials:       CredentialsConfig{APIKey: "k", APISecret: "s"},
+			},
+			Trading: TradingConfig{
+				InitialBalance: 10000,
+				Symbols:        []string{"BTC_JPY"},
+				Strategy:       StrategyConfig{Name: "scalping"},
+				RiskManagement: RiskManagementConfig{
+					MaxTotalLossPercent:   10,
+					MaxTradeAmountPercent: 5,
+				},
+			},
+			UI: UIConfig{Port: 8080},
+		}
+	}
+
+	tests := []struct {
+		name string
+		pct  float64
+	}{
+		{"negative", -0.1},
+		{"above 1", 1.1},
+		{"exactly 0 after default applied – should not happen but explicit 0 via re-set", -0.0001},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := base()
+			cfg.Runtime.SellSizePercentage = tc.pct
+			if err := cfg.Validate(); err == nil {
+				t.Errorf("Validate() expected error for SellSizePercentage=%v, got nil", tc.pct)
+			}
+		})
+	}
+}
