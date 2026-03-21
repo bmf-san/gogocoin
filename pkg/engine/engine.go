@@ -202,6 +202,7 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	strategyWorker := adapterworker.NewStrategyWorker(log, strat, marketDataCh, signalCh)
 	signalWorker := adapterworker.NewSignalWorker(
 		log, signalCh, tradingCtrl, riskMgr, trader, strat, perfAnalytics,
+		bfMarketSpecSvc,
 		cfg.Runtime.SellSizePercentage,
 	)
 	strategyMonitor := adapterworker.NewStrategyMonitorWorker(log, &strategyGetter{strat: strat})

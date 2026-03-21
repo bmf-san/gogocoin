@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"sync"
 	"testing"
@@ -59,6 +60,19 @@ type mockPerformanceUpdater struct {
 
 func (m *mockPerformanceUpdater) UpdateMetrics(_ context.Context) error { return m.err }
 
+type mockLotSizeService struct {
+	sizes map[string]float64
+}
+
+func (m *mockLotSizeService) GetMinimumOrderSize(symbol string) (float64, error) {
+	if m.sizes != nil {
+		if s, ok := m.sizes[symbol]; ok {
+			return s, nil
+		}
+	}
+	return 0, fmt.Errorf("unknown symbol: %s", symbol)
+}
+
 // mockSignalStrategy wraps BaseStrategy and exposes a configurable config map.
 type mockSignalStrategy struct {
 	*strategy.BaseStrategy
@@ -99,7 +113,13 @@ func newTestWorker(t *testing.T, trader *mockTrader, strat strategy.Strategy, tr
 		trader:               trader,
 		currentStrategy:      strat,
 		performanceUpdater:   &mockPerformanceUpdater{},
-		sellSizePercentage:   0.95,
+		lotSizeSvc: &mockLotSizeService{sizes: map[string]float64{
+			"BTC_JPY": 0.001,
+			"ETH_JPY": 0.01,
+			"XRP_JPY": 1.0,
+			"XLM_JPY": 10.0,
+		}},
+		sellSizePercentage: 0.95,
 	}
 }
 

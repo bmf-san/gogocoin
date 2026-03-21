@@ -27,6 +27,7 @@ type SignalWorker struct {
 	trader               Trader
 	currentStrategy      strategy.Strategy
 	performanceUpdater   PerformanceUpdater
+	lotSizeSvc           LotSizeService
 	// sellSizePercentage is the fraction of available balance used when selling
 	// (< 1.0 to avoid rounding errors). Loaded from config at startup.
 	sellSizePercentage float64
@@ -54,6 +55,11 @@ type PerformanceUpdater interface {
 	UpdateMetrics(ctx context.Context) error
 }
 
+// LotSizeService returns the minimum order size (lot size) for a symbol.
+type LotSizeService interface {
+	GetMinimumOrderSize(symbol string) (float64, error)
+}
+
 // NewSignalWorker creates a new signal worker
 func NewSignalWorker(
 	logger logger.LoggerInterface,
@@ -63,6 +69,7 @@ func NewSignalWorker(
 	trader Trader,
 	currentStrategy strategy.Strategy,
 	performanceUpdater PerformanceUpdater,
+	lotSizeSvc LotSizeService,
 	sellSizePercentage float64,
 ) *SignalWorker {
 	return &SignalWorker{
@@ -73,6 +80,7 @@ func NewSignalWorker(
 		trader:               trader,
 		currentStrategy:      currentStrategy,
 		performanceUpdater:   performanceUpdater,
+		lotSizeSvc:           lotSizeSvc,
 		sellSizePercentage:   sellSizePercentage,
 	}
 }
@@ -243,7 +251,7 @@ func (w *SignalWorker) applyAutoScaleToBuySignal(ctx context.Context, signal *st
 	}
 
 	rawQty := effectiveNotional / signal.Price
-	lotSize := symbolLotSize(signal.Symbol)
+	lotSize := w.resolveLotsSize(signal.Symbol)
 	signal.Quantity = math.Floor(rawQty/lotSize) * lotSize
 	if signal.Quantity <= 0 {
 		w.logger.Trading().
@@ -406,7 +414,7 @@ func (w *SignalWorker) getAvailableSellSize(ctx context.Context, symbol string, 
 	}
 
 	// Sell a portion of holdings rounded down to the nearest lot size
-	lotSize := symbolLotSize(symbol)
+	lotSize := w.resolveLotsSize(symbol)
 	result := math.Floor(availableBalance*w.sellSizePercentage/lotSize) * lotSize
 	if result <= 0 {
 		return availableBalance * w.sellSizePercentage
@@ -414,9 +422,20 @@ func (w *SignalWorker) getAvailableSellSize(ctx context.Context, symbol string, 
 	return result
 }
 
-// symbolLotSize returns the minimum lot (order increment) for a symbol.
-// For all BitFlyer spot markets the lot size equals the minimum order size.
-func symbolLotSize(symbol string) float64 {
+// resolveLotsSize returns the minimum lot size for a symbol using the injected
+// LotSizeService when available, falling back to hardcoded values otherwise.
+func (w *SignalWorker) resolveLotsSize(symbol string) float64 {
+	if w.lotSizeSvc != nil {
+		if size, err := w.lotSizeSvc.GetMinimumOrderSize(symbol); err == nil && size > 0 {
+			return size
+		}
+	}
+	return fallbackLotSize(symbol)
+}
+
+// fallbackLotSize returns hardcoded lot sizes used when the LotSizeService is
+// unavailable. Values match BitFlyer's documented minimums.
+func fallbackLotSize(symbol string) float64 {
 	switch symbol {
 	case "BTC_JPY":
 		return 0.001
