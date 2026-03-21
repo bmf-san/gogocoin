@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"math"
 	"sync"
 	"testing"
 
@@ -249,12 +250,19 @@ func TestApplyAutoScaleToBuySignal_ScalesUp(t *testing.T) {
 		t.Fatal("expected ok=true")
 	}
 	effectiveNotional := sig.Quantity * price
-	// target = 200000 * 5/100 = 10000; ensure scaled > base
-	if effectiveNotional <= 8000 {
-		t.Errorf("expected effective notional > 8000, got %v", effectiveNotional)
+	// After lot-size floor rounding the order may not exceed the base notional in JPY
+	// (e.g. BTC lot 0.001 * 8_000_000 = 8000 JPY is the minimum increment).
+	// Verify the quantity is a valid lot multiple and is not reduced below the base.
+	if effectiveNotional < 8000 {
+		t.Errorf("expected effective notional >= base (8000), got %v", effectiveNotional)
 	}
 	if effectiveNotional > 11000 {
 		t.Errorf("effective notional %v unreasonably high", effectiveNotional)
+	}
+	// quantity must be a multiple of the BTC lot size (0.001)
+	const btcLot = 0.001
+	if sig.Quantity < btcLot || math.Abs(math.Mod(sig.Quantity, btcLot)) > 1e-9 {
+		t.Errorf("quantity %v is not aligned to lot size %v", sig.Quantity, btcLot)
 	}
 	// Metadata should be populated
 	if sig.Metadata == nil {

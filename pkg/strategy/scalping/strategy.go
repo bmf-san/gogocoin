@@ -511,13 +511,14 @@ func (s *Strategy) quantityForSymbol(symbol string, price float64) float64 {
 		return 0
 	}
 	notional := s.symbolOrderNotional(symbol)
-	qty := math.Ceil((notional/price)*1e8) / 1e8
-	minSize := s.minimumOrderSize(symbol)
-	if qty < minSize {
-		qty = minSize
+	lotSize := s.minimumOrderSize(symbol)
+	if lotSize <= 0 {
+		lotSize = fallbackMinOrderSize(symbol)
 	}
-	if qty*price < notional {
-		qty += 1.0 / 1e8
+	// Round UP to nearest lot to cover at least the required notional
+	qty := math.Ceil(notional/price/lotSize) * lotSize
+	if qty < lotSize {
+		qty = lotSize
 	}
 	return qty
 }

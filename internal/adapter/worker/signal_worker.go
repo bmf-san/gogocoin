@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"math"
 	"sync"
 	"time"
 
@@ -241,7 +242,17 @@ func (w *SignalWorker) applyAutoScaleToBuySignal(ctx context.Context, signal *st
 		return false
 	}
 
-	signal.Quantity = effectiveNotional / signal.Price
+	rawQty := effectiveNotional / signal.Price
+	lotSize := symbolLotSize(signal.Symbol)
+	signal.Quantity = math.Floor(rawQty/lotSize) * lotSize
+	if signal.Quantity <= 0 {
+		w.logger.Trading().
+			WithField("symbol", signal.Symbol).
+			WithField("raw_qty", rawQty).
+			WithField("lot_size", lotSize).
+			Warn("Skipping BUY signal - scaled quantity below minimum lot size after rounding")
+		return false
+	}
 	if signal.Metadata == nil {
 		signal.Metadata = make(map[string]interface{})
 	}
@@ -394,6 +405,32 @@ func (w *SignalWorker) getAvailableSellSize(ctx context.Context, symbol string, 
 		return requestedSize
 	}
 
-	// Sell 95% of holdings (to avoid rounding errors with full amount)
-	return availableBalance * w.sellSizePercentage
+	// Sell a portion of holdings rounded down to the nearest lot size
+	lotSize := symbolLotSize(symbol)
+	result := math.Floor(availableBalance*w.sellSizePercentage/lotSize) * lotSize
+	if result <= 0 {
+		return availableBalance * w.sellSizePercentage
+	}
+	return result
+}
+
+// symbolLotSize returns the minimum lot (order increment) for a symbol.
+// For all BitFlyer spot markets the lot size equals the minimum order size.
+func symbolLotSize(symbol string) float64 {
+	switch symbol {
+	case "BTC_JPY":
+		return 0.001
+	case "ETH_JPY":
+		return 0.01
+	case "XRP_JPY":
+		return 1.0
+	case "XLM_JPY":
+		return 10.0
+	case "MONA_JPY":
+		return 1.0
+	case "BCH_JPY":
+		return 0.01
+	default:
+		return 0.001
+	}
 }
