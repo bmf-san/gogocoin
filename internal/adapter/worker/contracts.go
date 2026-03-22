@@ -43,3 +43,10 @@ type PositionReader interface {
 	GetOpenPositions(symbol string, side string) ([]domain.Position, error)
 }
 
+// PositionCloser marks all open/partial positions for a symbol+side as CLOSED.
+// Used by SignalWorker to discard ghost positions when the actual exchange
+// balance is below the minimum lot size and a stop-loss SELL cannot execute.
+type PositionCloser interface {
+	CloseOpenPositions(symbol string, side string) error
+}
+

@@ -93,6 +93,8 @@ func (m *mockTradingRepo) UpdatePosition(p *domain.Position) error {
 	return nil
 }
 
+func (m *mockTradingRepo) CloseOpenPositions(symbol, side string) error { return nil }
+
 func (m *mockTradingRepo) SaveBalance(b domain.Balance) error { return nil }
 
 // mockTx delegates to repo so assertions see the same slices.

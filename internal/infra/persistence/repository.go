@@ -61,6 +61,9 @@ func (r *Repository) GetOpenPositions(symbol string, side string) ([]domain.Posi
 func (r *Repository) UpdatePosition(position *domain.Position) error {
 	return r.position.UpdatePosition(position)
 }
+func (r *Repository) CloseOpenPositions(symbol string, side string) error {
+	return r.position.CloseOpenPositions(symbol, side)
+}
 func (r *Repository) GetActivePositions() ([]domain.Position, error) {
 	return r.position.GetActivePositions()
 }

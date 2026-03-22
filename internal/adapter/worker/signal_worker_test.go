@@ -601,3 +601,98 @@ func TestGetAvailableSellSize(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Ghost position auto-close tests
+// ---------------------------------------------------------------------------
+
+type mockPositionCloser struct {
+	closed []string // "symbol:side" entries
+	err    error
+}
+
+func (m *mockPositionCloser) CloseOpenPositions(symbol, side string) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.closed = append(m.closed, symbol+":"+side)
+	return nil
+}
+
+func TestProcessSignal_StopLossDust_ClosesGhostPositions(t *testing.T) {
+	// When a stop-loss SELL signal cannot execute because the exchange balance
+	// is below the minimum lot size, the signal worker must close the ghost
+	// PARTIAL positions so stop-loss stops firing on them every tick.
+	log := createTestLogger(t)
+	signalCh := make(chan *strategy.Signal, 1)
+
+	closer := &mockPositionCloser{}
+	w := &SignalWorker{
+		logger:               log,
+		signalCh:             signalCh,
+		tradingEnabledGetter: &mockTradingEnabledGetter{enabled: true},
+		riskChecker:          &mockRiskChecker{},
+		trader: &mockTrader{
+			// XRP balance is dust — below 1 XRP lot
+			balances: []domain.Balance{{Currency: "XRP", Available: 0.06717, Amount: 0.06717}},
+		},
+		currentStrategy:    &mockSignalStrategy{},
+		performanceUpdater: &mockPerformanceUpdater{},
+		lotSizeSvc: &mockLotSizeService{sizes: map[string]float64{
+			"XRP_JPY": 1.0,
+		}},
+		sellSizePercentage: 0.95,
+		positionCloser:     closer,
+	}
+
+	sig := &strategy.Signal{
+		Symbol: "XRP_JPY",
+		Action: strategy.SignalSell,
+		Price:  222.64,
+		Metadata: map[string]interface{}{
+			"reason": "stop_loss",
+		},
+	}
+	w.processSignal(context.Background(), sig)
+
+	if len(closer.closed) != 1 || closer.closed[0] != "XRP_JPY:BUY" {
+		t.Errorf("expected ghost positions closed for XRP_JPY:BUY, got %v", closer.closed)
+	}
+}
+
+func TestProcessSignal_NormalSell_DoesNotClosePositions(t *testing.T) {
+	// A regular (non-stop-loss) SELL skipped due to no balance must NOT
+	// trigger ghost position cleanup.
+	log := createTestLogger(t)
+	signalCh := make(chan *strategy.Signal, 1)
+
+	closer := &mockPositionCloser{}
+	w := &SignalWorker{
+		logger:               log,
+		signalCh:             signalCh,
+		tradingEnabledGetter: &mockTradingEnabledGetter{enabled: true},
+		riskChecker:          &mockRiskChecker{},
+		trader: &mockTrader{
+			balances: []domain.Balance{{Currency: "XRP", Available: 0.0, Amount: 0.0}},
+		},
+		currentStrategy:    &mockSignalStrategy{},
+		performanceUpdater: &mockPerformanceUpdater{},
+		lotSizeSvc: &mockLotSizeService{sizes: map[string]float64{
+			"XRP_JPY": 1.0,
+		}},
+		sellSizePercentage: 0.95,
+		positionCloser:     closer,
+	}
+
+	sig := &strategy.Signal{
+		Symbol:   "XRP_JPY",
+		Action:   strategy.SignalSell,
+		Price:    222.64,
+		Metadata: map[string]interface{}{}, // no "reason" = normal SELL
+	}
+	w.processSignal(context.Background(), sig)
+
+	if len(closer.closed) != 0 {
+		t.Errorf("normal SELL skip must not close ghost positions, got %v", closer.closed)
+	}
+}

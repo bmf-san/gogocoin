@@ -12,6 +12,10 @@ type PositionRepository interface {
 	SavePosition(position *Position) error
 	GetOpenPositions(symbol string, side string) ([]Position, error)
 	UpdatePosition(position *Position) error
+	// CloseOpenPositions sets all OPEN/PARTIAL positions for the given
+	// symbol+side to CLOSED. Used to discard ghost positions when the
+	// actual exchange balance has fallen below the minimum lot size.
+	CloseOpenPositions(symbol string, side string) error
 }
 
 // BalanceRepository is the interface for balance data persistence
