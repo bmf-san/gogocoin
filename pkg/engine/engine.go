@@ -200,6 +200,7 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 		cfg.Worker.StaleDataTimeoutSeconds,
 	)
 	strategyWorker := adapterworker.NewStrategyWorker(log, strat, marketDataCh, signalCh)
+	strategyWorker.SetPositionReader(repo)
 	signalWorker := adapterworker.NewSignalWorker(
 		log, signalCh, tradingCtrl, riskMgr, trader, strat, perfAnalytics,
 		bfMarketSpecSvc,

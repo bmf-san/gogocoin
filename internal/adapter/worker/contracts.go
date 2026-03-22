@@ -3,6 +3,8 @@ package worker
 import (
 	"context"
 	"time"
+
+	"github.com/bmf-san/gogocoin/internal/domain"
 )
 
 // Worker defines the standard interface for all background workers
@@ -34,5 +36,10 @@ type HealthStatus struct {
 type Stoppable interface {
 	// Stop gracefully stops the worker
 	Stop() error
+}
+
+// PositionReader fetches open buy positions for a symbol, used by stop-loss logic.
+type PositionReader interface {
+	GetOpenPositions(symbol string, side string) ([]domain.Position, error)
 }
 
