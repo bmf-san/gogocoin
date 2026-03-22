@@ -99,6 +99,37 @@ func TestPositionRepository_SaveAndGetOpen(t *testing.T) {
 	}
 }
 
+func TestPositionRepository_CloseOpenPositions(t *testing.T) {
+	db := newTestDB(t)
+	repo := persistence.NewPositionRepository(db)
+
+	for _, p := range []*domain.Position{
+		{Symbol: "XRP_JPY", Side: "BUY", Size: 10, RemainingSize: 10, EntryPrice: 229.0, Status: "OPEN", OrderID: "POS-A"},
+		{Symbol: "XRP_JPY", Side: "BUY", Size: 10, UsedSize: 3, RemainingSize: 7, EntryPrice: 229.0, Status: "PARTIAL", OrderID: "POS-B"},
+		{Symbol: "ETH_JPY", Side: "BUY", Size: 1, RemainingSize: 1, EntryPrice: 343000.0, Status: "OPEN", OrderID: "POS-C"},
+	} {
+		if err := repo.SavePosition(p); err != nil {
+			t.Fatalf("SavePosition %s: %v", p.OrderID, err)
+		}
+	}
+
+	if err := repo.CloseOpenPositions("XRP_JPY", "BUY"); err != nil {
+		t.Fatalf("CloseOpenPositions: %v", err)
+	}
+
+	// XRP_JPY BUY positions must now be gone
+	xrp, _ := repo.GetOpenPositions("XRP_JPY", "BUY")
+	if len(xrp) != 0 {
+		t.Errorf("expected 0 XRP_JPY positions after close, got %d", len(xrp))
+	}
+
+	// ETH_JPY position must be untouched
+	eth, _ := repo.GetOpenPositions("ETH_JPY", "BUY")
+	if len(eth) != 1 {
+		t.Errorf("expected ETH_JPY position to be untouched, got %d", len(eth))
+	}
+}
+
 func TestPositionRepository_GetOpenPositions_IncludesPartial(t *testing.T) {
 	db := newTestDB(t)
 	repo := persistence.NewPositionRepository(db)

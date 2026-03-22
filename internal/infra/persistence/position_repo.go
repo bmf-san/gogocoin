@@ -59,6 +59,19 @@ func (r *PositionRepository) GetOpenPositions(symbol string, side string) ([]dom
 	return positions, rows.Err()
 }
 
+// CloseOpenPositions marks all OPEN/PARTIAL positions for symbol+side as CLOSED.
+// Called when a stop-loss SELL cannot be executed because the actual exchange
+// balance is dust (below the minimum lot size), to keep the DB in sync.
+func (r *PositionRepository) CloseOpenPositions(symbol string, side string) error {
+	now := time.Now()
+	_, err := r.db.db.Exec(
+		`UPDATE positions SET status = 'CLOSED', updated_at = ?
+		  WHERE symbol = ? AND side = ? AND status IN ('OPEN', 'PARTIAL')`,
+		now, symbol, side,
+	)
+	return err
+}
+
 // UpdatePosition updates a position by order_id.
 func (r *PositionRepository) UpdatePosition(position *domain.Position) error {
 	position.UpdatedAt = time.Now()

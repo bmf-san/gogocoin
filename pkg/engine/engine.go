@@ -206,6 +206,7 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 		bfMarketSpecSvc,
 		cfg.Runtime.SellSizePercentage,
 	)
+	signalWorker.SetPositionCloser(repo)
 	strategyMonitor := adapterworker.NewStrategyMonitorWorker(log, &strategyGetter{strat: strat})
 	maintenanceWorker := adapterworker.NewMaintenanceWorker(log, repo, cfg.DataRetention.RetentionDays, repo)
 

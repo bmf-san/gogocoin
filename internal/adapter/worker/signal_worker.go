@@ -32,6 +32,9 @@ type SignalWorker struct {
 	// (< 1.0 to avoid rounding errors). Loaded from config at startup.
 	sellSizePercentage float64
 	wg                 sync.WaitGroup // Tracks background goroutines for graceful shutdown
+	// positionCloser is optional; when set, ghost PARTIAL positions are closed
+	// automatically when a stop-loss SELL cannot execute due to dust balance.
+	positionCloser PositionCloser
 }
 
 // TradingEnabledGetter defines the interface for checking if trading is enabled
@@ -84,6 +87,11 @@ func NewSignalWorker(
 		sellSizePercentage:   sellSizePercentage,
 	}
 }
+
+// SetPositionCloser injects an optional PositionCloser. When set, ghost
+// PARTIAL positions are automatically closed if a stop-loss SELL is skipped
+// because the actual exchange balance is below the minimum lot size.
+func (w *SignalWorker) SetPositionCloser(c PositionCloser) { w.positionCloser = c }
 
 // Name returns the worker name.
 func (w *SignalWorker) Name() string { return "signal-worker" }
@@ -143,6 +151,14 @@ func (w *SignalWorker) processSignal(ctx context.Context, signal *strategy.Signa
 	// Create order (pass context for balance checking)
 	order, skip := w.createOrderFromSignal(ctx, signal)
 	if skip {
+		// If a stop-loss SELL was skipped because the exchange balance is dust
+		// (below the minimum lot size), close the ghost PARTIAL positions in the
+		// DB so stop-loss stops firing on already-liquidated positions.
+		if signal.Action == strategy.SignalSell {
+			if reason, ok := signal.Metadata["reason"].(string); ok && reason == "stop_loss" {
+				w.closeGhostPositions(signal.Symbol)
+			}
+		}
 		return
 	}
 
@@ -433,6 +449,21 @@ func (w *SignalWorker) getAvailableSellSize(ctx context.Context, symbol string, 
 		return 0
 	}
 	return result
+}
+
+// closeGhostPositions marks all open/partial BUY positions for symbol as CLOSED
+// when a stop-loss SELL cannot execute because exchange balance is dust.
+func (w *SignalWorker) closeGhostPositions(symbol string) {
+	if w.positionCloser == nil {
+		return
+	}
+	if err := w.positionCloser.CloseOpenPositions(symbol, "BUY"); err != nil {
+		w.logger.Trading().WithError(err).WithField("symbol", symbol).
+			Warn("Failed to close ghost positions after dust stop-loss skip")
+		return
+	}
+	w.logger.Trading().WithField("symbol", symbol).
+		Info("Closed ghost PARTIAL positions — balance was dust (below minimum lot size)")
 }
 
 // resolveLotsSize returns the minimum lot size for a symbol using the injected
