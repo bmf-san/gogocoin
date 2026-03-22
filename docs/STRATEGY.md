@@ -1,22 +1,36 @@
-# 取引戦略リファレンス
+# Strategy Reference
 
-## プラガブル戦略アーキテクチャ
+## Pluggable Strategy Architecture
 
-gogocoin の戦略は**プラガブル**設計になっており、`pkg/strategy.Strategy` インターフェースを実装することで独自戦略を差し込めます。
+gogocoin uses a **pluggable** strategy design. Any type that implements the `pkg/strategy.Strategy` interface can be registered and used.
 
-- カスタム戦略の実装手順: [DESIGN_DOC.md § 5](DESIGN_DOC.md)
-- Strategy インターフェース定義: `pkg/strategy/strategy.go`
+- How to implement a custom strategy: [DESIGN_DOC.md § 5](DESIGN_DOC.md)
+- Strategy interface definition: `pkg/strategy/strategy.go`
 
-## 同梱戦略
+## Built-in Strategies
 
-| 戦略名 | パッケージ | 説明 |
+| Name | Package | Description |
 |---|---|---|
-| `scalping` | `pkg/strategy/scalping` | EMA クロスオーバー + RSI フィルタによるスキャルピング戦略 |
+| `scalping` | `pkg/strategy/scalping` | EMA crossover + optional RSI filter scalping strategy |
 
-各戦略の設定パラメータ・シグナル生成ロジックの詳細は、パッケージ内の README を参照してください:
+For configuration parameters and signal generation details, see the package README:
 
 - [pkg/strategy/scalping/README.md](../pkg/strategy/scalping/README.md)
 
-## 免責事項
+## Engine-level Stop Loss
 
-実際の取引成績は市場環境や設定により大きく変動します。過去のバックテスト結果は将来の成績を保証するものではありません。
+Stop-loss is enforced by `StrategyWorker` on every market tick, independent of the strategy's signal output.
+
+On each tick, after the strategy generates a signal, `StrategyWorker` queries open BUY positions from the database. If the current price has fallen at or below the stop price for any open position, a `SELL` signal is injected regardless of what the strategy returned.
+
+```
+stop_price = entry_price × (1 - stop_loss_pct / 100)
+```
+
+This means stop-loss fires even when the strategy outputs `HOLD` or `BUY`, cutting losing positions as soon as the threshold is breached.
+
+The `stop_loss_pct` value is read from the strategy's configuration (set via `strategy_params.scalping.stop_loss_pct` in `config.yaml`). Setting it to `0` disables the stop-loss check.
+
+## Disclaimer
+
+Actual trading results vary significantly depending on market conditions and configuration. Past backtest results do not guarantee future performance.

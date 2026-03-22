@@ -1,98 +1,102 @@
 # Scalping Strategy
 
-EMAベースのステートレス・スキャルピング戦略。gogocoin 同梱のデフォルト戦略として提供される。
+Stateless EMA-based scalping strategy. The default strategy shipped with gogocoin.
 
 ---
 
-## 特徴
+## Features
 
-| 項目 | 内容 |
+| Feature | Detail |
 |---|---|
-| 設計 | ステートレス設計: 再起動に強い（内部状態を最小限に保持） |
-| インジケーター | 短期EMA と中期EMA のクロスオーバー |
-| RSI フィルタ | オプション。`rsi_period > 0` で有効化 |
-| リスク/リワード比 | デフォルト 2:1（利確2.0% / 損切1.0%） |
-| クールダウン | 取引後のインターバル（デフォルト90秒） |
-| 手数料考慮 | 取引手数料を考慮した損益計算 |
+| Design | Stateless — minimal internal state, restart-safe |
+| Indicator | Short EMA / long EMA crossover |
+| RSI filter | Optional. Enabled when `rsi_period > 0` |
+| Risk/reward | Default 2:1 (take-profit 2.0% / stop-loss 1.0%) |
+| Cooldown | Configurable interval between entries (default 90 s) |
+| Fee-aware | Fee included in P&L calculations |
+| Stop loss | `stop_loss_pct` is enforced at the engine level on every market tick, independent of the EMA signal — see [STRATEGY.md § Engine-level Stop Loss](../docs/STRATEGY.md) |
 
 ---
 
-## シグナル生成ロジック
+## Signal Generation Logic
 
-| シグナル | 条件 |
+| Signal | Condition |
 |---|---|
-| 買い（BUY） | 短期EMA > 中期EMA かつ 現在価格 > 短期EMA |
-| 売り（SELL） | 短期EMA < 中期EMA かつ 現在価格 < 短期EMA |
-| 待機（HOLD） | 上記以外、またはクールダウン中、または日次制限到達時 |
+| BUY | short EMA > long EMA **and** price > short EMA |
+| SELL | short EMA < long EMA **and** price < short EMA |
+| HOLD | none of the above, or in cooldown, or daily limit reached |
 
-### RSI フィルタ（オプション）
+> **Note:** The engine (`StrategyWorker`) overrides HOLD/BUY with a SELL signal when an open position breaches its stop-loss price, regardless of EMA state. See [STRATEGY.md § Engine-level Stop Loss](../docs/STRATEGY.md).
 
-`rsi_period` を 0 以外に設定すると RSI フィルタが有効になる。上記 EMA 条件に加え、以下の条件も満たす場合のみシグナルが発行される:
+### RSI Filter (optional)
 
-| シグナル | RSI 条件 |
+When `rsi_period` is set to a non-zero value, the RSI filter activates. In addition to the EMA conditions above, the following RSI conditions must also be met:
+
+| Signal | RSI condition |
 |---|---|
-| BUY | RSI < `rsi_overbought`（買われ過ぎでない） |
-| SELL | RSI > `rsi_oversold`（売られ過ぎでない） |
+| BUY | RSI < `rsi_overbought` (not overbought) |
+| SELL | RSI > `rsi_oversold` (not oversold) |
 
 ---
 
-## 設定パラメータ（`strategy_params.scalping`）
+## Configuration Parameters (`strategy_params.scalping`)
 
-`config.yaml` の `strategy_params.scalping` ブロックで設定する。
+Configured in the `strategy_params.scalping` block of `config.yaml`.
 
-| キー | デフォルト | 説明 |
+| Key | Default | Description |
 |---|---|---|
-| `ema_fast_period` | `9` | 短期EMAの期間（バー数） |
-| `ema_slow_period` | `21` | 中期EMAの期間（バー数） |
-| `take_profit_pct` | `2.0` | 利確ライン（%） |
-| `stop_loss_pct` | `1.0` | 損切ライン（%）。リスク/リワード比 = 1:2 |
-| `cooldown_sec` | `90` | 取引後のクールダウン時間（秒）。過剰取引を防止 |
-| `max_daily_trades` | `3` | 1日の最大取引回数（保守的運用のデフォルト） |
-| `order_notional` | `200` | **注文金額（JPY）。この値が実際の注文サイズになる** |
-| `auto_scale_enabled` | `false` | `true` の場合、BUY時に残高連動で `order_notional` を自動拡大 |
-| `auto_scale_balance_pct` | `80` | `auto_scale_enabled=true` 時の目標割合（`JPY残高 × この%`） |
-| `auto_scale_max_notional` | `0` | 自動拡大時の上限。`0` は上限なし |
-| `fee_rate` | `0.001` | 手数料率（損益計算に使用） |
-| `rsi_period` | `0` | RSIの期間。`0` で RSI フィルタは無効 |
-| `rsi_overbought` | `70` | RSI 買われ過ぎしきい値。超えると BUY を抑制 |
-| `rsi_oversold` | `30` | RSI 売られ過ぎしきい値。下回ると SELL を抑制 |
+| `ema_fast_period` | `9` | Short EMA period (bars) |
+| `ema_slow_period` | `21` | Long EMA period (bars) |
+| `take_profit_pct` | `2.0` | Take-profit threshold (%) |
+| `stop_loss_pct` | `1.0` | Stop-loss threshold (%). Enforced by the engine on every tick. Set to `0` to disable. |
+| `cooldown_sec` | `90` | Cooldown between entries (seconds). Prevents over-trading |
+| `max_daily_trades` | `3` | Maximum trades per day (conservative default) |
+| `order_notional` | `200` | **Order size in JPY — this is the actual trade amount** |
+| `auto_scale_enabled` | `false` | When `true`, scales `order_notional` up automatically based on available balance |
+| `auto_scale_balance_pct` | `80` | Target fraction of JPY balance when auto-scaling (`balance × pct%`) |
+| `auto_scale_max_notional` | `0` | Cap on auto-scaled order size. `0` = no cap |
+| `fee_rate` | `0.001` | Fee rate used in P&L calculations |
+| `rsi_period` | `0` | RSI period. `0` disables the RSI filter |
+| `rsi_overbought` | `70` | RSI overbought threshold — suppresses BUY above this level |
+| `rsi_oversold` | `30` | RSI oversold threshold — suppresses SELL below this level |
 
-### `order_notional` について
+### `order_notional`
 
-`order_notional` は1回あたりの**注文金額（JPY）**を指定する。
-戦略は `order_notional / 現在価格` で数量を計算する。残高の何%を使うかで自動算出する機能はない。
+`order_notional` sets the **order size in JPY** per trade.
+The strategy calculates quantity as `order_notional / current_price`.
+There is no automatic percentage-of-balance sizing without `auto_scale_enabled`.
 
-1トレードあたりの利益の目安: `order_notional × take_profit_pct / 100 − 往復手数料`
+Expected profit per trade: `order_notional × take_profit_pct / 100 − round-trip fees`
 
-例（`order_notional: 4000`, `take_profit_pct: 2.0`, `fee_rate: 0.0015`）:
-- 利確時グロス: 4000 × 0.02 = 80 JPY
-- 往復手数料: 4000 × 0.0015 × 2 = 12 JPY
-- 純利益: ~68 JPY
+Example (`order_notional: 4000`, `take_profit_pct: 2.0`, `fee_rate: 0.0015`):
+- Gross profit at take-profit: 4000 × 0.02 = 80 JPY
+- Round-trip fees: 4000 × 0.0015 × 2 = 12 JPY
+- Net profit: ~68 JPY
 
-### 自動スケール（`auto_scale_*`）
+### Auto-scaling (`auto_scale_*`)
 
-`auto_scale_enabled: true` の場合、BUYシグナル時に次の式で注文金額を再計算する。
+When `auto_scale_enabled: true`, the order size is recalculated on each BUY signal:
 
-- ベース: `order_notional`（または `symbol_params.<symbol>.order_notional`）
-- 目標: `JPY残高 × auto_scale_balance_pct / 100`
-- 実際の注文金額: `max(ベース, 目標)` をベースに、`auto_scale_max_notional` と手数料込みの残高上限でクランプ
+- Base: `order_notional` (or `symbol_params.<symbol>.order_notional`)
+- Target: `JPY balance × auto_scale_balance_pct / 100`
+- Effective size: `max(base, target)`, clamped by `auto_scale_max_notional` and affordable balance (after fees)
 
-これにより、残高が増えると注文金額が自動で増加し、手動で `order_notional` を更新しなくても複利的にスケールできる。
+This allows order sizes to grow as the balance increases, compounding gains without manually updating `order_notional`.
 
-### symbol_params（シンボル個別オーバーライド）
+### Per-symbol overrides (`symbol_params`)
 
-通貨ペアごとに一部パラメータをオーバーライドできる。0 または未設定の場合はグローバル設定にフォールバックする。
+Individual parameters can be overridden per currency pair. `0` or unset falls back to the global value.
 
-| キー | 説明 |
+| Key | Description |
 |---|---|
-| `ema_fast_period` | 短期EMA期間 |
-| `ema_slow_period` | 中期EMA期間 |
-| `cooldown_sec` | クールダウン秒数 |
-| `order_notional` | 注文金額 |
+| `ema_fast_period` | Short EMA period |
+| `ema_slow_period` | Long EMA period |
+| `cooldown_sec` | Cooldown in seconds |
+| `order_notional` | Order size in JPY |
 
 ---
 
-## 設定例
+## Configuration Example
 
 ```yaml
 strategy_params:
@@ -119,38 +123,47 @@ strategy_params:
 
 ---
 
-## パラメータ調整ガイド
+## Tuning Guide
 
-### EMA期間
+### EMA periods
 
-`ema_fast_period < ema_slow_period` を必ず守ること。
+`ema_fast_period` must always be less than `ema_slow_period`.
 
-- `ema_fast_period` を小さくする → 反応が早い（ノイズも増える）
-- `ema_slow_period` を大きくする → トレンド追従型になる
+- Decrease `ema_fast_period` → faster reaction (more noise)
+- Increase `ema_slow_period` → more trend-following, fewer signals
 
-### 利確・損切
+### Take-profit and stop-loss
 
-リスク/リワード比を 2:1 以上に保つことを推奨（`take_profit_pct >= stop_loss_pct * 2`）。
+Recommended risk/reward ratio ≥ 2:1 (`take_profit_pct >= stop_loss_pct * 2`).
 
-### 注文金額と利益の関係
+Break-even win rate (ignoring fees): `1 / (1 + take_profit_pct / stop_loss_pct)`
 
-| `order_notional` | 利確2%時のグロス | 往復手数料(0.15%) | 純利益 |
+With 0.15% round-trip fee, the required win rate to break even is:
+`stop_loss_pct / (take_profit_pct + stop_loss_pct) + fee_overhead`
+
+Example (take 2%, stop 1%): break-even win rate ≈ 43%.
+
+### Order size and expected profit
+
+| `order_notional` | Gross at 2% take-profit | Round-trip fees (0.15%) | Net profit |
 |---|---|---|---|
 | 200 | 4 JPY | 0.6 JPY | ~3 JPY |
 | 1000 | 20 JPY | 3 JPY | ~17 JPY |
 | 4000 | 80 JPY | 12 JPY | ~68 JPY |
 | 7000 | 140 JPY | 21 JPY | ~119 JPY |
 
-### 取引頻度
+### Trade frequency
 
-取引頻度を上げる場合は `max_daily_trades` を増やし `cooldown_sec` を短くする。ただし手数料コストが増加するため、損益分岐点の試算を行うこと。
+Increasing `max_daily_trades` and decreasing `cooldown_sec` raises trade frequency but also increases total fee cost. Always recalculate the break-even win rate before tightening cooldown.
+
+With a short cooldown (e.g. 60 s), the engine's stop-loss can trigger a SELL just seconds after a BUY if the price immediately reverses. A longer cooldown (e.g. 300 s) is recommended for noisy, range-bound markets.
 
 ---
 
-## 推奨設定
+## Recommended Settings
 
-| 項目 | 推奨値 | 理由 |
+| Item | Recommended | Reason |
 |---|---|---|
-| 通貨ペア | XRP_JPY | 少額取引に最適（最小1 XRP） |
-| 稼働形態 | 24/7稼働 | 常時監視で機会を逃さない |
-| 取引頻度 | `max_daily_trades` で調整 | デフォルト3回は保守的な設定 |
+| Symbol | XRP_JPY | Low minimum order size (1 XRP) |
+| Operation | 24/7 | Captures signals at any hour |
+| Trade frequency | Tune via `max_daily_trades` | Default of 3 is conservative |
