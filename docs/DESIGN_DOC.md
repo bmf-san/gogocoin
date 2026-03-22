@@ -620,7 +620,7 @@ func (m *WorkerManager) HealthCheck() map[string]HealthStatus
 | ワーカー | 役割 |
 |---|---|
 | `MarketDataWorker` | WebSocketからtickデータを受信しDBに保存 |
-| `StrategyWorker` | marketDataChを受信しシグナルを生成してsignalChに送信 |
+| `StrategyWorker` | marketDataChを受信しシグナルを生成・エンジンレベルのストップロスを強制適用してsignalChに送信 |
 | `SignalWorker` | signalChから受信しリスクチェック・発注を実行 |
 | `MaintenanceWorker` | 定期的に古いデータをDB上からクリーンアップ |
 | `StrategyMonitorWorker` | 戦略ヘルスを5分ごとに確認 |

@@ -52,6 +52,9 @@ type StrategyWorker struct {
 	// Deduplication: track last sent signal action per symbol to avoid flooding the channel
 	// with identical signals on every tick during a sustained trend
 	lastSentSignals sync.Map // map[string]strategy.SignalAction
+
+	// positionReader is optional; when set, stop-loss is checked on every tick.
+	positionReader PositionReader
 }
 
 // NewStrategyWorker creates a new strategy worker
@@ -254,6 +257,75 @@ func (w *StrategyWorker) cleanupInactiveSymbols() {
 	}
 }
 
+// SetPositionReader injects an optional PositionReader so that stop-loss can be
+// checked on every market data tick. Safe to call before Run().
+func (w *StrategyWorker) SetPositionReader(r PositionReader) {
+	w.positionReader = r
+}
+
+// checkStopLoss returns a SELL signal when the current price has fallen below the
+// stop-loss threshold of any open BUY position for the symbol. Returns nil when
+// stop-loss is not triggered or no position reader is configured.
+func (w *StrategyWorker) checkStopLoss(symbol string, currentPrice float64) *strategy.Signal {
+	if w.positionReader == nil {
+		return nil
+	}
+
+	stopLossPct := w.getStopLossPct()
+	if stopLossPct <= 0 {
+		return nil
+	}
+
+	positions, err := w.positionReader.GetOpenPositions(symbol, "BUY")
+	if err != nil {
+		w.logger.Strategy().WithError(err).Warn("Failed to read open positions for stop-loss check")
+		return nil
+	}
+
+	for i := range positions {
+		pos := &positions[i]
+		if pos.EntryPrice <= 0 {
+			continue
+		}
+		stopPrice := pos.EntryPrice * (1.0 - stopLossPct/100.0)
+		if currentPrice <= stopPrice {
+			w.logger.Trading().
+				WithField("symbol", symbol).
+				WithField("entry_price", pos.EntryPrice).
+				WithField("current_price", currentPrice).
+				WithField("stop_price", stopPrice).
+				WithField("stop_loss_pct", stopLossPct).
+				Warn("Stop loss triggered — injecting SELL signal")
+			return &strategy.Signal{
+				Symbol:    symbol,
+				Action:    strategy.SignalSell,
+				Strength:  1.0,
+				Price:     currentPrice,
+				Timestamp: time.Now(),
+				Metadata: map[string]interface{}{
+					"reason":       "stop_loss",
+					"entry_price":  pos.EntryPrice,
+					"stop_price":   stopPrice,
+					"stop_loss_pct": stopLossPct,
+				},
+			}
+		}
+	}
+	return nil
+}
+
+// getStopLossPct reads stop_loss_pct from the strategy configuration.
+// Returns 0 when not configured or invalid.
+func (w *StrategyWorker) getStopLossPct() float64 {
+	if w.strategy == nil {
+		return 0
+	}
+	if v, ok := asFloat(w.strategy.GetConfig()["stop_loss_pct"]); ok && v > 0 {
+		return v
+	}
+	return 0
+}
+
 // executeStrategy executes the strategy
 func (w *StrategyWorker) executeStrategy(ctx context.Context, marketData *domain.MarketData, history []strategy.MarketData) {
 	// History already includes the latest data, use as is
@@ -277,6 +349,15 @@ func (w *StrategyWorker) executeStrategy(ctx context.Context, marketData *domain
 	// Only log strategy analysis at debug level (not in production)
 	// Reduce log volume for high-frequency market data
 	logEntry.Debug("Strategy analysis completed")
+
+	// Stop-loss override: if an open BUY position has breached its stop price,
+	// inject a SELL regardless of the EMA signal. This runs even when the
+	// strategy says HOLD or BUY, ensuring positions are cut quickly.
+	if signal.Action != strategy.SignalSell {
+		if slSignal := w.checkStopLoss(marketData.Symbol, marketData.Price); slSignal != nil {
+			signal = slSignal
+		}
+	}
 
 	if signal.Action != strategy.SignalHold {
 		// Deduplicate: skip if the action is the same as the last sent signal for this symbol.
