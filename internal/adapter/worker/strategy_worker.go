@@ -282,7 +282,8 @@ func (w *StrategyWorker) checkStopLoss(symbol string, currentPrice float64) *str
 		return nil
 	}
 
-	for _, pos := range positions {
+	for i := range positions {
+		pos := &positions[i]
 		if pos.EntryPrice <= 0 {
 			continue
 		}
