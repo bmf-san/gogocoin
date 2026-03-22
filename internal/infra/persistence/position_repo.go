@@ -32,12 +32,14 @@ func (r *PositionRepository) SavePosition(position *domain.Position) error {
 	return err
 }
 
-// GetOpenPositions returns OPEN positions for symbol+side with remaining_size > 0, ordered oldest first.
+// GetOpenPositions returns OPEN and PARTIAL positions for symbol+side with remaining_size > 0, ordered oldest first.
+// Both statuses are included because real exchange fills move positions from OPEN→PARTIAL before CLOSED,
+// and stop-loss checks must see partially-filled positions to function correctly.
 func (r *PositionRepository) GetOpenPositions(symbol string, side string) ([]domain.Position, error) {
 	query := `SELECT id, symbol, side, size, used_size, remaining_size, entry_price,
 			  current_price, unrealized_pl, status, order_id, created_at, updated_at
 			  FROM positions
-			  WHERE symbol = ? AND side = ? AND status = 'OPEN' AND remaining_size > 0
+			  WHERE symbol = ? AND side = ? AND status IN ('OPEN', 'PARTIAL') AND remaining_size > 0
 			  ORDER BY created_at ASC`
 	rows, err := r.db.db.Query(query, symbol, side)
 	if err != nil {
@@ -70,11 +72,11 @@ func (r *PositionRepository) UpdatePosition(position *domain.Position) error {
 	return err
 }
 
-// GetActivePositions returns all positions with status='OPEN' and size != 0.
+// GetActivePositions returns all OPEN and PARTIAL positions with size != 0.
 func (r *PositionRepository) GetActivePositions() ([]domain.Position, error) {
 	query := `SELECT id, symbol, side, size, used_size, remaining_size, entry_price,
 			  current_price, unrealized_pl, pnl, status, order_id, created_at, updated_at
-			  FROM positions WHERE size != 0 AND status = 'OPEN' ORDER BY created_at DESC`
+			  FROM positions WHERE size != 0 AND status IN ('OPEN', 'PARTIAL') ORDER BY created_at DESC`
 	rows, err := r.db.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -93,10 +95,10 @@ func (r *PositionRepository) GetActivePositions() ([]domain.Position, error) {
 	return positions, rows.Err()
 }
 
-// GetActivePositionsCount returns the count of OPEN positions.
+// GetActivePositionsCount returns the count of OPEN and PARTIAL positions.
 func (r *PositionRepository) GetActivePositionsCount() (int, error) {
 	var count int
-	err := r.db.db.QueryRow("SELECT COUNT(*) FROM positions WHERE status = ?", "OPEN").Scan(&count)
+	err := r.db.db.QueryRow("SELECT COUNT(*) FROM positions WHERE status IN ('OPEN', 'PARTIAL')").Scan(&count)
 	if err != nil {
 		return 0, err
 	}

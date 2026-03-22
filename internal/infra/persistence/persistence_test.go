@@ -99,6 +99,40 @@ func TestPositionRepository_SaveAndGetOpen(t *testing.T) {
 	}
 }
 
+func TestPositionRepository_GetOpenPositions_IncludesPartial(t *testing.T) {
+	db := newTestDB(t)
+	repo := persistence.NewPositionRepository(db)
+
+	// PARTIAL position: partially filled, remaining_size > 0 — stop-loss must see this.
+	partial := &domain.Position{
+		Symbol: "XRP_JPY", Side: "BUY",
+		Size: 10, UsedSize: 3, RemainingSize: 7, EntryPrice: 229.0, CurrentPrice: 226.0,
+		Status: "PARTIAL", OrderID: "POS-PARTIAL",
+	}
+	// CLOSED position: must NOT be returned.
+	closed := &domain.Position{
+		Symbol: "XRP_JPY", Side: "BUY",
+		Size: 5, UsedSize: 5, RemainingSize: 0, EntryPrice: 220.0, CurrentPrice: 226.0,
+		Status: "CLOSED", OrderID: "POS-CLOSED",
+	}
+	for _, p := range []*domain.Position{partial, closed} {
+		if err := repo.SavePosition(p); err != nil {
+			t.Fatalf("SavePosition %s: %v", p.OrderID, err)
+		}
+	}
+
+	positions, err := repo.GetOpenPositions("XRP_JPY", "BUY")
+	if err != nil {
+		t.Fatalf("GetOpenPositions: %v", err)
+	}
+	if len(positions) != 1 {
+		t.Fatalf("expected 1 position (PARTIAL), got %d: %v", len(positions), positions)
+	}
+	if positions[0].OrderID != "POS-PARTIAL" {
+		t.Errorf("expected POS-PARTIAL, got %v", positions[0].OrderID)
+	}
+}
+
 func TestPositionRepository_UpdatePosition(t *testing.T) {
 	db := newTestDB(t)
 	repo := persistence.NewPositionRepository(db)

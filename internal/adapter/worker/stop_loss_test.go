@@ -158,6 +158,29 @@ func TestCheckStopLoss_MultiplePositions_OnlyOneBreached(t *testing.T) {
 	}
 }
 
+func TestCheckStopLoss_PartialPosition_Triggered(t *testing.T) {
+	// Real BitFlyer positions transition OPEN→PARTIAL once partially matched.
+	// Stop-loss must fire on PARTIAL positions, not only OPEN ones.
+	w := newTestStrategyWorker(t, map[string]any{"stop_loss_pct": 1.0})
+	w.SetPositionReader(&mockPositionReader{
+		positions: []domain.Position{
+			{Symbol: "XRP_JPY", Side: "BUY", EntryPrice: 229.01, Status: "PARTIAL"},
+		},
+	})
+
+	// 1% below 229.01 = 226.7199; current price 226.29 is below stop → trigger
+	got := w.checkStopLoss("XRP_JPY", 226.29)
+	if got == nil {
+		t.Fatal("expected SELL signal for PARTIAL position below stop price, got nil")
+	}
+	if got.Action != strategy.SignalSell {
+		t.Fatalf("expected SignalSell, got %v", got.Action)
+	}
+	if got.Metadata["reason"] != "stop_loss" {
+		t.Fatalf("expected reason=stop_loss, got %v", got.Metadata["reason"])
+	}
+}
+
 func TestGetStopLossPct_NotConfigured(t *testing.T) {
 	w := newTestStrategyWorker(t, map[string]any{})
 	if pct := w.getStopLossPct(); pct != 0 {
