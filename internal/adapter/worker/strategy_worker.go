@@ -326,6 +326,69 @@ func (w *StrategyWorker) getStopLossPct() float64 {
 	return 0
 }
 
+// checkTakeProfit returns a SELL signal when the current price has risen above the
+// take-profit threshold of any open BUY position for the symbol. Returns nil when
+// take-profit is not triggered or no position reader is configured.
+func (w *StrategyWorker) checkTakeProfit(symbol string, currentPrice float64) *strategy.Signal {
+	if w.positionReader == nil {
+		return nil
+	}
+
+	takeProfitPct := w.getTakeProfitPct()
+	if takeProfitPct <= 0 {
+		return nil
+	}
+
+	positions, err := w.positionReader.GetOpenPositions(symbol, "BUY")
+	if err != nil {
+		w.logger.Strategy().WithError(err).Warn("Failed to read open positions for take-profit check")
+		return nil
+	}
+
+	for i := range positions {
+		pos := &positions[i]
+		if pos.EntryPrice <= 0 {
+			continue
+		}
+		takePrice := pos.EntryPrice * (1.0 + takeProfitPct/100.0)
+		if currentPrice >= takePrice {
+			w.logger.Trading().
+				WithField("symbol", symbol).
+				WithField("entry_price", pos.EntryPrice).
+				WithField("current_price", currentPrice).
+				WithField("take_price", takePrice).
+				WithField("take_profit_pct", takeProfitPct).
+				Info("Take profit triggered — injecting SELL signal")
+			return &strategy.Signal{
+				Symbol:    symbol,
+				Action:    strategy.SignalSell,
+				Strength:  1.0,
+				Price:     currentPrice,
+				Timestamp: time.Now(),
+				Metadata: map[string]interface{}{
+					"reason":          "take_profit",
+					"entry_price":     pos.EntryPrice,
+					"take_price":      takePrice,
+					"take_profit_pct": takeProfitPct,
+				},
+			}
+		}
+	}
+	return nil
+}
+
+// getTakeProfitPct reads take_profit_pct from the strategy configuration.
+// Returns 0 when not configured or invalid.
+func (w *StrategyWorker) getTakeProfitPct() float64 {
+	if w.strategy == nil {
+		return 0
+	}
+	if v, ok := asFloat(w.strategy.GetConfig()["take_profit_pct"]); ok && v > 0 {
+		return v
+	}
+	return 0
+}
+
 // executeStrategy executes the strategy
 func (w *StrategyWorker) executeStrategy(ctx context.Context, marketData *domain.MarketData, history []strategy.MarketData) {
 	// History already includes the latest data, use as is
@@ -350,12 +413,14 @@ func (w *StrategyWorker) executeStrategy(ctx context.Context, marketData *domain
 	// Reduce log volume for high-frequency market data
 	logEntry.Debug("Strategy analysis completed")
 
-	// Stop-loss override: if an open BUY position has breached its stop price,
-	// inject a SELL regardless of the EMA signal. This runs even when the
-	// strategy says HOLD or BUY, ensuring positions are cut quickly.
+	// Stop-loss / take-profit override: inject a SELL regardless of the EMA signal
+	// when an open BUY position has breached its stop or take-profit price.
+	// Stop-loss is checked first (risk priority); take-profit only when no SL fires.
 	if signal.Action != strategy.SignalSell {
 		if slSignal := w.checkStopLoss(marketData.Symbol, marketData.Price); slSignal != nil {
 			signal = slSignal
+		} else if tpSignal := w.checkTakeProfit(marketData.Symbol, marketData.Price); tpSignal != nil {
+			signal = tpSignal
 		}
 	}
 
