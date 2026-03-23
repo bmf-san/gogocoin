@@ -151,11 +151,11 @@ func (w *SignalWorker) processSignal(ctx context.Context, signal *strategy.Signa
 	// Create order (pass context for balance checking)
 	order, skip := w.createOrderFromSignal(ctx, signal)
 	if skip {
-		// If a stop-loss SELL was skipped because the exchange balance is dust
-		// (below the minimum lot size), close the ghost PARTIAL positions in the
-		// DB so stop-loss stops firing on already-liquidated positions.
+		// If a stop-loss or take-profit SELL was skipped because the exchange
+		// balance is dust (below the minimum lot size), close the ghost PARTIAL
+		// positions in the DB so the condition stops firing on every tick.
 		if signal.Action == strategy.SignalSell {
-			if reason, ok := signal.Metadata["reason"].(string); ok && reason == "stop_loss" {
+			if reason, ok := signal.Metadata["reason"].(string); ok && (reason == "stop_loss" || reason == "take_profit") {
 				w.closeGhostPositions(signal.Symbol)
 			}
 		}
