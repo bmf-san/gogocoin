@@ -58,6 +58,18 @@ func NewRiskManager(
 	}
 }
 
+// isForcedExitSell reports whether signal is a SELL triggered by stop-loss or
+// take-profit.  These signals exist to limit further losses, so blocking them
+// via portfolio-protection checks (daily limit, trade interval, total loss
+// limit) would be counter-productive.
+func isForcedExitSell(signal *strategy.Signal) bool {
+	if signal.Action != strategy.SignalSell {
+		return false
+	}
+	reason, _ := signal.Metadata["reason"].(string)
+	return reason == "stop_loss" || reason == "take_profit"
+}
+
 // CheckRiskManagement performs all risk management checks before placing an order
 // Returns error if any risk rule is violated
 func (rm *Manager) CheckRiskManagement(ctx context.Context, signal *strategy.Signal) error {
@@ -86,6 +98,19 @@ func (rm *Manager) CheckRiskManagement(ctx context.Context, signal *strategy.Sig
 		if err := rm.checkTradeAmount(signal, totalBalanceJPY); err != nil {
 			return fmt.Errorf("trade amount validation failed: %w", err)
 		}
+	}
+
+	// Forced exits (stop-loss / take-profit SELLs) bypass portfolio-protection
+	// checks.  These checks exist to prevent reckless over-trading, but blocking
+	// an emergency exit makes losses worse, not better.
+	if isForcedExitSell(signal) {
+		if rm.logger != nil {
+			rm.logger.System().Info("Bypassing portfolio checks for forced exit SELL",
+				"symbol", signal.Symbol,
+				"reason", signal.Metadata["reason"],
+			)
+		}
+		return nil
 	}
 
 	// Check daily trade limit
