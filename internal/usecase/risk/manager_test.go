@@ -118,7 +118,12 @@ func TestCheckDailyTradeLimit(t *testing.T) {
 		MaxDailyTrades: 5,
 	}
 
-	now := time.Now()
+	// Anchor trade timestamps to today's JST midnight so the test is stable
+	// regardless of what time of day it runs (relative offsets like -5h can
+	// cross midnight and land on the previous day).
+	jst, _ := time.LoadLocation("Asia/Tokyo")
+	today := time.Now().In(jst)
+	todayJST := time.Date(today.Year(), today.Month(), today.Day(), 0, 1, 0, 0, jst)
 
 	tests := []struct {
 		name        string
@@ -128,27 +133,27 @@ func TestCheckDailyTradeLimit(t *testing.T) {
 		{
 			name: "Under daily limit",
 			trades: []domain.Trade{
-				{CreatedAt: now.Add(-1 * time.Hour)},
-				{CreatedAt: now.Add(-2 * time.Hour)},
+				{CreatedAt: todayJST.Add(1 * time.Minute)},
+				{CreatedAt: todayJST.Add(2 * time.Minute)},
 			},
 			expectError: false,
 		},
 		{
 			name: "At daily limit",
 			trades: []domain.Trade{
-				{CreatedAt: now.Add(-1 * time.Hour)},
-				{CreatedAt: now.Add(-2 * time.Hour)},
-				{CreatedAt: now.Add(-3 * time.Hour)},
-				{CreatedAt: now.Add(-4 * time.Hour)},
-				{CreatedAt: now.Add(-5 * time.Hour)},
+				{CreatedAt: todayJST.Add(1 * time.Minute)},
+				{CreatedAt: todayJST.Add(2 * time.Minute)},
+				{CreatedAt: todayJST.Add(3 * time.Minute)},
+				{CreatedAt: todayJST.Add(4 * time.Minute)},
+				{CreatedAt: todayJST.Add(5 * time.Minute)},
 			},
 			expectError: true,
 		},
 		{
 			name: "No trades today",
 			trades: []domain.Trade{
-				{CreatedAt: now.Add(-25 * time.Hour)},
-				{CreatedAt: now.Add(-26 * time.Hour)},
+				{CreatedAt: todayJST.Add(-25 * time.Hour)},
+				{CreatedAt: todayJST.Add(-26 * time.Hour)},
 			},
 			expectError: false,
 		},
@@ -282,6 +287,9 @@ func TestCheckRiskManagement(t *testing.T) {
 	}
 
 	now := time.Now()
+	jst, _ := time.LoadLocation("Asia/Tokyo")
+	todayInJST := now.In(jst)
+	todayJST := time.Date(todayInJST.Year(), todayInJST.Month(), todayInJST.Day(), 0, 1, 0, 0, jst)
 
 	tests := []struct {
 		name        string
@@ -326,11 +334,11 @@ func TestCheckRiskManagement(t *testing.T) {
 			},
 			balances: []domain.Balance{{Currency: "JPY", Available: 100000}},
 			trades: []domain.Trade{
-				{CreatedAt: now.Add(-1 * time.Hour), ExecutedAt: now.Add(-1 * time.Hour)},
-				{CreatedAt: now.Add(-2 * time.Hour), ExecutedAt: now.Add(-2 * time.Hour)},
-				{CreatedAt: now.Add(-3 * time.Hour), ExecutedAt: now.Add(-3 * time.Hour)},
-				{CreatedAt: now.Add(-4 * time.Hour), ExecutedAt: now.Add(-4 * time.Hour)},
-				{CreatedAt: now.Add(-5 * time.Hour), ExecutedAt: now.Add(-5 * time.Hour)},
+				{CreatedAt: todayJST.Add(1 * time.Minute), ExecutedAt: todayJST.Add(1 * time.Minute)},
+				{CreatedAt: todayJST.Add(2 * time.Minute), ExecutedAt: todayJST.Add(2 * time.Minute)},
+				{CreatedAt: todayJST.Add(3 * time.Minute), ExecutedAt: todayJST.Add(3 * time.Minute)},
+				{CreatedAt: todayJST.Add(4 * time.Minute), ExecutedAt: todayJST.Add(4 * time.Minute)},
+				{CreatedAt: todayJST.Add(5 * time.Minute), ExecutedAt: todayJST.Add(5 * time.Minute)},
 			},
 			metrics:     []domain.PerformanceMetric{},
 			expectError: true,
