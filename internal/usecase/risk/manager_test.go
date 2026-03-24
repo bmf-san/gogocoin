@@ -377,3 +377,88 @@ func TestCheckRiskManagement(t *testing.T) {
 		})
 	}
 }
+
+// TestForcedExitSellBypassesPortfolioChecks verifies that stop-loss and
+// take-profit SELL signals are allowed even when portfolio-protection checks
+// (daily trade limit, trade interval, total loss limit) would otherwise block
+// the order.  Blocking an emergency exit makes a loss situation worse.
+func TestForcedExitSellBypassesPortfolioChecks(t *testing.T) {
+	cfg := ManagerConfig{
+		MaxTradeAmountPercent: 10.0,
+		MaxDailyTrades:        2,    // already exhausted
+		MinTradeInterval:      1 * time.Hour, // last trade was recent
+		MaxTotalLossPercent:   10.0, // already exceeded
+		FeeRate:               0.001,
+		InitialBalance:        100000,
+	}
+
+	jst, _ := time.LoadLocation("Asia/Tokyo")
+	todayInJST := time.Now().In(jst)
+	todayJST := time.Date(todayInJST.Year(), todayInJST.Month(), todayInJST.Day(), 0, 1, 0, 0, jst)
+
+	// Conditions that would block a normal SELL:
+	//   - daily limit reached (2 trades today)
+	//   - last trade 30s ago (< 1h interval)
+	//   - total loss 15% > 10% limit
+	blockedTrades := []domain.Trade{
+		{CreatedAt: todayJST.Add(1 * time.Minute), ExecutedAt: time.Now().Add(-30 * time.Second)},
+		{CreatedAt: todayJST.Add(2 * time.Minute), ExecutedAt: time.Now().Add(-30 * time.Second)},
+	}
+	blockedMetrics := []domain.PerformanceMetric{{TotalPnL: -15000}}
+	blockedBalances := []domain.Balance{
+		{Currency: "JPY", Available: 0},
+		{Currency: "BTC", Available: 0.001},
+	}
+
+	tests := []struct {
+		name        string
+		reason      string
+		expectError bool
+	}{
+		{
+			name:        "stop_loss SELL bypasses all checks",
+			reason:      "stop_loss",
+			expectError: false,
+		},
+		{
+			name:        "take_profit SELL bypasses all checks",
+			reason:      "take_profit",
+			expectError: false,
+		},
+		{
+			name:        "plain SELL (no reason) is still blocked",
+			reason:      "",
+			expectError: true,
+		},
+		{
+			name:        "SELL with unrelated reason is still blocked",
+			reason:      "ema_crossover",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			signal := &strategy.Signal{
+				Action:   strategy.SignalSell,
+				Symbol:   "BTC_JPY",
+				Price:    5000000,
+				Quantity: 0.001,
+				Metadata: map[string]interface{}{},
+			}
+			if tt.reason != "" {
+				signal.Metadata["reason"] = tt.reason
+			}
+
+			tradingRepo := &mockTradingRepo{trades: blockedTrades}
+			analyticsRepo := &mockAnalyticsRepo{metrics: blockedMetrics}
+			trader := &mockTrader{balances: blockedBalances}
+			rm := NewRiskManager(cfg, tradingRepo, analyticsRepo, trader, nil)
+
+			err := rm.CheckRiskManagement(context.Background(), signal)
+			if (err != nil) != tt.expectError {
+				t.Errorf("CheckRiskManagement() reason=%q error = %v, expectError %v", tt.reason, err, tt.expectError)
+			}
+		})
+	}
+}
