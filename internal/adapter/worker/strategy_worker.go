@@ -21,6 +21,11 @@ const (
 	// DefaultMaxConcurrentProcessing is the default maximum number of concurrent market data processing goroutines
 	// This prevents memory exhaustion from unbounded goroutine creation during high-frequency market data
 	DefaultMaxConcurrentProcessing = 10
+
+	// ForcedExitCooldown is the minimum interval between successive forced-exit
+	// (stop-loss / take-profit) SELL signals for the same symbol. This prevents
+	// duplicate orders while still retrying if the first attempt failed.
+	ForcedExitCooldown = 30 * time.Second
 )
 
 // symbolHistory holds market data history for a single symbol with its own lock
@@ -52,6 +57,11 @@ type StrategyWorker struct {
 	// Deduplication: track last sent signal action per symbol to avoid flooding the channel
 	// with identical signals on every tick during a sustained trend
 	lastSentSignals sync.Map // map[string]strategy.SignalAction
+
+	// lastForcedExitAttempt tracks when a forced-exit (SL/TP) SELL was last dispatched
+	// per symbol so that repeated attempts are gated by ForcedExitCooldown rather than
+	// the standard action-level dedup (which would block them indefinitely after any EMA SELL).
+	lastForcedExitAttempt sync.Map // map[string]time.Time
 
 	// positionReader is optional; when set, stop-loss is checked on every tick.
 	positionReader PositionReader
@@ -416,20 +426,38 @@ func (w *StrategyWorker) executeStrategy(ctx context.Context, marketData *domain
 	// Stop-loss / take-profit override: inject a SELL regardless of the EMA signal
 	// when an open BUY position has breached its stop or take-profit price.
 	// Stop-loss is checked first (risk priority); take-profit only when no SL fires.
+	isForcedExit := false
 	if signal.Action != strategy.SignalSell {
 		if slSignal := w.checkStopLoss(marketData.Symbol, marketData.Price); slSignal != nil {
 			signal = slSignal
+			isForcedExit = true
 		} else if tpSignal := w.checkTakeProfit(marketData.Symbol, marketData.Price); tpSignal != nil {
 			signal = tpSignal
+			isForcedExit = true
 		}
 	}
 
 	if signal.Action != strategy.SignalHold {
-		// Deduplicate: skip if the action is the same as the last sent signal for this symbol.
-		// Once a SELL/BUY trend is established, every tick would re-generate the same signal;
-		// we only need to act on the transition (e.g., HOLD→SELL or BUY→SELL).
-		if last, ok := w.lastSentSignals.Load(signal.Symbol); ok && last.(strategy.SignalAction) == signal.Action {
-			return
+		if isForcedExit {
+			// Forced exits (SL/TP) bypass the standard action-level dedup because a prior
+			// EMA SELL sets lastSentSignals=SELL and would block all subsequent SL/TP signals
+			// indefinitely. Instead, use a separate per-symbol cooldown so we retry after
+			// ForcedExitCooldown without hammering the exchange on every tick.
+			if last, ok := w.lastForcedExitAttempt.Load(signal.Symbol); ok {
+				if time.Since(last.(time.Time)) < ForcedExitCooldown {
+					return // still within cooldown — wait for prior order to settle
+				}
+			}
+			// Cooldown elapsed (or first attempt): clear standard dedup so the SELL is not
+			// blocked by a stale EMA-generated SELL recorded in lastSentSignals.
+			w.lastSentSignals.Delete(signal.Symbol)
+		} else {
+			// Standard EMA dedup: skip if the action is the same as the last sent signal.
+			// Once a SELL/BUY trend is established, every tick would re-generate the same
+			// signal; we only need to act on the transition (e.g., HOLD→SELL or BUY→SELL).
+			if last, ok := w.lastSentSignals.Load(signal.Symbol); ok && last.(strategy.SignalAction) == signal.Action {
+				return
+			}
 		}
 
 		// Only log actual trading signals (not HOLD signals) to reduce log volume
@@ -446,6 +474,9 @@ func (w *StrategyWorker) executeStrategy(ctx context.Context, marketData *domain
 		case w.signalCh <- signal:
 			// Record last sent action only on successful send
 			w.lastSentSignals.Store(signal.Symbol, signal.Action)
+			if isForcedExit {
+				w.lastForcedExitAttempt.Store(signal.Symbol, time.Now())
+			}
 		case <-ctx.Done():
 			return
 		default:
