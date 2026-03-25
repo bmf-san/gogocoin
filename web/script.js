@@ -457,10 +457,7 @@ class GogocoinUI {
                 return;
             }
 
-            // Reverse to show newest first (slice to avoid mutating original)
-            const reversedLogs = logs.slice().reverse();
-
-            container.innerHTML = reversedLogs.map(log => {
+            container.innerHTML = logs.map(log => {
                 const levelClass = log.level.toLowerCase();
                 const levelColor = {
                     'debug': 'text-slate-500',
