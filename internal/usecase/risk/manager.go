@@ -18,18 +18,28 @@ type RiskManager interface {
 	CheckRiskManagement(ctx context.Context, signal *strategy.Signal) error
 }
 
+// PositionRepository defines the DB operations needed to check open positions.
+type PositionRepository interface {
+	GetOpenPositions(symbol string, side string) ([]domain.Position, error)
+}
+
 // Manager provides risk management functionality for trading operations
 // Enforces trading limits, intervals, and loss protection rules
 type Manager struct {
 	cfg           ManagerConfig
 	tradingRepo   TradingRepository
 	analyticsRepo AnalyticsRepository
+	positionRepo  PositionRepository
 	trader        trading.Trader
 	logger        logger.LoggerInterface
 }
 
 // Verify Manager implements RiskManager interface at compile time
 var _ RiskManager = (*Manager)(nil)
+
+// SetPositionRepository injects an optional PositionRepository used to enforce
+// max_open_positions_per_symbol.  Must be called before trading starts.
+func (rm *Manager) SetPositionRepository(repo PositionRepository) { rm.positionRepo = repo }
 
 // TradingRepository defines database operations needed for risk checks
 type TradingRepository interface {
@@ -97,6 +107,9 @@ func (rm *Manager) CheckRiskManagement(ctx context.Context, signal *strategy.Sig
 		}
 		if err := rm.checkTradeAmount(signal, totalBalanceJPY); err != nil {
 			return fmt.Errorf("trade amount validation failed: %w", err)
+		}
+		if err := rm.checkMaxOpenPositions(signal.Symbol); err != nil {
+			return err
 		}
 	}
 
@@ -268,5 +281,26 @@ func (rm *Manager) checkTotalLossLimit(ctx context.Context) error {
 			lossPercent, maxLossPercent, totalLoss, totalAssets)
 	}
 
+	return nil
+}
+
+// checkMaxOpenPositions rejects a BUY when the symbol already has too many
+// open positions.  This prevents position stacking where multiple sequential
+// BUYs accumulate and then a single stop-loss SELL exits all of them at once,
+// multiplying the loss.
+func (rm *Manager) checkMaxOpenPositions(symbol string) error {
+	max := rm.cfg.MaxOpenPositionsPerSymbol
+	if max <= 0 || rm.positionRepo == nil {
+		return nil // feature disabled or repository not wired
+	}
+	positions, err := rm.positionRepo.GetOpenPositions(symbol, "BUY")
+	if err != nil {
+		// Non-fatal: if we can't read positions, allow the trade rather than
+		// blocking it on a transient DB error.
+		return nil
+	}
+	if len(positions) >= max {
+		return fmt.Errorf("max open positions reached for %s: %d/%d", symbol, len(positions), max)
+	}
 	return nil
 }
