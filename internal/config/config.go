@@ -69,9 +69,10 @@ type RiskManagementConfig struct {
 	MaxTotalLossPercent   float64 `yaml:"max_total_loss_percent"`
 	MaxTradeLossPercent   float64 `yaml:"max_trade_loss_percent"`
 	MaxDailyLossPercent   float64 `yaml:"max_daily_loss_percent"`
-	MaxTradeAmountPercent float64 `yaml:"max_trade_amount_percent"`
-	MaxDailyTrades        int     `yaml:"max_daily_trades"`
-	MinTradeInterval      string  `yaml:"min_trade_interval"`
+	MaxTradeAmountPercent        float64 `yaml:"max_trade_amount_percent"`
+	MaxDailyTrades               int     `yaml:"max_daily_trades"`
+	MinTradeInterval             string  `yaml:"min_trade_interval"`
+	MaxOpenPositionsPerSymbol    int     `yaml:"max_open_positions_per_symbol"` // 0 = unlimited
 }
 
 // StrategyParams represents strategy-specific parameters

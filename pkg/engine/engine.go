@@ -160,17 +160,19 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	minInterval, _ := time.ParseDuration(cfg.Trading.RiskManagement.MinTradeInterval)
 	riskMgr := risk.NewRiskManager(
 		risk.ManagerConfig{
-			MaxTotalLossPercent:   cfg.Trading.RiskManagement.MaxTotalLossPercent,
-			MaxTradeLossPercent:   cfg.Trading.RiskManagement.MaxTradeLossPercent,
-			MaxDailyLossPercent:   cfg.Trading.RiskManagement.MaxDailyLossPercent,
-			MaxTradeAmountPercent: cfg.Trading.RiskManagement.MaxTradeAmountPercent,
-			MaxDailyTrades:        cfg.Trading.RiskManagement.MaxDailyTrades,
-			MinTradeInterval:      minInterval,
-			FeeRate:               cfg.Trading.FeeRate,
-			InitialBalance:        cfg.Trading.InitialBalance,
+			MaxTotalLossPercent:       cfg.Trading.RiskManagement.MaxTotalLossPercent,
+			MaxTradeLossPercent:       cfg.Trading.RiskManagement.MaxTradeLossPercent,
+			MaxDailyLossPercent:       cfg.Trading.RiskManagement.MaxDailyLossPercent,
+			MaxTradeAmountPercent:     cfg.Trading.RiskManagement.MaxTradeAmountPercent,
+			MaxDailyTrades:            cfg.Trading.RiskManagement.MaxDailyTrades,
+			MinTradeInterval:          minInterval,
+			MaxOpenPositionsPerSymbol: cfg.Trading.RiskManagement.MaxOpenPositionsPerSymbol,
+			FeeRate:                   cfg.Trading.FeeRate,
+			InitialBalance:            cfg.Trading.InitialBalance,
 		},
 		repo, repo, trader, log,
 	)
+	riskMgr.SetPositionRepository(repo)
 
 	// ── 7. Performance analytics ──────────────────────────────────────────────
 	perfAnalytics := analytics.NewPerformanceAnalytics(repo, repo, log, cfg.Trading.InitialBalance)

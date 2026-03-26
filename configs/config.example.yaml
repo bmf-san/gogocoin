@@ -33,6 +33,7 @@ trading:
     max_trade_amount_percent: 80.0
     max_daily_trades: 100
     min_trade_interval: 60s
+    max_open_positions_per_symbol: 1  # prevent position stacking (one BUY per symbol at a time)
     # Note: profit/loss targets are in strategy_params.scalping
 
 # Scalping Strategy
