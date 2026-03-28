@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/bmf-san/gogocoin/pkg/engine"
-	_ "github.com/bmf-san/gogocoin/pkg/strategy/scalping" // register scalping strategy
 )
 
 func main() {
