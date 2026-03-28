@@ -4,6 +4,10 @@ package scalping
 type Params struct {
 	EMAFastPeriod        int                       `yaml:"ema_fast_period"`
 	EMASlowPeriod        int                       `yaml:"ema_slow_period"`
+	// TrendEMAPeriod is the period of the long-term trend EMA used as a trend
+	// filter. BUY signals are only emitted when the current price is above this
+	// EMA, indicating an overall uptrend. Set to 0 to disable (default).
+	TrendEMAPeriod       int                       `yaml:"trend_ema_period"`
 	TakeProfitPct        float64                   `yaml:"take_profit_pct"`
 	StopLossPct          float64                   `yaml:"stop_loss_pct"`
 	CooldownSec          int                       `yaml:"cooldown_sec"`

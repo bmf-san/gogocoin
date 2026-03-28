@@ -45,6 +45,11 @@ type Strategy struct {
 	rsiOverbought float64
 	rsiOversold   float64
 
+	// trendEMAPeriod is the long-term EMA period used as a trend direction
+	// filter. When > 0, BUY signals are suppressed if the current price is
+	// below this EMA (= downtrend). 0 disables the filter.
+	trendEMAPeriod int
+
 	symbolParams map[string]SymbolOverride
 
 	marketSpecSvc MarketSpecService
@@ -94,6 +99,7 @@ func New(cfg Params) *Strategy { //nolint:gocritic // hugeParam: Params is passe
 		rsiPeriod:            cfg.RSIPeriod,
 		rsiOverbought:        rsiOverbought,
 		rsiOversold:          rsiOversold,
+		trendEMAPeriod:       cfg.TrendEMAPeriod,
 		symbolParams:         cfg.SymbolParams,
 	}
 }
@@ -177,6 +183,9 @@ func (s *Strategy) Initialize(config map[string]interface{}) error {
 	if v, ok := config["rsi_oversold"].(float64); ok {
 		s.rsiOversold = v
 	}
+	if v, ok := config["trend_ema_period"].(int); ok {
+		s.trendEMAPeriod = v
+	}
 	// Parse per-symbol overrides.  strategyParamsToMap provides
 	// map[string]map[string]interface{}; GetConfig/UpdateConfig roundtrip
 	// provides map[string]SymbolOverride.  Handle both.
@@ -236,6 +245,7 @@ func (s *Strategy) GetConfig() map[string]interface{} {
 		"rsi_period":              s.rsiPeriod,
 		"rsi_overbought":          s.rsiOverbought,
 		"rsi_oversold":            s.rsiOversold,
+		"trend_ema_period":        s.trendEMAPeriod,
 		"symbol_params":           s.symbolParams,
 	}
 }
@@ -284,13 +294,29 @@ func (s *Strategy) GenerateSignal(ctx context.Context, data *strategy.MarketData
 			map[string]interface{}{"reason": "no_new_crossover", "ema_fast": emaFast, "ema_slow": emaSlow}), nil
 	}
 
-	// Snapshot RSI config under read lock (these fields may be updated concurrently
-	// by UpdateConfig called from the HTTP API handler).
+	// Snapshot RSI and trend config under read lock (these fields may be updated
+	// concurrently by UpdateConfig called from the HTTP API handler).
 	s.mu.RLock()
 	rsiPeriod := s.rsiPeriod
 	rsiOverbought := s.rsiOverbought
 	rsiOversold := s.rsiOversold
+	trendEMAPeriod := s.trendEMAPeriod
 	s.mu.RUnlock()
+
+	// Trend filter: suppress BUY when price is below the long-term trend EMA.
+	// This avoids entering longs during a downtrend even if the fast/slow EMA
+	// produces a golden cross (temporary bounce).
+	if action == strategy.SignalBuy && trendEMAPeriod > 0 {
+		if len(history) < trendEMAPeriod {
+			return s.CreateSignal(data.Symbol, strategy.SignalHold, 0, data.Price, 0,
+				map[string]interface{}{"reason": "trend_filter_insufficient_history", "ema_fast": emaFast, "ema_slow": emaSlow}), nil
+		}
+		emaTrend := s.calculateEMA(history, trendEMAPeriod)
+		if data.Price < emaTrend {
+			return s.CreateSignal(data.Symbol, strategy.SignalHold, 0, data.Price, 0,
+				map[string]interface{}{"reason": "trend_filter", "ema_fast": emaFast, "ema_slow": emaSlow, "ema_trend": emaTrend}), nil
+		}
+	}
 
 	// RSI filter
 	if action != strategy.SignalHold && rsiPeriod > 0 {
