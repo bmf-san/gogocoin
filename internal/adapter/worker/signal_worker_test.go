@@ -97,6 +97,23 @@ func (m *mockSignalStrategy) UpdateConfig(cfg map[string]interface{}) error {
 	return nil
 }
 
+func (m *mockSignalStrategy) GetAutoScaleConfig() strategy.AutoScaleConfig {
+	cfg := strategy.AutoScaleConfig{Enabled: false, BalancePct: 80.0}
+	if v, ok := m.cfg["auto_scale_enabled"].(bool); ok {
+		cfg.Enabled = v
+	}
+	if v, ok := m.cfg["auto_scale_balance_pct"].(float64); ok && v > 0 && v <= 100 {
+		cfg.BalancePct = v
+	}
+	if v, ok := m.cfg["auto_scale_max_notional"].(float64); ok {
+		cfg.MaxNotional = v
+	}
+	if v, ok := m.cfg["fee_rate"].(float64); ok {
+		cfg.FeeRate = v
+	}
+	return cfg
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -142,7 +159,7 @@ func TestComputeScaledNotional(t *testing.T) {
 		name         string
 		base         float64
 		available    float64
-		cfg          autoScaleConfig
+		cfg          strategy.AutoScaleConfig
 		wantMin      float64
 		wantMax      float64
 	}{
@@ -150,7 +167,7 @@ func TestComputeScaledNotional(t *testing.T) {
 			name:      "disabled returns base",
 			base:      8000,
 			available: 100000,
-			cfg:       autoScaleConfig{enabled: false, balancePct: 5, feeRate: 0.0015},
+			cfg:       strategy.AutoScaleConfig{Enabled: false, BalancePct: 5, FeeRate: 0.0015},
 			wantMin:   8000,
 			wantMax:   8000,
 		},
@@ -158,7 +175,7 @@ func TestComputeScaledNotional(t *testing.T) {
 			name:      "scale up when target > base",
 			base:      8000,
 			available: 200000,
-			cfg:       autoScaleConfig{enabled: true, balancePct: 5, feeRate: 0.0015},
+			cfg:       strategy.AutoScaleConfig{Enabled: true, BalancePct: 5, FeeRate: 0.0015},
 			// target = 200000 * 5/100 = 10000; affordable = 200000/1.0015 ≈ 199700
 			wantMin: 9900,
 			wantMax: 10100,
@@ -167,7 +184,7 @@ func TestComputeScaledNotional(t *testing.T) {
 			name:      "stay at base when target < base",
 			base:      8000,
 			available: 100000,
-			cfg:       autoScaleConfig{enabled: true, balancePct: 3, feeRate: 0.0015},
+			cfg:       strategy.AutoScaleConfig{Enabled: true, BalancePct: 3, FeeRate: 0.0015},
 			// target = 100000 * 3/100 = 3000 < base → stays at 8000
 			wantMin: 7900,
 			wantMax: 8100,
@@ -176,7 +193,7 @@ func TestComputeScaledNotional(t *testing.T) {
 			name:      "clamped by maxNotional",
 			base:      8000,
 			available: 200000,
-			cfg:       autoScaleConfig{enabled: true, balancePct: 10, maxNotional: 12000, feeRate: 0.0015},
+			cfg:       strategy.AutoScaleConfig{Enabled: true, BalancePct: 10, MaxNotional: 12000, FeeRate: 0.0015},
 			// target = 200000 * 10/100 = 20000; capped to 12000
 			wantMin: 11900,
 			wantMax: 12100,
@@ -185,7 +202,7 @@ func TestComputeScaledNotional(t *testing.T) {
 			name:      "clamped by affordable (low balance)",
 			base:      8000,
 			available: 5000,
-			cfg:       autoScaleConfig{enabled: true, balancePct: 100, feeRate: 0.0015},
+			cfg:       strategy.AutoScaleConfig{Enabled: true, BalancePct: 100, FeeRate: 0.0015},
 			// target = 5000; affordable = 5000/1.0015 ≈ 4993
 			wantMin: 4980,
 			wantMax: 5000,
@@ -194,7 +211,7 @@ func TestComputeScaledNotional(t *testing.T) {
 			name:      "zero available returns 0",
 			base:      8000,
 			available: 0,
-			cfg:       autoScaleConfig{enabled: true, balancePct: 5},
+			cfg:       strategy.AutoScaleConfig{Enabled: true, BalancePct: 5},
 			wantMin:   0,
 			wantMax:   0,
 		},
@@ -202,7 +219,7 @@ func TestComputeScaledNotional(t *testing.T) {
 			name:      "zero base returns 0",
 			base:      0,
 			available: 100000,
-			cfg:       autoScaleConfig{enabled: true, balancePct: 5},
+			cfg:       strategy.AutoScaleConfig{Enabled: true, BalancePct: 5},
 			wantMin:   0,
 			wantMax:   0,
 		},
@@ -210,7 +227,7 @@ func TestComputeScaledNotional(t *testing.T) {
 			name:      "maxNotional=0 means no cap",
 			base:      8000,
 			available: 1000000,
-			cfg:       autoScaleConfig{enabled: true, balancePct: 10, maxNotional: 0, feeRate: 0.0015},
+			cfg:       strategy.AutoScaleConfig{Enabled: true, BalancePct: 10, MaxNotional: 0, FeeRate: 0.0015},
 			// target = 100000; affordable = 1000000/1.0015 ≈ 998500
 			wantMin: 99000,
 			wantMax: 101000,
@@ -466,37 +483,6 @@ func TestProcessSignal_SellSkippedWhenNoHoldings(t *testing.T) {
 
 	if len(trader.orders) != 0 {
 		t.Error("should skip SELL when no crypto holdings")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: getAutoScaleConfig (edge cases for balancePct clamping)
-// ---------------------------------------------------------------------------
-
-func TestGetAutoScaleConfig_InvalidBalancePctClamped(t *testing.T) {
-	tests := []struct {
-		name string
-		pct  float64
-		want float64
-	}{
-		{"zero pct falls back to default", 0, 80.0},
-		{"negative pct falls back to default", -5, 80.0},
-		{"over 100 falls back to default", 101, 80.0},
-		{"valid 5 kept", 5, 5.0},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			strat := newMockStrategy(map[string]interface{}{
-				"auto_scale_enabled":     true,
-				"auto_scale_balance_pct": tc.pct,
-			})
-			trader := &mockTrader{}
-			w := newTestWorker(t, trader, strat, true)
-			cfg := w.getAutoScaleConfig()
-			if cfg.balancePct != tc.want {
-				t.Errorf("balancePct = %v; want %v", cfg.balancePct, tc.want)
-			}
-		})
 	}
 }
 

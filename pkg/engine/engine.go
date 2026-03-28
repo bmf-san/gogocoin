@@ -131,7 +131,7 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	)
 
 	// ── 5. Strategy ───────────────────────────────────────────────────────────
-	strat, err := buildStrategy(cfg, ec.registry)
+	strat, err := buildStrategy(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to build strategy: %w", err)
 	}
@@ -258,18 +258,17 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	return nil
 }
 
-// buildStrategy creates and initializes the strategy from the registry.
-func buildStrategy(cfg *config.Config, registry *pkgstrategy.Registry) (pkgstrategy.Strategy, error) {
+// buildStrategy creates and initializes the strategy from the global registry.
+// Strategy implementations self-register via init() using strategy.Register().
+func buildStrategy(cfg *config.Config) (pkgstrategy.Strategy, error) {
 	name := cfg.Trading.Strategy.Name
 
-	strat, err := registry.Create(name)
+	strat, err := pkgstrategy.Create(name)
 	if err != nil {
 		return nil, fmt.Errorf("strategy %q not registered: %w", name, err)
 	}
 
 	// Load strategy params from config and pass them directly to Initialize.
-	// GetStrategyParams returns map[string]interface{} which is exactly what
-	// Strategy.Initialize expects, so no conversion layer is needed.
 	params, err := cfg.GetStrategyParams(name)
 	if err != nil || params == nil {
 		// No params block – start with strategy defaults.

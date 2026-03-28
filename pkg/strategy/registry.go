@@ -53,3 +53,34 @@ func (r *Registry) Names() []string {
 	}
 	return names
 }
+
+// ── Global registry ───────────────────────────────────────────────────────────
+// Strategy implementations register themselves in an init() function using
+// Register(), following the database/sql driver pattern. Callers (main.go)
+// activate a strategy with a blank import:
+//
+//	import _ "github.com/bmf-san/gogocoin/pkg/strategy/scalping"
+
+var globalRegistry = NewRegistry()
+
+// Register adds a strategy constructor to the global registry.
+// Call this from an init() function in the strategy package.
+// Panics if name is already registered.
+func Register(name string, ctor Constructor) {
+	globalRegistry.Register(name, ctor)
+}
+
+// Create returns a new Strategy instance from the global registry.
+func Create(name string) (Strategy, error) {
+	return globalRegistry.Create(name)
+}
+
+// List returns all strategy names registered in the global registry.
+func List() []string {
+	return globalRegistry.Names()
+}
+
+// Global returns the global Registry (used by the engine internals).
+func Global() *Registry {
+	return globalRegistry
+}

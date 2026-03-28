@@ -401,6 +401,29 @@ func (s *Strategy) GetStopLossPrice(entry float64) float64 {
 	return entry * (1.0 - pct/100.0)
 }
 
+// GetBaseNotional returns the configured order notional for symbol, applying
+// per-symbol overrides when available.
+func (s *Strategy) GetBaseNotional(symbol string) float64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if ov, ok := s.symbolParams[symbol]; ok && ov.OrderNotional > 0 {
+		return ov.OrderNotional
+	}
+	return s.orderNotional
+}
+
+// GetAutoScaleConfig returns the auto-scaling configuration.
+func (s *Strategy) GetAutoScaleConfig() strategy.AutoScaleConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return strategy.AutoScaleConfig{
+		Enabled:     s.autoScaleEnabled,
+		BalancePct:  s.autoScaleBalancePct,
+		MaxNotional: s.autoScaleMaxNotional,
+		FeeRate:     s.feeRate,
+	}
+}
+
 // ── internal helpers ─────────────────────────────────────────────────────────
 
 func (s *Strategy) validate() error {
