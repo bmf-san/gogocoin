@@ -660,9 +660,10 @@ func TestProcessSignal_StopLossDust_ClosesGhostPositions(t *testing.T) {
 	}
 }
 
-func TestProcessSignal_NormalSell_DoesNotClosePositions(t *testing.T) {
-	// A regular (non-stop-loss) SELL skipped due to no balance must NOT
-	// trigger ghost position cleanup.
+func TestProcessSignal_NormalSell_ClosesGhostPositions(t *testing.T) {
+	// A regular (EMA crossover) SELL skipped due to no balance must ALSO
+	// trigger ghost position cleanup so manually-closed positions don't block
+	// future BUYs.
 	log := createTestLogger(t)
 	signalCh := make(chan *strategy.Signal, 1)
 
@@ -688,11 +689,11 @@ func TestProcessSignal_NormalSell_DoesNotClosePositions(t *testing.T) {
 		Symbol:   "XRP_JPY",
 		Action:   strategy.SignalSell,
 		Price:    222.64,
-		Metadata: map[string]interface{}{}, // no "reason" = normal SELL
+		Metadata: map[string]interface{}{}, // no "reason" = normal EMA SELL
 	}
 	w.processSignal(context.Background(), sig)
 
-	if len(closer.closed) != 0 {
-		t.Errorf("normal SELL skip must not close ghost positions, got %v", closer.closed)
+	if len(closer.closed) != 1 || closer.closed[0] != "XRP_JPY:BUY" {
+		t.Errorf("EMA SELL skip must close ghost positions for symbol, got %v", closer.closed)
 	}
 }
