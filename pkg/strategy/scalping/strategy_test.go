@@ -482,3 +482,112 @@ func TestInitialize_SymbolParams(t *testing.T) {
 		t.Errorf("BTC_JPY should use global defaults: want fast=9 slow=21, got fast=%d slow=%d", fast, slow)
 	}
 }
+
+// ── Trend EMA filter ─────────────────────────────────────────────────────────
+
+func TestTrendEMAFilter_BlocksBuyInDowntrend(t *testing.T) {
+	// Build a history that starts high (so EMA(7) is high), then drops sharply.
+	// EMA(3) fast may cross above EMA(5) slow on a small bounce, but price
+	// (103) is still far below the long-term EMA(7) seeded by the earlier
+	// 200-series → BUY must be suppressed.
+	s := New(Params{
+		EMAFastPeriod:  3,
+		EMASlowPeriod:  5,
+		TrendEMAPeriod: 7,
+		TakeProfitPct:  1.0,
+		StopLossPct:    0.5,
+		CooldownSec:    0,
+		MaxDailyTrades: 1000,
+		OrderNotional:  100.0,
+		FeeRate:        0.001,
+	})
+
+	prices := []float64{200, 200, 200, 200, 200, 200, 200, 100, 100, 101, 102, 103}
+	hist := makeHistory(prices...)
+	latest := hist[len(hist)-1]
+
+	sig, err := s.GenerateSignal(context.Background(), &latest, hist)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sig.Action == strategy.SignalBuy {
+		t.Errorf("expected BUY to be blocked by trend filter, got BUY (ema_trend=%v)", sig.Metadata["ema_trend"])
+	}
+}
+
+func TestTrendEMAFilter_AllowsBuyInUptrend(t *testing.T) {
+	// Steadily rising prices: EMA(7,5,3) all converge upward, price > EMA(7).
+	// A golden cross should produce a BUY that is NOT blocked by the trend filter.
+	s := New(Params{
+		EMAFastPeriod:  3,
+		EMASlowPeriod:  5,
+		TrendEMAPeriod: 7,
+		TakeProfitPct:  1.0,
+		StopLossPct:    0.5,
+		CooldownSec:    0,
+		MaxDailyTrades: 1000,
+		OrderNotional:  100.0,
+		FeeRate:        0.001,
+	})
+
+	prices := []float64{100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110}
+	hist := makeHistory(prices...)
+	latest := hist[len(hist)-1]
+
+	sig, err := s.GenerateSignal(context.Background(), &latest, hist)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sig.Metadata["reason"] == "trend_filter" {
+		t.Errorf("BUY should be allowed in uptrend, but was blocked by trend_filter (ema_trend=%v)", sig.Metadata["ema_trend"])
+	}
+}
+
+func TestTrendEMAFilter_Disabled_WhenZero(t *testing.T) {
+	// TrendEMAPeriod=0 → filter disabled; trend_filter reason must never appear.
+	s := New(Params{
+		EMAFastPeriod:  3,
+		EMASlowPeriod:  5,
+		TrendEMAPeriod: 0,
+		TakeProfitPct:  1.0,
+		StopLossPct:    0.5,
+		CooldownSec:    0,
+		MaxDailyTrades: 1000,
+		OrderNotional:  100.0,
+		FeeRate:        0.001,
+	})
+
+	prices := []float64{200, 200, 200, 200, 200, 200, 200, 100, 100, 101, 102, 103}
+	hist := makeHistory(prices...)
+	latest := hist[len(hist)-1]
+
+	sig, err := s.GenerateSignal(context.Background(), &latest, hist)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if reason, _ := sig.Metadata["reason"].(string); reason == "trend_filter" {
+		t.Error("trend_filter should be disabled when TrendEMAPeriod=0")
+	}
+}
+
+func TestTrendEMAFilter_Initialize_RoundTrip(t *testing.T) {
+	s := newTestStrategy()
+	err := s.Initialize(map[string]interface{}{
+		"ema_fast_period":  3,
+		"ema_slow_period":  5,
+		"trend_ema_period": 50,
+		"take_profit_pct":  1.0,
+		"stop_loss_pct":    0.5,
+		"cooldown_sec":     0,
+		"max_daily_trades": 1000,
+		"order_notional":   100.0,
+		"fee_rate":         0.001,
+	})
+	if err != nil {
+		t.Fatalf("Initialize error: %v", err)
+	}
+	cfg := s.GetConfig()
+	if got, ok := cfg["trend_ema_period"].(int); !ok || got != 50 {
+		t.Errorf("GetConfig trend_ema_period: want 50, got %v", cfg["trend_ema_period"])
+	}
+}

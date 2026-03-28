@@ -314,6 +314,7 @@ func strategyParamsToMap(name string, params interface{}) (map[string]interface{
 		return map[string]interface{}{
 			"ema_fast_period":         cp.EMAFastPeriod,
 			"ema_slow_period":         cp.EMASlowPeriod,
+			"trend_ema_period":        cp.TrendEMAPeriod,
 			"take_profit_pct":         cp.TakeProfitPct,
 			"stop_loss_pct":           cp.StopLossPct,
 			"cooldown_sec":            cp.CooldownSec,
