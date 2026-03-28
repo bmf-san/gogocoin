@@ -29,6 +29,20 @@ func (m *mockStrategyWithConfig) GetConfig() map[string]any {
 	return m.cfg
 }
 
+func (m *mockStrategyWithConfig) GetStopLossPrice(entry float64) float64 {
+	if v, ok := m.cfg["stop_loss_pct"].(float64); ok && v > 0 {
+		return entry * (1.0 - v/100.0)
+	}
+	return 0
+}
+
+func (m *mockStrategyWithConfig) GetTakeProfitPrice(entry float64) float64 {
+	if v, ok := m.cfg["take_profit_pct"].(float64); ok && v > 0 {
+		return entry * (1.0 + v/100.0)
+	}
+	return 0
+}
+
 func (m *mockStrategyWithConfig) Analyze(data []strategy.MarketData) (*strategy.Signal, error) {
 	return &strategy.Signal{
 		Symbol: "XRP_JPY",
@@ -178,20 +192,6 @@ func TestCheckStopLoss_PartialPosition_Triggered(t *testing.T) {
 	}
 	if got.Metadata["reason"] != "stop_loss" {
 		t.Fatalf("expected reason=stop_loss, got %v", got.Metadata["reason"])
-	}
-}
-
-func TestGetStopLossPct_NotConfigured(t *testing.T) {
-	w := newTestStrategyWorker(t, map[string]any{})
-	if pct := w.getStopLossPct(); pct != 0 {
-		t.Fatalf("expected 0 when stop_loss_pct not in config, got %v", pct)
-	}
-}
-
-func TestGetStopLossPct_Configured(t *testing.T) {
-	w := newTestStrategyWorker(t, map[string]any{"stop_loss_pct": 2.5})
-	if pct := w.getStopLossPct(); pct != 2.5 {
-		t.Fatalf("expected 2.5, got %v", pct)
 	}
 }
 

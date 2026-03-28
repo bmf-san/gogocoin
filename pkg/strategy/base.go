@@ -77,6 +77,24 @@ func (bs *BaseStrategy) RecordTrade() {}
 // InitializeDailyTradeCount is a no-op default; override in concrete strategies.
 func (bs *BaseStrategy) InitializeDailyTradeCount(_ int) {}
 
+// GetStopLossPrice returns 0 by default (stop-loss disabled).
+// Override in concrete strategies that support stop-loss.
+func (bs *BaseStrategy) GetStopLossPrice(_ float64) float64 { return 0 }
+
+// GetTakeProfitPrice returns 0 by default (take-profit disabled).
+// Override in concrete strategies that support take-profit.
+func (bs *BaseStrategy) GetTakeProfitPrice(_ float64) float64 { return 0 }
+
+// GetBaseNotional returns 0 by default.
+// Override in concrete strategies to provide the configured order size.
+func (bs *BaseStrategy) GetBaseNotional(_ string) float64 { return 0 }
+
+// GetAutoScaleConfig returns a disabled auto-scale config by default.
+// Override in concrete strategies that support auto-scaling.
+func (bs *BaseStrategy) GetAutoScaleConfig() AutoScaleConfig {
+	return AutoScaleConfig{Enabled: false, BalancePct: 80.0}
+}
+
 // UpdateSignalCount updates the signal accounting in StrategyStatus.
 func (bs *BaseStrategy) UpdateSignalCount(action SignalAction) {
 	bs.status.TotalSignals++

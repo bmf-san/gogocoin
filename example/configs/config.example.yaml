@@ -1,0 +1,73 @@
+# gogocoin Example Configuration
+# Copy this file to config.yaml and fill in your API credentials:
+#   export BITFLYER_API_KEY="your_key"
+#   export BITFLYER_API_SECRET="your_secret"
+
+app:
+  name: "gogocoin-example"
+
+api:
+  endpoint: "https://api.bitflyer.com"
+  websocket_endpoint: "wss://ws.lightstream.bitflyer.com/json-rpc"
+  credentials:
+    api_key: ${BITFLYER_API_KEY}
+    api_secret: ${BITFLYER_API_SECRET}
+  timeout: 30s
+  retry_count: 3
+  rate_limit:
+    requests_per_minute: 50
+
+trading:
+  initial_balance: 1000
+  fee_rate: 0.0015
+  symbols:
+    - "XRP_JPY"
+  strategy:
+    name: "scalping"
+  risk_management:
+    max_total_loss_percent: 50.0
+    max_trade_loss_percent: 10.0
+    max_daily_loss_percent: 30.0
+    max_trade_amount_percent: 80.0
+    max_daily_trades: 100
+    min_trade_interval: 60s
+    max_open_positions_per_symbol: 1
+
+strategy_params:
+  scalping:
+    ema_fast_period: 9
+    ema_slow_period: 21
+    trend_ema_period: 0     # 0 = disabled; set e.g. 50 to filter buys in downtrends
+    take_profit_pct: 1.5
+    stop_loss_pct: 1.0
+    cooldown_sec: 90
+    max_daily_trades: 3
+    order_notional: 1000
+    rsi_period: 0           # 0 = disabled; set e.g. 14 to enable RSI filter
+    rsi_overbought: 70.0
+    rsi_oversold: 30.0
+
+data:
+  market_data:
+    history_days: 365
+
+ui:
+  host: "0.0.0.0"
+  port: 8080
+
+logging:
+  level: "info"
+  format: "json"
+  output: "both"
+  file_path: "./logs/gogocoin.log"
+  max_size_mb: 50
+  max_backups: 3
+  max_age_days: 7
+  categories:
+    trading: "debug"
+    api: "info"
+    strategy: "debug"
+    ui: "info"
+
+data_retention:
+  retention_days: 1

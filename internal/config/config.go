@@ -75,44 +75,10 @@ type RiskManagementConfig struct {
 	MaxOpenPositionsPerSymbol    int     `yaml:"max_open_positions_per_symbol"` // 0 = unlimited
 }
 
-// StrategyParams represents strategy-specific parameters
-type StrategyParams struct {
-	Scalping ScalpingParams `yaml:"scalping"`
-}
-
-// ScalpingParams represents scalping strategy parameters
-type ScalpingParams struct {
-	EMAFastPeriod  int     `yaml:"ema_fast_period"`
-	EMASlowPeriod  int     `yaml:"ema_slow_period"`
-	// TrendEMAPeriod is the long-term EMA used as a trend direction filter.
-	// BUY signals are suppressed when price < EMA(TrendEMAPeriod). 0 = disabled.
-	TrendEMAPeriod int     `yaml:"trend_ema_period"`
-	TakeProfitPct  float64 `yaml:"take_profit_pct"`
-	StopLossPct    float64 `yaml:"stop_loss_pct"`
-	CooldownSec    int     `yaml:"cooldown_sec"`
-	MaxDailyTrades int     `yaml:"max_daily_trades"`
-	OrderNotional  float64 `yaml:"order_notional"`
-	// Auto-scale buy order notional by current JPY balance.
-	AutoScaleEnabled     bool    `yaml:"auto_scale_enabled"`
-	AutoScaleBalancePct  float64 `yaml:"auto_scale_balance_pct"`
-	AutoScaleMaxNotional float64 `yaml:"auto_scale_max_notional"`
-	FeeRate              float64 `yaml:"fee_rate"`
-	// RSI filter (0 = disabled)
-	RSIPeriod     int     `yaml:"rsi_period"`
-	RSIOverbought float64 `yaml:"rsi_overbought"`
-	RSIOversold   float64 `yaml:"rsi_oversold"`
-	// Per-symbol parameter overrides
-	SymbolParams map[string]ScalpingSymbolOverride `yaml:"symbol_params"`
-}
-
-// ScalpingSymbolOverride holds per-symbol overrides for the scalping strategy.
-// Zero values mean "use the global default".
-type ScalpingSymbolOverride struct {
-	EMAFastPeriod int     `yaml:"ema_fast_period"`
-	EMASlowPeriod int     `yaml:"ema_slow_period"`
-	CooldownSec   int     `yaml:"cooldown_sec"`
-	OrderNotional float64 `yaml:"order_notional"`
-}
+// StrategyParams holds strategy-specific parameters keyed by strategy name.
+// Values are free-form maps so that the config package stays decoupled from
+// any individual strategy implementation.
+type StrategyParams map[string]map[string]interface{}
 
 // DataConfig represents data management settings
 type DataConfig struct {
@@ -316,14 +282,17 @@ func expandEnvVars(s string) string {
 	return os.Expand(s, os.Getenv)
 }
 
-// GetStrategyParams returns parameters for the specified strategy
-func (c *Config) GetStrategyParams(strategyName string) (interface{}, error) {
-	switch strategyName {
-	case "scalping":
-		return c.StrategyParams.Scalping, nil
-	default:
+// GetStrategyParams returns the raw parameter map for the specified strategy.
+// Returns an error when no entry exists for that strategy name.
+func (c *Config) GetStrategyParams(strategyName string) (map[string]interface{}, error) {
+	if c.StrategyParams == nil {
+		return nil, fmt.Errorf("no strategy_params configured")
+	}
+	params, ok := c.StrategyParams[strategyName]
+	if !ok {
 		return nil, fmt.Errorf("unknown strategy: %s", strategyName)
 	}
+	return params, nil
 }
 
 // String returns a string representation of the configuration (masks sensitive information)

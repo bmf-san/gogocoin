@@ -12,6 +12,7 @@ import (
 
 	"github.com/bmf-san/gogocoin/internal/config"
 	"github.com/bmf-san/gogocoin/internal/domain"
+	pkgstrategy "github.com/bmf-san/gogocoin/pkg/strategy"
 )
 
 // customConfigResponse returns the full application config as JSON,
@@ -156,7 +157,7 @@ func (s *Server) PostApiConfig(ctx context.Context, request PostApiConfigRequest
 
 	if req.Strategy != nil && req.Strategy.Name != nil {
 		name := string(*req.Strategy.Name)
-		allowedStrategies := []string{"scalping", "simple"}
+		allowedStrategies := pkgstrategy.List()
 		if err := validateStringParam(name, allowedStrategies); err != nil {
 			msg := fmt.Sprintf("Invalid strategy name: %v", err)
 			return PostApiConfig400JSONResponse{BadRequestJSONResponse{Message: &msg}}, nil

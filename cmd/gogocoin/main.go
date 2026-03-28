@@ -8,8 +8,6 @@ import (
 	"syscall"
 
 	"github.com/bmf-san/gogocoin/pkg/engine"
-	pkgstrategy "github.com/bmf-san/gogocoin/pkg/strategy"
-	pkgscalping "github.com/bmf-san/gogocoin/pkg/strategy/scalping"
 )
 
 func main() {
@@ -24,9 +22,6 @@ func main() {
 	go func() {
 		defer close(done)
 		err := engine.Run(ctx,
-			engine.WithStrategy("scalping", func() pkgstrategy.Strategy {
-				return pkgscalping.NewDefault()
-			}),
 			engine.WithConfigPath("./configs/config.yaml"),
 		)
 		if err != nil {

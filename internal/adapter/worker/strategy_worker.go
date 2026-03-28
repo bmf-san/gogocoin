@@ -277,12 +277,7 @@ func (w *StrategyWorker) SetPositionReader(r PositionReader) {
 // stop-loss threshold of any open BUY position for the symbol. Returns nil when
 // stop-loss is not triggered or no position reader is configured.
 func (w *StrategyWorker) checkStopLoss(symbol string, currentPrice float64) *strategy.Signal {
-	if w.positionReader == nil {
-		return nil
-	}
-
-	stopLossPct := w.getStopLossPct()
-	if stopLossPct <= 0 {
+	if w.positionReader == nil || w.strategy == nil {
 		return nil
 	}
 
@@ -297,14 +292,16 @@ func (w *StrategyWorker) checkStopLoss(symbol string, currentPrice float64) *str
 		if pos.EntryPrice <= 0 {
 			continue
 		}
-		stopPrice := pos.EntryPrice * (1.0 - stopLossPct/100.0)
+		stopPrice := w.strategy.GetStopLossPrice(pos.EntryPrice)
+		if stopPrice <= 0 {
+			continue
+		}
 		if currentPrice <= stopPrice {
 			w.logger.Trading().
 				WithField("symbol", symbol).
 				WithField("entry_price", pos.EntryPrice).
 				WithField("current_price", currentPrice).
 				WithField("stop_price", stopPrice).
-				WithField("stop_loss_pct", stopLossPct).
 				Warn("Stop loss triggered — injecting SELL signal")
 			return &strategy.Signal{
 				Symbol:    symbol,
@@ -313,10 +310,9 @@ func (w *StrategyWorker) checkStopLoss(symbol string, currentPrice float64) *str
 				Price:     currentPrice,
 				Timestamp: time.Now(),
 				Metadata: map[string]interface{}{
-					"reason":       "stop_loss",
-					"entry_price":  pos.EntryPrice,
-					"stop_price":   stopPrice,
-					"stop_loss_pct": stopLossPct,
+					"reason":      "stop_loss",
+					"entry_price": pos.EntryPrice,
+					"stop_price":  stopPrice,
 				},
 			}
 		}
@@ -324,28 +320,11 @@ func (w *StrategyWorker) checkStopLoss(symbol string, currentPrice float64) *str
 	return nil
 }
 
-// getStopLossPct reads stop_loss_pct from the strategy configuration.
-// Returns 0 when not configured or invalid.
-func (w *StrategyWorker) getStopLossPct() float64 {
-	if w.strategy == nil {
-		return 0
-	}
-	if v, ok := asFloat(w.strategy.GetConfig()["stop_loss_pct"]); ok && v > 0 {
-		return v
-	}
-	return 0
-}
-
 // checkTakeProfit returns a SELL signal when the current price has risen above the
 // take-profit threshold of any open BUY position for the symbol. Returns nil when
 // take-profit is not triggered or no position reader is configured.
 func (w *StrategyWorker) checkTakeProfit(symbol string, currentPrice float64) *strategy.Signal {
-	if w.positionReader == nil {
-		return nil
-	}
-
-	takeProfitPct := w.getTakeProfitPct()
-	if takeProfitPct <= 0 {
+	if w.positionReader == nil || w.strategy == nil {
 		return nil
 	}
 
@@ -360,14 +339,16 @@ func (w *StrategyWorker) checkTakeProfit(symbol string, currentPrice float64) *s
 		if pos.EntryPrice <= 0 {
 			continue
 		}
-		takePrice := pos.EntryPrice * (1.0 + takeProfitPct/100.0)
+		takePrice := w.strategy.GetTakeProfitPrice(pos.EntryPrice)
+		if takePrice <= 0 {
+			continue
+		}
 		if currentPrice >= takePrice {
 			w.logger.Trading().
 				WithField("symbol", symbol).
 				WithField("entry_price", pos.EntryPrice).
 				WithField("current_price", currentPrice).
 				WithField("take_price", takePrice).
-				WithField("take_profit_pct", takeProfitPct).
 				Info("Take profit triggered — injecting SELL signal")
 			return &strategy.Signal{
 				Symbol:    symbol,
@@ -376,27 +357,14 @@ func (w *StrategyWorker) checkTakeProfit(symbol string, currentPrice float64) *s
 				Price:     currentPrice,
 				Timestamp: time.Now(),
 				Metadata: map[string]interface{}{
-					"reason":          "take_profit",
-					"entry_price":     pos.EntryPrice,
-					"take_price":      takePrice,
-					"take_profit_pct": takeProfitPct,
+					"reason":      "take_profit",
+					"entry_price": pos.EntryPrice,
+					"take_price":  takePrice,
 				},
 			}
 		}
 	}
 	return nil
-}
-
-// getTakeProfitPct reads take_profit_pct from the strategy configuration.
-// Returns 0 when not configured or invalid.
-func (w *StrategyWorker) getTakeProfitPct() float64 {
-	if w.strategy == nil {
-		return 0
-	}
-	if v, ok := asFloat(w.strategy.GetConfig()["take_profit_pct"]); ok && v > 0 {
-		return v
-	}
-	return 0
 }
 
 // executeStrategy executes the strategy

@@ -96,6 +96,11 @@ func (m *mockStrategy) Reset() error {
 	return nil
 }
 
+func (m *mockStrategy) GetStopLossPrice(_ float64) float64              { return 0 }
+func (m *mockStrategy) GetTakeProfitPrice(_ float64) float64            { return 0 }
+func (m *mockStrategy) GetBaseNotional(_ string) float64                { return 0 }
+func (m *mockStrategy) GetAutoScaleConfig() strategy.AutoScaleConfig   { return strategy.AutoScaleConfig{} }
+
 func TestStrategyMonitorWorker_Creation(t *testing.T) {
 	cfg := &logger.Config{
 		Level:  "info",

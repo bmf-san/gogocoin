@@ -11,13 +11,6 @@ import (
 	strategy "github.com/bmf-san/gogocoin/pkg/strategy"
 )
 
-type autoScaleConfig struct {
-	enabled     bool
-	balancePct  float64
-	maxNotional float64
-	feeRate     float64
-}
-
 // SignalWorker processes trading signals and executes trades
 type SignalWorker struct {
 	logger               logger.LoggerInterface
@@ -242,8 +235,8 @@ func (w *SignalWorker) applyAutoScaleToBuySignal(ctx context.Context, signal *st
 		return false
 	}
 
-	cfg := w.getAutoScaleConfig()
-	if !cfg.enabled {
+	cfg := w.currentStrategy.GetAutoScaleConfig()
+	if !cfg.Enabled {
 		return true
 	}
 
@@ -256,6 +249,7 @@ func (w *SignalWorker) applyAutoScaleToBuySignal(ctx context.Context, signal *st
 
 	baseNotional := signal.Price * signal.Quantity
 	effectiveNotional := computeScaledNotional(baseNotional, availableJPY, cfg)
+
 	if effectiveNotional < baseNotional {
 		w.logger.Trading().
 			WithField("symbol", signal.Symbol).
@@ -285,27 +279,28 @@ func (w *SignalWorker) applyAutoScaleToBuySignal(ctx context.Context, signal *st
 	return true
 }
 
-func computeScaledNotional(baseNotional, availableJPY float64, cfg autoScaleConfig) float64 {
+func computeScaledNotional(baseNotional, availableJPY float64, cfg strategy.AutoScaleConfig) float64 {
 	if baseNotional <= 0 || availableJPY <= 0 {
 		return 0
 	}
 
 	effective := baseNotional
-	if cfg.enabled {
-		target := availableJPY * cfg.balancePct / 100.0
+	if cfg.Enabled {
+		target := availableJPY * cfg.BalancePct / 100.0
 		if target > effective {
 			effective = target
 		}
 	}
 
-	if cfg.maxNotional > 0 && effective > cfg.maxNotional {
-		effective = cfg.maxNotional
+	if cfg.MaxNotional > 0 && effective > cfg.MaxNotional {
+		effective = cfg.MaxNotional
 	}
 
-	if cfg.feeRate < 0 {
-		cfg.feeRate = 0
+	feeRate := cfg.FeeRate
+	if feeRate < 0 {
+		feeRate = 0
 	}
-	affordable := availableJPY / (1.0 + cfg.feeRate)
+	affordable := availableJPY / (1.0 + feeRate)
 	if effective > affordable {
 		effective = affordable
 	}
@@ -314,54 +309,6 @@ func computeScaledNotional(baseNotional, availableJPY float64, cfg autoScaleConf
 		return 0
 	}
 	return effective
-}
-
-func (w *SignalWorker) getAutoScaleConfig() autoScaleConfig {
-	cfg := autoScaleConfig{enabled: false, balancePct: 80.0, maxNotional: 0, feeRate: 0}
-	if w.currentStrategy == nil {
-		return cfg
-	}
-
-	raw := w.currentStrategy.GetConfig()
-	if v, ok := asBool(raw["auto_scale_enabled"]); ok {
-		cfg.enabled = v
-	}
-	if v, ok := asFloat(raw["auto_scale_balance_pct"]); ok {
-		cfg.balancePct = v
-	}
-	if cfg.balancePct <= 0 || cfg.balancePct > 100 {
-		cfg.balancePct = 80.0
-	}
-	if v, ok := asFloat(raw["auto_scale_max_notional"]); ok {
-		cfg.maxNotional = v
-	}
-	if v, ok := asFloat(raw["fee_rate"]); ok {
-		cfg.feeRate = v
-	}
-
-	return cfg
-}
-
-func asFloat(v interface{}) (float64, bool) {
-	switch n := v.(type) {
-	case float64:
-		return n, true
-	case float32:
-		return float64(n), true
-	case int:
-		return float64(n), true
-	case int32:
-		return float64(n), true
-	case int64:
-		return float64(n), true
-	default:
-		return 0, false
-	}
-}
-
-func asBool(v interface{}) (bool, bool) {
-	b, ok := v.(bool)
-	return b, ok
 }
 
 func (w *SignalWorker) getAvailableBalance(ctx context.Context, currency string) (float64, bool) {
