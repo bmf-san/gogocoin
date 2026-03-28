@@ -122,8 +122,8 @@ func TestValidateTradingConfig(t *testing.T) {
 			},
 		},
 		StrategyParams: StrategyParams{
-			Scalping: ScalpingParams{
-				OrderNotional: 500,
+			"scalping": {
+				"order_notional": float64(500),
 			},
 		},
 	}

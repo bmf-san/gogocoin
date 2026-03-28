@@ -267,71 +267,25 @@ func buildStrategy(cfg *config.Config, registry *pkgstrategy.Registry) (pkgstrat
 		return nil, fmt.Errorf("strategy %q not registered: %w", name, err)
 	}
 
-	// Load strategy params from config and pass them to Initialize.
-	rawParams, err := cfg.GetStrategyParams(name)
-	if err != nil || rawParams == nil {
-		// No params block – Start with strategy defaults.
+	// Load strategy params from config and pass them directly to Initialize.
+	// GetStrategyParams returns map[string]interface{} which is exactly what
+	// Strategy.Initialize expects, so no conversion layer is needed.
+	params, err := cfg.GetStrategyParams(name)
+	if err != nil || params == nil {
+		// No params block – start with strategy defaults.
 		if resetErr := strat.Reset(); resetErr != nil {
 			return nil, fmt.Errorf("failed to reset strategy: %w", resetErr)
 		}
 		return strat, nil
 	}
 
-	// Convert config struct to map[string]interface{} for Initialize.
-	initMap, err := strategyParamsToMap(name, rawParams)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert strategy params: %w", err)
-	}
-	if err := strat.Initialize(initMap); err != nil {
+	if err := strat.Initialize(params); err != nil {
 		return nil, fmt.Errorf("failed to initialize strategy: %w", err)
 	}
 	if err := strat.Reset(); err != nil {
 		return nil, fmt.Errorf("failed to reset strategy: %w", err)
 	}
 	return strat, nil
-}
-
-// strategyParamsToMap converts a typed config params struct to a
-// map[string]interface{} suitable for Strategy.Initialize.
-func strategyParamsToMap(name string, params interface{}) (map[string]interface{}, error) {
-	switch name {
-	case "scalping":
-		cp, ok := params.(config.ScalpingParams)
-		if !ok {
-			return nil, fmt.Errorf("expected config.ScalpingParams, got %T", params)
-		}
-		// Build symbol_params as map[string]map[string]interface{} so that
-		// any strategy implementation can consume it generically.
-		symParams := make(map[string]map[string]interface{}, len(cp.SymbolParams))
-		for sym, ov := range cp.SymbolParams {
-			symParams[sym] = map[string]interface{}{
-				"ema_fast_period": ov.EMAFastPeriod,
-				"ema_slow_period": ov.EMASlowPeriod,
-				"cooldown_sec":    ov.CooldownSec,
-				"order_notional":  ov.OrderNotional,
-			}
-		}
-		return map[string]interface{}{
-			"ema_fast_period":         cp.EMAFastPeriod,
-			"ema_slow_period":         cp.EMASlowPeriod,
-			"trend_ema_period":        cp.TrendEMAPeriod,
-			"take_profit_pct":         cp.TakeProfitPct,
-			"stop_loss_pct":           cp.StopLossPct,
-			"cooldown_sec":            cp.CooldownSec,
-			"max_daily_trades":        cp.MaxDailyTrades,
-			"order_notional":          cp.OrderNotional,
-			"auto_scale_enabled":      cp.AutoScaleEnabled,
-			"auto_scale_balance_pct":  cp.AutoScaleBalancePct,
-			"auto_scale_max_notional": cp.AutoScaleMaxNotional,
-			"fee_rate":                cp.FeeRate,
-			"rsi_period":              cp.RSIPeriod,
-			"rsi_overbought":          cp.RSIOverbought,
-			"rsi_oversold":            cp.RSIOversold,
-			"symbol_params":           symParams,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown strategy %q: no parameter mapping registered", name)
-	}
 }
 
 // initDailyTradeCount restores today's trade count into the strategy.

@@ -69,12 +69,17 @@ func (v *Validator) ValidateSymbol(cfg *Config, symbol string) error {
 		return fmt.Errorf("failed to load strategy params for %s: %w", strategyName, err)
 	}
 
-	scalpingParams, ok := strategyParams.(ScalpingParams)
-	if !ok {
-		return fmt.Errorf("invalid strategy params type for %s: %T", strategyName, strategyParams)
+	// order_notional may be parsed by yaml.v3 as int or float64 depending on
+	// whether the value contains a decimal point.
+	var configOrderNotionalFloat float64
+	if raw, ok := strategyParams["order_notional"]; ok {
+		switch v := raw.(type) {
+		case float64:
+			configOrderNotionalFloat = v
+		case int:
+			configOrderNotionalFloat = float64(v)
+		}
 	}
-
-	configOrderNotionalFloat := scalpingParams.OrderNotional
 	if configOrderNotionalFloat == 0 {
 		return fmt.Errorf("strategy_params.%s.order_notional must be set and positive", strategyName)
 	}
