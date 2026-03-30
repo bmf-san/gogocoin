@@ -1,36 +1,36 @@
-# 取引戦略リファレンス
+# Trading Strategy Reference
 
-## プラガブル戦略アーキテクチャ
+## Pluggable Strategy Architecture
 
-gogocoin の戦略は**プラガブル**設計になっており、`pkg/strategy.Strategy` インターフェースを実装することで独自戦略を差し込めます。
+gogocoin's strategy system is **pluggable** — implement the `pkg/strategy.Strategy` interface to inject your own trading strategy.
 
-- カスタム戦略の実装手順: [DESIGN_DOC.md § 5](DESIGN_DOC.md)
-- Strategy インターフェース定義: `pkg/strategy/strategy.go`
+- How to implement a custom strategy: [DESIGN_DOC.md § 5](DESIGN_DOC.md)
+- Strategy interface definition: `pkg/strategy/strategy.go`
 
-## 同梱戦略
+## Bundled Strategies
 
-| 戦略名 | パッケージ | 説明 |
+| Strategy Name | Package | Description |
 |---|---|---|
-| `scalping` | `pkg/strategy/scalping` | EMA クロスオーバー + RSI フィルタによるスキャルピング戦略 |
+| `scalping` | `pkg/strategy/scalping` | EMA crossover + RSI filter scalping strategy |
 
-各戦略の設定パラメータ・シグナル生成ロジックの詳細は、パッケージ内の README を参照してください:
+For detailed configuration parameters and signal generation logic for each strategy, refer to the README in the respective package:
 
 - [pkg/strategy/scalping/README.md](../pkg/strategy/scalping/README.md)
 
-## エンジンレベルのストップロス
+## Engine-Level Stop Loss
 
-ストップロスは `StrategyWorker` が毎ティックで強制適用します。戦略のシグナル出力とは独立して動作します。
+The stop loss is enforced by `StrategyWorker` on every tick, independently of the strategy's signal output.
 
-各ティックで戦略がシグナルを生成した後、`StrategyWorker` はDBからオープン中のBUYポジションを照会します。現在価格がいずれかのポジションのストップ価格以下に下落した場合、戦略の出力に関わらず `SELL` シグナルが注入されます。
+On each tick, after the strategy generates a signal, `StrategyWorker` queries open BUY positions from the DB. If the current price has fallen to or below the stop price of any position, a `SELL` signal is injected regardless of what the strategy returned.
 
 ```
 stop_price = entry_price × (1 - stop_loss_pct / 100)
 ```
 
-これにより、戦略が `HOLD` や `BUY` を返している場合でもストップロスが発火し、閾値を超えた瞬間に損失ポジションを決済します。
+This ensures the stop loss fires even when the strategy returns `HOLD` or `BUY`, closing the losing position immediately when the threshold is crossed.
 
-`stop_loss_pct` の値は戦略の設定から読み込まれます（`config.yaml` の `strategy_params.scalping.stop_loss_pct`）。`0` に設定するとストップロスチェックが無効になります。
+The `stop_loss_pct` value is read from the strategy config (`strategy_params.scalping.stop_loss_pct` in `config.yaml`). Setting it to `0` disables the stop loss check.
 
-## 免責事項
+## Disclaimer
 
-実際の取引成績は市場環境や設定により大きく変動します。過去のバックテスト結果は将来の成績を保証するものではありません。
+Actual trading results vary greatly depending on market conditions and configuration. Past backtesting results do not guarantee future performance.
