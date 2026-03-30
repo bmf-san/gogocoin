@@ -1,64 +1,64 @@
-# データ管理リファレンス
+# Data Management Reference
 
-gogocoinは軽量性を重視し、設定可能な日数分のデータのみを保持します。
+gogocoin prioritizes a lightweight footprint and retains only a configurable number of days worth of data.
 
 ---
 
-## 自動クリーンアップ
+## Automatic Cleanup
 
-### スケジュール
+### Schedule
 
-| 項目 | 内容 |
+| Item | Details |
 |---|---|
-| 実行時刻 | 毎日 00:00（深夜） |
-| 保持日数 | 設定可能（デフォルト: 1日 = 当日のみ） |
-| 削除対象 | 保持期間より古いデータ |
+| Run time | Daily at 00:00 (midnight) |
+| Retention period | Configurable (default: 1 day = current day only) |
+| Deleted records | Data older than the retention period |
 
-### クリーンアップフロー（retention_days = 1 の場合）
+### Cleanup flow (retention_days = 1)
 
 ```
-00:00（深夜）: 昨日以前のデータを自動削除
+00:00 (midnight): Data older than yesterday is automatically deleted
   ↓
-結果: DBは当日データのみ保持 → 軽量コンテナ維持
+Result: DB retains only today's data → lightweight container maintained
 ```
 
-### 保持日数の例
+### Retention period examples
 
-| retention_days | 効果 |
+| retention_days | Effect |
 |---|---|
-| `1`（デフォルト） | 当日のみ保持（最軽量） |
-| `7` | 過去1週間のデータを保持 |
-| `30` | 過去1ヶ月のデータを保持 |
+| `1` (default) | Retain current day only (lightest) |
+| `7` | Retain last 7 days of data |
+| `30` | Retain last 30 days of data |
 
-設定方法は [docs/CONFIG.md](CONFIG.md) の `data_retention` セクションを参照してください。
+See the `data_retention` section in [docs/CONFIG.md](CONFIG.md) for configuration details.
 
-### 対象テーブル
+### Affected tables
 
-以下のテーブルが `retention_days` の設定日数分保持されます。
+The following tables are retained for the number of days set by `retention_days`.
 
-| テーブル | 内容 | 削除基準カラム |
+| Table | Contents | Deletion column |
 |---|---|---|
-| `logs` | ログ（全レベル） | `timestamp` |
-| `market_data` | 市場データ | `timestamp` |
-| `balances` | 残高スナップショット | `timestamp` |
-| `trades` | 取引履歴 | `executed_at` |
-| `positions` | クローズ済みポジション（OPEN は保持） | `updated_at` |
-| `performance_metrics` | パフォーマンス指標（日次） | `date` |
+| `logs` | Logs (all levels) | `timestamp` |
+| `market_data` | Market data | `timestamp` |
+| `balances` | Balance snapshots | `timestamp` |
+| `trades` | Trade history | `executed_at` |
+| `positions` | Closed positions (OPEN positions are retained) | `updated_at` |
+| `performance_metrics` | Performance metrics (daily) | `date` |
 
-> `app_state` テーブルは固定キーの上書き更新のみ（2行）のため、クリーンアップ対象外です。
+> The `app_state` table uses fixed-key upserts (2 rows) and is not subject to cleanup.
 
-### 過去データの確認
+### Accessing historical data
 
-削除済みの取引履歴はbitFlyer管理画面から確認できます。税務申告等が必要な場合はbitFlyerからダウンロードしてください。
+Deleted trade records can be viewed from the bitFlyer dashboard. Download them from bitFlyer if needed for tax filing or other purposes.
 
 ---
 
-## 冪等性の保証
+## Idempotency Guarantees
 
-再起動しても安全に動作します。
+The system is safe to restart at any time.
 
-| 機能 | 内容 |
+| Feature | Details |
 |---|---|
-| 重複防止 | 日付ベースの実行管理でクリーンアップの二重実行を防止 |
-| missed cleanup 対応 | 起動時に未実行クリーンアップを自動実行 |
-| 状態復元 | 取引状態をDBから復元 |
+| Duplicate prevention | Date-based execution tracking prevents double-running cleanup |
+| Missed cleanup recovery | Any missed cleanup jobs are automatically run on startup |
+| State restoration | Trading state is restored from the DB on restart |

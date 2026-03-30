@@ -6,185 +6,185 @@
 [![GitHub license](https://img.shields.io/github/license/bmf-san/gogocoin)](https://github.com/bmf-san/gogocoin/blob/main/LICENSE)
 [![GitHub release](https://img.shields.io/github/release/bmf-san/gogocoin.svg)](https://github.com/bmf-san/gogocoin/releases)
 
-bitFlyer取引所向けの暗号通貨取引ボット
+Automated cryptocurrency trading bot for the bitFlyer exchange.
 
 <img src="./docs/assets/icon.png" alt="gogocoin" title="gogocoin" width="100px">
 
 This logo was created by [gopherize.me](https://gopherize.me/gopher/c3ef0a34f257bb18ea3b9b5a3ada0b1a0573e431).
 
-## 概要
+## Overview
 
-gogocoinは、bitFlyer暗号通貨取引所向けのGo言語製自動取引ボットです。EMAベースのスキャルピング戦略を使用し、設定可能な取引頻度で自動取引を実行します。
+gogocoin is an automated trading bot for the bitFlyer cryptocurrency exchange, written in Go. It executes trades using an EMA-based scalping strategy with configurable trade frequency.
 
-### 機能一覧
+### Features
 
-- **プラガブル戦略アーキテクチャ**: `pkg/strategy.Strategy` インターフェースを実装することで独自の取引戦略を差し込み可能
-- 同梱デフォルト戦略: EMAクロスオーバー + RSI フィルタによるスキャルピング戦略
-- リスク管理（利確・ストップロス・1日の取引回数制限・クールダウン）
-- WebUIによる取引の開始・停止制御
-- WebSocketによるリアルタイム市場データ取得・分析
-- WebダッシュボードによるリアルタイムモニタリングUI（`http://localhost:8080`）
-- SQLiteによるデータ永続化
-- 取引データの自動クリーンアップ（`retention_days` で保持日数を設定可能）
-- 構造化ログ（レベル別・カテゴリ別フィルタリング対応）
-- 24/7稼働対応（冪等性・再起動耐性）
+- **Pluggable strategy architecture**: Implement the `pkg/strategy.Strategy` interface to plug in your own trading strategy
+- Bundled default strategy: EMA crossover + RSI filter scalping strategy
+- Risk management (take-profit, stop-loss, daily trade limit, cooldown)
+- Web UI for starting and stopping trading
+- Real-time market data ingestion and analysis via WebSocket
+- Real-time monitoring dashboard (`http://localhost:8080`)
+- Data persistence with SQLite
+- Automatic trade data cleanup (configurable via `retention_days`)
+- Structured logging with level and category filtering
+- 24/7 operation support (idempotent, restart-safe)
 
-### スクリーンショット
+### Screenshot
 
 ![gogocoin Dashboard](./docs/assets/screenshot-dashboard.png)
 
-### 技術スタック
+### Tech Stack
 
-- **言語**: Go 1.23以上（開発環境: Go 1.25.0）
-- **依存関係**: 最小限（go-bitflyer-api-client + yaml.v3 + sqlite3のみ）
-- **アーキテクチャ**: レイヤー分離されたモジュラーアーキテクチャ
-- **公開API** (`pkg/`): `pkg/engine.Run()` + `pkg/strategy.Strategy` インターフェースにより外部リポジトリからの戦略差し込みが可能。セマンティックバージョニング対象の安定API
-- **データベース**: SQLite（軽量・埋め込み・外部DB不要）
-  - DB保持: `retention_days` で設定可能（デフォルト1日）
-  - 過去データ: bitFlyerで確認可能
-- **並行処理**: Goroutines + Channels による非同期ワーカー
-- **通信**: WebSocket（リアルタイム） + REST API（Web UI）
-- **ログ**: 標準log/slogベースの構造化ログ
-  - 高頻度ログフィルタリング（DEBUGレベル・dataカテゴリの2種類）
-  - DBインデックス最適化（timestamp DESC）
-- **パフォーマンス最適化**:
-  - バランスキャッシュ（60秒TTL、APIコール90%削減）
-  - 429エラー98%削減
-  - デッドロック防止設計
-- **デプロイ**: 埋め込みWebアセット付きシングルバイナリ
-- **品質保証**:
-  - 静的解析ツール対応（golangci-lint）
-  - 複数パッケージにわたるユニットテスト
-  - モジュラーアーキテクチャ（レイヤー分離設計）
-  - 型安全性（Go言語の型システム活用）
-  - エラーハンドリング（適切な例外処理）
+- **Language**: Go 1.23+ (development: Go 1.25.0)
+- **Dependencies**: Minimal (go-bitflyer-api-client + yaml.v3 + sqlite3 only)
+- **Architecture**: Layered modular architecture
+- **Public API** (`pkg/`): `pkg/engine.Run()` + `pkg/strategy.Strategy` interface allow strategy injection from external repositories. Stable, semantically versioned API
+- **Database**: SQLite (lightweight, embedded, no external DB required)
+  - Retention: configurable via `retention_days` (default: 1 day)
+  - Historical data: accessible via bitFlyer
+- **Concurrency**: Asynchronous workers via Goroutines + Channels
+- **Transport**: WebSocket (real-time) + REST API (Web UI)
+- **Logging**: Structured logging based on the standard `log/slog` package
+  - High-frequency log filtering (DEBUG level and `data` category)
+  - DB index optimization (`timestamp DESC`)
+- **Performance optimizations**:
+  - Balance cache (60s TTL, ~90% reduction in API calls)
+  - ~98% reduction in 429 errors
+  - Deadlock-safe design
+- **Deployment**: Single binary with embedded web assets
+- **Quality assurance**:
+  - Static analysis with golangci-lint
+  - Unit tests across multiple packages
+  - Layered modular architecture
+  - Type safety via Go's type system
+  - Proper error handling
 
-## 免責事項
+## Disclaimer
 
-**重要: 必ずお読みください**
+**Important: Please read carefully.**
 
-**このソフトウェアは情報提供および開発目的でのみ提供されており、金融アドバイスや投資判断を構成することを意図していません。暗号通貨取引は高リスクであり、投資元本を失う可能性があります。**
+**This software is provided for informational and development purposes only and does not constitute financial advice or investment recommendations. Cryptocurrency trading carries significant risk and you may lose your entire investment.**
 
-**実際の取引成績は市場環境、設定、タイミング等により大きく変動します。過去のバックテスト結果やシミュレーション結果は将来の成績を保証するものではありません。**
+**Actual trading results vary greatly depending on market conditions, configuration, and timing. Past backtesting or simulation results do not guarantee future performance.**
 
-**このソフトウェアの使用により生じるいかなる損失や損害についても、作者は一切の責任を負いません。ご自身の判断と責任において使用してください。**
+**The author accepts no responsibility for any losses or damages arising from the use of this software. Use it at your own discretion and risk.**
 
-**このライブラリはbitFlyerと一切関係ありません。使用前に各APIプロバイダーの利用規約を確認してください。**
+**This library is not affiliated with bitFlyer in any way. Please review each API provider's terms of service before use.**
 
-**このライブラリは「現状のまま」提供され、正確性、完全性、将来の互換性についていかなる保証もありません。**
+**This library is provided "as is" with no warranties regarding accuracy, completeness, or future compatibility.**
 
-## クイックスタート
+## Quick Start
 
-gogocoin には2つの使い方があります。
+gogocoin can be used in two ways.
 
-### A. ライブラリとして使う（推奨）
+### A. Use as a library (recommended)
 
-gogocoin を `go get` して自分のリポジトリに組み込む方法です。独自の取引戦略を実装して使えます。
+Install gogocoin via `go get` and integrate it into your own repository. You can implement and plug in your own trading strategy.
 
 ```bash
 go get github.com/bmf-san/gogocoin@latest
 ```
 
-`example/` ディレクトリに動作するサンプルがあります。詳細は [example ディレクトリの使い方](#example-ディレクトリの使い方) を参照してください。
+A working sample is available in the `example/` directory. See [Using the example directory](#using-the-example-directory) for details.
 
-### B. Docker で素早く試す（動作確認・開発向け）
+### B. Try quickly with Docker (for testing and development)
 
-> **注意**: この方法でビルドされるバイナリは戦略が登録されていないため、実際のトレードは行えません。動作確認・開発目的専用です。
+> **Note**: The binary built this way has no strategy registered and cannot execute real trades. It is intended for testing and development purposes only.
 
-#### 前提条件
+#### Prerequisites
 
-- Docker と Docker Compose
-- bitFlyer APIキー（[管理画面](https://bitflyer.com/ja-jp/api)で取得）
+- Docker and Docker Compose
+- bitFlyer API key (obtain from the [API settings page](https://bitflyer.com/en-jp/api))
 
-> ローカル開発（Docker なし）の場合は Go 1.25.0 以上が必要です。
+> For local development without Docker, Go 1.25.0 or higher is required.
 
-#### セットアップ
+#### Setup
 
 ```bash
-# 1. リポジトリのクローン
+# 1. Clone the repository
 git clone https://github.com/bmf-san/gogocoin.git
 cd gogocoin
 
-# 2. 環境変数の設定
+# 2. Configure environment variables
 cp .env.example .env
-# .envファイルを編集してAPIキーを設定
+# Edit .env and set your API keys
 
-# 3. 設定ファイルの作成
+# 3. Create the config file
 make init
 
-# 4. 起動
+# 4. Start
 make up
 
-# 5. Web UIにアクセス
+# 5. Open the Web UI
 open http://localhost:8080
 ```
 
-#### .envファイルの設定例
+#### Example .env file
 
 ```bash
 BITFLYER_API_KEY=your_actual_api_key_here
 BITFLYER_API_SECRET=your_actual_api_secret_here
 ```
 
-**⚠️ 注意**: このボットはライブトレードのみ対応しています。実資金を使用するため、設定を十分に確認してから使用してください。
+**⚠️ Warning**: This bot supports live trading only. It uses real funds — review your configuration carefully before use.
 
-#### コンテナ管理
+#### Container management
 
 ```bash
-make logs     # ログ確認
-make down     # 停止
-make restart  # 再起動
-make rebuild  # 再ビルド
+make logs     # View logs
+make down     # Stop
+make restart  # Restart
+make rebuild  # Rebuild
 ```
 
-## example ディレクトリの使い方
+## Using the example directory
 
-`example/` は gogocoin をライブラリとして使う際の完全な動作サンプルです。独自リポジトリを作る際の出発点として使えます。
+`example/` is a fully working sample showing how to use gogocoin as a library. It serves as a starting point for building your own repository.
 
-### 構成
+### Structure
 
 ```
 example/
 ├── cmd/
-│   └── main.go                  # エントリーポイント (blank import で戦略登録)
+│   └── main.go                  # Entry point (registers strategy via blank import)
 ├── strategy/scalping/
-│   ├── params.go                # 戦略パラメータ定義
-│   ├── strategy.go              # 戦略実装 (EMA + RSI + クールダウン)
-│   └── register.go              # init() による自動登録
+│   ├── params.go                # Strategy parameter definitions
+│   ├── strategy.go              # Strategy implementation (EMA + RSI + cooldown)
+│   └── register.go              # Auto-registration via init()
 ├── configs/
-│   └── config.example.yaml      # 設定ファイルのテンプレート
-├── go.mod                       # 独立した Go モジュール
-└── Makefile                     # build / run ショートカット
+│   └── config.example.yaml      # Config file template
+├── go.mod                       # Independent Go module
+└── Makefile                     # build / run shortcuts
 ```
 
-### 動かし方
+### Running the example
 
 ```bash
 cd example
 
-# 1. 設定ファイルを作成
+# 1. Create the config file
 cp configs/config.example.yaml configs/config.yaml
-# configs/config.yaml を編集して API キーを設定
+# Edit configs/config.yaml and set your API keys
 
-# 2. 実行
+# 2. Run
 export BITFLYER_API_KEY=your_key
 export BITFLYER_API_SECRET=your_secret
 make run
-# または: go run ./cmd/
+# or: go run ./cmd/
 ```
 
-### 独自リポジトリへの移植
+### Adapting to your own repository
 
-`example/` をそのままコピーして自分のリポジトリとして使うか、以下のパターンを参考に実装してください。
+Copy `example/` as-is to use as your own repository, or follow the pattern below.
 
-**1. `go.mod` を作成**
+**1. Create `go.mod`**
 
 ```bash
 go mod init github.com/yourname/your-bot
 go get github.com/bmf-san/gogocoin@latest
 ```
 
-**2. 戦略を実装して `init()` で登録**
+**2. Implement your strategy and register it via `init()`**
 
 ```go
 // strategy/scalping/register.go
@@ -199,12 +199,12 @@ func init() {
 }
 ```
 
-**3. `main.go` で blank import**
+**3. Blank import in `main.go`**
 
 ```go
 import (
     "github.com/bmf-san/gogocoin/pkg/engine"
-    _ "github.com/yourname/your-bot/strategy/scalping" // init() を呼ぶ
+    _ "github.com/yourname/your-bot/strategy/scalping" // triggers init()
 )
 
 func main() {
@@ -212,85 +212,85 @@ func main() {
 }
 ```
 
-> 参考実装: [bmf-san/my-gogocoin](https://github.com/bmf-san/my-gogocoin)
+> Reference implementation: [bmf-san/my-gogocoin](https://github.com/bmf-san/my-gogocoin)
 
-## ドキュメント
+## Documentation
 
-| ドキュメント | 内容 |
+| Document | Description |
 |---|---|
-| [docs/CONFIG.md](docs/CONFIG.md) | 設定リファレンス |
-| [docs/STRATEGY.md](docs/STRATEGY.md) | 取引戦略リファレンス（プラガブルアーキテクチャ概要・同梱戦略一覧） |
-| [docs/DESIGN_DOC.md](docs/DESIGN_DOC.md) | アーキテクチャ設計ドキュメント（**カスタム戦略の実装方法** § 5） |
-| [docs/DATA_MANAGEMENT.md](docs/DATA_MANAGEMENT.md) | データ管理リファレンス |
-| [docs/openapi.yaml](docs/openapi.yaml) | API仕様（OpenAPI 3.1） |
+| [docs/CONFIG.md](docs/CONFIG.md) | Configuration reference |
+| [docs/STRATEGY.md](docs/STRATEGY.md) | Trading strategy reference (pluggable architecture overview and bundled strategies) |
+| [docs/DESIGN_DOC.md](docs/DESIGN_DOC.md) | Architecture design document (**how to implement a custom strategy** § 5) |
+| [docs/DATA_MANAGEMENT.md](docs/DATA_MANAGEMENT.md) | Data management reference |
+| [docs/openapi.yaml](docs/openapi.yaml) | API specification (OpenAPI 3.1) |
 
 ## Web UI
 
-ブラウザで取引状況をリアルタイム監視できます: `http://localhost:8080`
+Monitor trading activity in real time in your browser: `http://localhost:8080`
 
-取引の開始・停止もWeb UIから操作できます。
+You can also start and stop trading from the Web UI.
 
-## 運用
+## Operations
 
-### 推奨運用
+### Recommended practices
 
-1. Docker volume で `./data/` を永続化（設定済み）
-2. 週1回程度の再起動で安定性向上
-3. ログレベルは `info` を推奨（`debug` は開発時のみ）
+1. Persist `./data/` via a Docker volume (already configured)
+2. Restart roughly once a week for stability
+3. Use log level `info` in production (`debug` for development only)
 
-### トラブルシューティング
+### Troubleshooting
 
-- ログ確認: `make logs` または `docker compose logs -f`
-- DB状態確認: `ls -lh ./data/gogocoin.db`
-- コンテナ再起動: `make restart`
+- View logs: `make logs` or `docker compose logs -f`
+- Check DB: `ls -lh ./data/gogocoin.db`
+- Restart container: `make restart`
 
-## 開発
+## Development
 
-### ローカル開発
+### Local development
 
 ```bash
-# 依存関係インストール
+# Install dependencies
 make deps
 
-# 開発ツールインストール（golangci-lint・oapi-codegen 等）
+# Install dev tools (golangci-lint, oapi-codegen, etc.)
 make install-tools
 
-# テスト実行
+# Run tests
 make test
 
-# カバレッジ確認
+# Check coverage
 make test-coverage
 
-# コードフォーマット
+# Format code
 make fmt
 
-# リンター実行
+# Run linter
 make lint
 
-# Docker経由で実行
+# Run via Docker
 make up
 
 ```
 
-### API コード生成
+### API code generation
 
-`docs/openapi.yaml` を変更した場合は、`oapi-codegen` でコードを再生成してコミットしてください。
+When you modify `docs/openapi.yaml`, regenerate the code with `oapi-codegen` and commit it.
 
 ```bash
-# api.gen.go を再生成
+# Regenerate api.gen.go
 make generate
 
 ```
 
-> `internal/api/api.gen.go` は自動生成ファイルです。直接編集せず、必ず `make generate` 経由で更新してください。
-> CI の `codegen` ジョブが spec と生成コードの同期を検証します。
+> `internal/api/api.gen.go` is an auto-generated file. Do not edit it directly — always update it via `make generate`.
+> The CI `codegen` job verifies that the spec and generated code are in sync.
 
-## 関連
+## Related
 
-- [example/](example/) — gogocoin をライブラリとして使う動作サンプル（このリポジトリ内）
-- [bmf-san/my-gogocoin](https://github.com/bmf-san/my-gogocoin) — gogocoin を使った実際の運用リポジトリ例
-- [gogocoin-vps-template](https://github.com/bmf-san/gogocoin-vps-template) — VPS（ConoHa 等）に systemd + GitHub Actions でデプロイする運用構成のテンプレート
+- [example/](example/) — Working sample for using gogocoin as a library (in this repository)
+- [bmf-san/my-gogocoin](https://github.com/bmf-san/my-gogocoin) — Example production repository using gogocoin
+- [gogocoin-vps-template](https://github.com/bmf-san/gogocoin-vps-template) — Template for deploying to a VPS (ConoHa, etc.) with systemd + GitHub Actions
 
-## コントリビューション
+## Contributing
 
-[CONTRIBUTING.md](.github/CONTRIBUTING.md) を参照してください。
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md).

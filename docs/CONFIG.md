@@ -1,9 +1,9 @@
-# 設定リファレンス
+# Configuration Reference
 
-設定ファイルは `configs/config.yaml`（`configs/config.example.yaml` からコピーして作成）で管理します。
-APIキーは `.env` ファイルで環境変数として設定します。
+The configuration file is managed at `configs/config.yaml` (copy from `configs/config.example.yaml`).
+API keys are set as environment variables in the `.env` file.
 
-## APIキー（.env）
+## API Keys (.env)
 
 ```bash
 BITFLYER_API_KEY=your_api_key_here
@@ -14,119 +14,119 @@ BITFLYER_API_SECRET=your_api_secret_here
 
 ## app
 
-| キー | デフォルト | 説明 |
+| Key | Default | Description |
 |---|---|---|
-| `app.name` | `"gogocoin"` | アプリケーション名 |
+| `app.name` | `"gogocoin"` | Application name |
 
 ---
 
 ## api
 
-| キー | デフォルト | 説明 |
+| Key | Default | Description |
 |---|---|---|
-| `api.endpoint` | `https://api.bitflyer.com` | bitFlyer REST API エンドポイント |
-| `api.websocket_endpoint` | `wss://ws.lightstream.bitflyer.com/json-rpc` | bitFlyer WebSocket エンドポイント |
-| `api.credentials.api_key` | `${BITFLYER_API_KEY}` | APIキー（環境変数から注入） |
-| `api.credentials.api_secret` | `${BITFLYER_API_SECRET}` | APIシークレット（環境変数から注入） |
-| `api.timeout` | `30s` | APIリクエストタイムアウト |
-| `api.retry_count` | `3` | リトライ回数 |
-| `api.rate_limit.requests_per_minute` | `50` | 1分あたりのAPIリクエスト上限 |
+| `api.endpoint` | `https://api.bitflyer.com` | bitFlyer REST API endpoint |
+| `api.websocket_endpoint` | `wss://ws.lightstream.bitflyer.com/json-rpc` | bitFlyer WebSocket endpoint |
+| `api.credentials.api_key` | `${BITFLYER_API_KEY}` | API key (injected from environment variable) |
+| `api.credentials.api_secret` | `${BITFLYER_API_SECRET}` | API secret (injected from environment variable) |
+| `api.timeout` | `30s` | API request timeout |
+| `api.retry_count` | `3` | Number of retries |
+| `api.rate_limit.requests_per_minute` | `50` | Maximum API requests per minute |
 
 ---
 
 ## trading
 
-| キー | デフォルト | 説明 |
+| Key | Default | Description |
 |---|---|---|
-| `trading.initial_balance` | `1000` | 初期資金（JPY）。リスク計算の基準値 |
-| `trading.fee_rate` | `0.0015` | 取引手数料率（0.15%） |
-| `trading.symbols` | `["XRP_JPY"]` | 取引対象の通貨ペア。少額取引には XRP_JPY を推奨 |
-| `trading.strategy.name` | `"scalping"` | 使用する戦略名 |
+| `trading.initial_balance` | `1000` | Initial balance (JPY). Used as base for risk calculations |
+| `trading.fee_rate` | `0.0015` | Trading fee rate (0.15%) |
+| `trading.symbols` | `["XRP_JPY"]` | Trading pairs. XRP_JPY is recommended for small-amount trading |
+| `trading.strategy.name` | `"scalping"` | Name of the strategy to use |
 
-> 起動時の設定検証は fail-fast です。`trading.symbols` に未知シンボルを指定するとエラーで起動停止します。
+> Config validation at startup is fail-fast. Specifying an unknown symbol in `trading.symbols` will cause an error and prevent startup.
 
 ### trading.risk_management
 
-| キー | デフォルト | 説明 |
+| Key | Default | Description |
 |---|---|---|
-| `max_total_loss_percent` | `50.0` | 累計損失の上限（初期資金に対する%）。超えると取引停止 |
-| `max_trade_loss_percent` | `10.0` | 1回の取引での最大損失（%） |
-| `max_daily_loss_percent` | `30.0` | 1日の損失上限（%） |
-| `max_trade_amount_percent` | `80.0` | 1回の取引で使用できる残高の上限（%） |
-| `max_daily_trades` | `100` | 1日の最大取引回数（リスク管理上限） |
-| `min_trade_interval` | `60s` | 取引間の最小インターバル |
+| `max_total_loss_percent` | `50.0` | Maximum cumulative loss limit (% of initial balance). Trading stops when exceeded |
+| `max_trade_loss_percent` | `10.0` | Maximum loss per trade (%) |
+| `max_daily_loss_percent` | `30.0` | Daily loss limit (%) |
+| `max_trade_amount_percent` | `80.0` | Maximum percentage of balance that can be used in a single trade (%) |
+| `max_daily_trades` | `100` | Maximum number of trades per day (risk management upper bound) |
+| `min_trade_interval` | `60s` | Minimum interval between trades |
 
-> `max_daily_trades` はリスク管理の上限値です。実際の取引頻度は各戦略の `max_daily_trades` で制御します。
+> `max_daily_trades` is the risk management upper bound. Actual trade frequency is controlled by each strategy's own `max_daily_trades`.
 
 ---
 
 ## strategy_params
 
-`strategy_params.<strategy_name>` ブロックで戦略固有のパラメータを設定します。
-設定は `pkg/strategy.Strategy.Initialize()` 経由で各戦略に渡されます。
+Strategy-specific parameters are configured under the `strategy_params.<strategy_name>` block.
+The config is passed to each strategy via `pkg/strategy.Strategy.Initialize()`.
 
-同梱の Scalping 戦略のパラメータ詳細は [pkg/strategy/scalping/README.md](../pkg/strategy/scalping/README.md) を参照してください。
+For the bundled Scalping strategy parameters, see [pkg/strategy/scalping/README.md](../pkg/strategy/scalping/README.md).
 
 ```yaml
-# 例: 同梱のスキャルピング戦略
+# Example: bundled scalping strategy
 strategy_params:
   scalping:
     ema_fast_period: 9
     auto_scale_enabled: true
     auto_scale_balance_pct: 80
     auto_scale_max_notional: 20000
-    # ... 詳細は scalping/README.md を参照
+    # ... see scalping/README.md for full details
 
-# 例: カスタム戦略
+# Example: custom strategy
 strategy_params:
   mystrategy:
     my_param: 42
 ```
 
-> `strategy_params.scalping.order_notional` は明示必須です（暗黙デフォルト値はありません）。
+> `strategy_params.scalping.order_notional` must be set explicitly (no implicit default).
 
 ---
 
 ## ui
 
-| キー | デフォルト | 説明 |
+| Key | Default | Description |
 |---|---|---|
-| `ui.host` | `"0.0.0.0"` | Web UI のリッスンホスト |
-| `ui.port` | `8080` | Web UI のポート番号 |
+| `ui.host` | `"0.0.0.0"` | Web UI listen host |
+| `ui.port` | `8080` | Web UI port number |
 
 ---
 
 ## logging
 
-| キー | デフォルト | 説明 |
+| Key | Default | Description |
 |---|---|---|
-| `logging.level` | `"info"` | グローバルログレベル（`debug` / `info` / `warn` / `error`） |
-| `logging.format` | `"json"` | ログフォーマット |
-| `logging.output` | `"both"` | 出力先（`stdout` / `file` / `both`） |
-| `logging.file_path` | `"./logs/gogocoin.log"` | ログファイルパス |
-| `logging.max_size_mb` | `50` | ログファイルの最大サイズ（MB） |
-| `logging.max_backups` | `3` | ローテーション保持数 |
-| `logging.max_age_days` | `7` | ログファイルの保持日数 |
+| `logging.level` | `"info"` | Global log level (`debug` / `info` / `warn` / `error`) |
+| `logging.format` | `"json"` | Log format |
+| `logging.output` | `"both"` | Output destination (`stdout` / `file` / `both`) |
+| `logging.file_path` | `"./logs/gogocoin.log"` | Log file path |
+| `logging.max_size_mb` | `50` | Maximum log file size (MB) |
+| `logging.max_backups` | `3` | Number of rotated log files to retain |
+| `logging.max_age_days` | `7` | Number of days to retain log files |
 
 ### logging.categories
 
-カテゴリごとにログレベルを個別設定できます。
+Log levels can be configured per category.
 
-| カテゴリ | デフォルト | 説明 |
+| Category | Default | Description |
 |---|---|---|
-| `trading` | `"debug"` | 取引関連ログ |
-| `api` | `"info"` | API通信ログ |
-| `strategy` | `"debug"` | 戦略シグナルログ |
-| `ui` | `"info"` | Web UI / REST APIログ |
+| `trading` | `"debug"` | Trade-related logs |
+| `api` | `"info"` | API communication logs |
+| `strategy` | `"debug"` | Strategy signal logs |
+| `ui` | `"info"` | Web UI / REST API logs |
 
-> 本番運用では `logging.level: "info"` を推奨します。`debug` は高頻度ログが出力されパフォーマンスに影響することがあります。
+> `logging.level: "info"` is recommended for production. `debug` generates high-frequency logs and may impact performance.
 
 ---
 
 ## data_retention
 
-| キー | デフォルト | 説明 |
+| Key | Default | Description |
 |---|---|---|
-| `data_retention.retention_days` | `1` | DBに保持するデータの日数。`1` = 当日データのみ（最軽量） |
+| `data_retention.retention_days` | `1` | Number of days to retain data in the DB. `1` = current day only (lightest) |
 
-毎日 00:00 に `retention_days` より古いデータが自動削除されます。過去の取引履歴が必要な場合は bitFlyer 管理画面からダウンロードしてください。
+Data older than `retention_days` is automatically deleted at 00:00 every day. If you need historical trade records, download them from the bitFlyer dashboard.
