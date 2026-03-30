@@ -38,8 +38,9 @@ rebuild: ## Rebuild image and start
 	$(COMPOSE) up -d --build
 
 # Build
-build: ## Build application
+build: ## [For gogocoin developers] Build the reference binary (no strategy registered — not for production use)
 	@echo "Building $(APP_NAME)..."
+	@echo "NOTE: This binary has no strategy registered. See example/ or docs/DESIGN_DOC.md for library usage."
 	@go build -o bin/$(APP_NAME) ./cmd/$(APP_NAME)
 	@echo "Build complete: bin/$(APP_NAME)"
 
