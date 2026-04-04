@@ -108,7 +108,7 @@ jobs:
       working-directory: example
       run: |
         go mod tidy
-        go build ./cmd/
+        go build -o /dev/null ./cmd/
 
   security:
     name: Security Scan
