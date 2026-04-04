@@ -101,15 +101,12 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
-    - name: Build application
-      run: make build
+    - name: Build library packages
+      run: go build ./pkg/... ./internal/...
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v7
-      with:
-        name: gogocoin-binary
-        path: bin/gogocoin
-        retention-days: 7
+    - name: Build example
+      working-directory: example
+      run: go build ./cmd/
 
   security:
     name: Security Scan

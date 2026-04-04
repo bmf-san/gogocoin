@@ -1,6 +1,7 @@
-.PHONY: help build run clean
+.PHONY: help build run up down logs restart rebuild clean
 
 APP_NAME := gogocoin-example
+COMPOSE := docker compose
 
 .DEFAULT_GOAL := help
 
@@ -15,6 +16,23 @@ build: ## Build the example binary
 run: ## Run the example (requires configs/config.yaml and BITFLYER_API_KEY/SECRET env vars)
 	@[ -f configs/config.yaml ] || { echo "Error: configs/config.yaml not found. Copy configs/config.example.yaml and fill in your API credentials."; exit 1; }
 	@go run ./cmd/
+
+# Docker Compose commands (build context is the repo root)
+# Requires BITFLYER_API_KEY and BITFLYER_API_SECRET
+up: ## Start containers
+	$(COMPOSE) up -d
+
+down: ## Stop containers
+	$(COMPOSE) down
+
+logs: ## Show logs
+	$(COMPOSE) logs -f
+
+restart: ## Restart containers
+	$(COMPOSE) restart
+
+rebuild: ## Rebuild image and start
+	$(COMPOSE) up -d --build
 
 clean: ## Remove build artifacts
 	@rm -rf bin/
