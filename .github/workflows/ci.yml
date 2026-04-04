@@ -106,7 +106,9 @@ jobs:
 
     - name: Build example
       working-directory: example
-      run: go build ./cmd/
+      run: |
+        go mod tidy
+        go build ./cmd/
 
   security:
     name: Security Scan
@@ -151,6 +153,7 @@ jobs:
       uses: docker/build-push-action@v7
       with:
         context: .
+        file: example/Dockerfile
         platforms: linux/amd64
         push: false
         tags: gogocoin:test

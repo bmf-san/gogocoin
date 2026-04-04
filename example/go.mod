@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/lerenn/asyncapi-codegen v0.46.3 // indirect
 	github.com/mattn/go-sqlite3 v1.14.37 // indirect
-	github.com/oapi-codegen/runtime v1.3.0 // indirect
+	github.com/oapi-codegen/runtime v1.3.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
