@@ -23,7 +23,7 @@ C4Container
     Person(operator, "Operator")
 
     System_Boundary(gogocoin, "gogocoin") {
-        Container(cmd, "cmd/gogocoin", "Go", "Composition Root — startup/shutdown")
+        Container(example, "example/cmd", "Go", "Composition Root — startup/shutdown (user-provided)")
         Container(http, "adapter/http", "Go net/http", "REST API server")
         Container(worker, "adapter/worker", "Go goroutine", "Background workers")
         Container(usecase, "usecase/", "Go", "Business logic (trading / strategy / risk / analytics)")
@@ -36,8 +36,8 @@ C4Container
     SystemDb_Ext(sqlite, "SQLite")
 
     Rel(operator, http, "HTTP/JSON")
-    Rel(cmd, http, "starts")
-    Rel(cmd, worker, "starts")
+    Rel(example, http, "starts")
+    Rel(example, worker, "starts")
     Rel(http, usecase, "uses")
     Rel(worker, usecase, "uses")
     Rel(usecase, domain, "uses")
@@ -84,7 +84,7 @@ C4Component
 | `usecase/` does not import `infra/` | Depends only on `domain/` interfaces |
 | `adapter/` holds no concrete `infra/` types | Uses only `domain/` interfaces |
 | `infra/` implements `domain/` | Knows nothing about `usecase/` or `adapter/` |
-| Only `cmd/` combines all packages | The sole exception as the Composition Root |
+| The caller's `main` combines all packages | The sole exception as the Composition Root (lives in user repo, e.g. `example/cmd`) |
 
 ---
 
@@ -92,11 +92,12 @@ C4Component
 
 ```
 gogocoin/
-├── cmd/
-│   └── gogocoin/
-│       ├── main.go           # Signal handling and startup/shutdown only (~50 lines)
-│       ├── bootstrap.go      # Wires all services together (Composition Root)
-│       └── trading_ctrl.go   # TradingController
+├── example/                  # Working sample — also the Docker entry point
+│   ├── cmd/main.go           # Signal handling and engine.Run() call
+│   ├── strategy/scalping/    # Bundled EMA+RSI strategy
+│   ├── configs/              # Config template
+│   ├── Dockerfile            # Build context: repo root
+│   └── docker-compose.yml
 ├── internal/
 │   ├── domain/               # Layer 0: Models and interface definitions
 │   │   ├── trade.go
@@ -226,20 +227,27 @@ if apiErr := new(domain.Error); errors.As(err, &apiErr) {
 
 ## 4. Component Design
 
-### 4.1 Composition Root (`cmd/gogocoin/`)
+### 4.1 Composition Root
 
-`cmd/gogocoin/` is the sole wiring layer (Composition Root) in the application.
+The Composition Root lives in the **caller's repository** (e.g. `example/cmd/main.go`, `my-gogocoin/cmd/main.go`). gogocoin itself is a library; it does not ship a `cmd/` directory.
 
+A typical entry point:
+
+```go
+// example/cmd/main.go
+package main
+
+import (
+    "github.com/bmf-san/gogocoin/pkg/engine"
+    _ "github.com/yourname/your-bot/strategy/scalping" // triggers init()
+)
+
+func main() {
+    engine.Run(ctx, engine.WithConfigPath("./configs/config.yaml"))
+}
 ```
-cmd/gogocoin/
-  main.go          # Signal handling and call to bootstrap.Run() only
-  bootstrap.go     # The one place all services are initialized and wired
-  trading_ctrl.go  # TradingController implementation
-```
 
-`main.go` is responsible only for signal capture and calling `bootstrap.Run(ctx)` (~50 lines).
-
-`bootstrap.go` is the single place all services are assembled:
+`engine.Run()` internally wires all services. A sketch of what happens inside:
 
 ```go
 // bootstrap.go sketch

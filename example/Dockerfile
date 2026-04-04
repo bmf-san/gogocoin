@@ -6,15 +6,20 @@ RUN apk add --no-cache git ca-certificates tzdata gcc musl-dev sqlite-dev
 
 WORKDIR /app
 
-# Copy go mod files
+# Copy root module files first (example/ depends on the parent module via replace)
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
+# Copy example module files
+COPY example/go.mod example/go.sum ./example/
+
+# Copy all source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags="-s -w" -o gogocoin ./cmd/gogocoin
+# Build the example application
+WORKDIR /app/example
+RUN go mod download
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags="-s -w" -o /app/gogocoin ./cmd/
 
 # Final stage
 FROM alpine:latest
@@ -38,8 +43,8 @@ RUN mkdir -p /app/data /app/logs /app/configs /app/web && \
 # Copy binary from builder stage
 COPY --from=builder /app/gogocoin .
 
-# Copy configuration and web files
-COPY --chown=gogocoin:gogocoin configs/ ./configs/
+# Copy config and web assets from the root context
+COPY --chown=gogocoin:gogocoin example/configs/ ./configs/
 COPY --chown=gogocoin:gogocoin web/ ./web/
 
 # Switch to non-root user
@@ -47,6 +52,3 @@ USER gogocoin
 
 # Expose port
 EXPOSE 8080
-
-# Default command
-CMD ["./gogocoin"]

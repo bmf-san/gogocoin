@@ -87,43 +87,31 @@ go get github.com/bmf-san/gogocoin@latest
 
 A working sample is available in the `example/` directory. See [Using the example directory](#using-the-example-directory) for details.
 
-### B. Try quickly with Docker (for testing and development)
+### B. Try quickly with Docker
 
-> **Note**: The binary built this way has no strategy registered and cannot execute real trades. It is intended for testing and development purposes only.
+The `example/` directory includes a `Dockerfile` and `docker-compose.yml` that build a fully working binary with the bundled EMA+RSI scalping strategy registered.
 
 #### Prerequisites
 
 - Docker and Docker Compose
 - bitFlyer API key (obtain from the [API settings page](https://bitflyer.com/en-jp/api))
 
-> For local development without Docker, Go 1.25.0 or higher is required.
-
 #### Setup
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/bmf-san/gogocoin.git
-cd gogocoin
+cd gogocoin/example
 
-# 2. Configure environment variables
-cp .env.example .env
-# Edit .env and set your API keys
+# 2. Create the config file
+cp configs/config.example.yaml configs/config.yaml
+# Edit configs/config.yaml and set your API keys
 
-# 3. Create the config file
-make init
-
-# 4. Start
+# 3. Start (build context is the repo root, so run from example/)
 make up
 
-# 5. Open the Web UI
+# 4. Open the Web UI
 open http://localhost:8080
-```
-
-#### Example .env file
-
-```bash
-BITFLYER_API_KEY=your_actual_api_key_here
-BITFLYER_API_SECRET=your_actual_api_secret_here
 ```
 
 **⚠️ Warning**: This bot supports live trading only. It uses real funds — review your configuration carefully before use.
@@ -154,10 +142,23 @@ example/
 ├── configs/
 │   └── config.example.yaml      # Config file template
 ├── go.mod                       # Independent Go module
-└── Makefile                     # build / run shortcuts
+├── Makefile                     # build / run / Docker shortcuts
+├── Dockerfile                   # Docker image (build context: repo root)
+└── docker-compose.yml           # Docker Compose config
 ```
 
 ### Running the example
+
+**With Docker (simplest):**
+
+```bash
+cd example
+cp configs/config.example.yaml configs/config.yaml
+# Edit configs/config.yaml and set your API keys
+make up
+```
+
+**Without Docker:**
 
 ```bash
 cd example
@@ -267,9 +268,8 @@ make fmt
 # Run linter
 make lint
 
-# Run via Docker
-make up
-
+# Run via Docker (from example/ directory)
+# cd example && make up
 ```
 
 ### API code generation

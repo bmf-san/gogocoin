@@ -23,7 +23,7 @@ C4Container
     Person(operator, "オペレーター")
 
     System_Boundary(gogocoin, "gogocoin") {
-        Container(cmd, "cmd/gogocoin", "Go", "Composition Root・起動/終了")
+        Container(example, "example/cmd", "Go", "Composition Root・起動/終了（呼び元が指定）")
         Container(http, "adapter/http", "Go net/http", "REST API サーバー")
         Container(worker, "adapter/worker", "Go goroutine", "バックグラウンドワーカー群")
         Container(usecase, "usecase/", "Go", "業務ロジック（trading / strategy / risk / analytics）")
@@ -36,8 +36,8 @@ C4Container
     SystemDb_Ext(sqlite, "SQLite")
 
     Rel(operator, http, "HTTP/JSON")
-    Rel(cmd, http, "起動")
-    Rel(cmd, worker, "起動")
+    Rel(example, http, "起動")
+    Rel(example, worker, "起動")
     Rel(http, usecase, "uses")
     Rel(worker, usecase, "uses")
     Rel(usecase, domain, "uses")
@@ -84,7 +84,7 @@ C4Component
 | `usecase/` は `infra/` をimportしない | `domain/` interfaceにのみ依存する |
 | `adapter/` は `infra/` の具体型を持たない | `domain/` interfaceのみ使用 |
 | `infra/` は `domain/` を実装する | `usecase/` や `adapter/` は知らない |
-| `cmd/` のみが全パッケージを組み合わせる | Composition Rootとして唯一の例外 |
+| 呼び元の `main` が全パッケージを組み合わせる | Composition Rootとして唯一の例外（ユーザリポジトリに存在、例: `example/cmd`） |
 
 ---
 
@@ -92,11 +92,12 @@ C4Component
 
 ```
 gogocoin/
-├── cmd/
-│   └── gogocoin/
-│       ├── main.go           # シグナル処理・起動/終了のみ（〜50行）
-│       ├── bootstrap.go      # 全サービスの組み立て（Composition Root）
-│       └── trading_ctrl.go   # TradingController
+├── example/                  # 動作サンプル — Dockerエントリポイントも兼ねる
+│   ├── cmd/main.go           # シグナル処理・ engine.Run() 呼び出し
+│   ├── strategy/scalping/    # 同棱EMA+RSI戦略
+│   ├── configs/              # 設定テンプレート
+│   ├── Dockerfile            # ビルドコンテキスト: リポジトリルート
+│   └── docker-compose.yml
 ├── internal/
 │   ├── domain/               # Layer 0: モデル + インターフェース定義
 │   │   ├── trade.go
@@ -226,20 +227,27 @@ if apiErr := new(domain.Error); errors.As(err, &apiErr) {
 
 ## 4. コンポーネント設計
 
-### 4.1 Composition Root（`cmd/gogocoin/`）
+### 4.1 Composition Root
 
-`cmd/gogocoin/` がアプリケーション内の唯一のwiring層（Composition Root）。
+Composition Root は**呼び出し側リポジトリ**に存在する（例: `example/cmd/main.go`、`my-gogocoin/cmd/main.go`）。gogocoin 本体はライブラリであり、`cmd/` ディレクトリは持たない。
 
+典型的なエントリーポイント:
+
+```go
+// example/cmd/main.go
+package main
+
+import (
+    "github.com/bmf-san/gogocoin/pkg/engine"
+    _ "github.com/yourname/your-bot/strategy/scalping" // init() を呼ぶ
+)
+
+func main() {
+    engine.Run(ctx, engine.WithConfigPath("./configs/config.yaml"))
+}
 ```
-cmd/gogocoin/
-  main.go          # シグナル処理とbootstrap.Run()の呼び出しのみ
-  bootstrap.go     # 全サービスの初期化と依存注入
-  trading_ctrl.go  # TradingControllerの実装
-```
 
-`main.go` の責務はシグナル捕捉と `bootstrap.Run(ctx)` の呼び出しのみ（〜50行）。
-
-`bootstrap.go` がすべてのサービスを組み立てる唯一の場所：
+`engine.Run()` が内部で全サービスを組み立てる。内部イメージ：
 
 ```go
 // bootstrap.go のイメージ

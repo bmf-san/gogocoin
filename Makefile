@@ -1,13 +1,12 @@
 # gogocoin Makefile
 
-.PHONY: help up down logs restart rebuild build init test test-coverage fmt lint deps install-tools generate generate-check clean
+.PHONY: help init test test-coverage fmt lint deps install-tools generate generate-check clean
 
 # Default target
 .DEFAULT_GOAL := help
 
 # Variable definitions
 APP_NAME := gogocoin
-COMPOSE := docker compose
 
 # Help
 help: ## Show this help
@@ -15,34 +14,8 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-# Docker Compose commands
-# Note: Requires bitFlyer API keys configured in .env
-up: ## Start containers
-	@echo "Starting $(APP_NAME) container..."
-	$(COMPOSE) up -d
-
-down: ## Stop containers
-	@echo "Stopping $(APP_NAME) container..."
-	$(COMPOSE) down
-
-logs: ## Show logs
-	@echo "Showing logs..."
-	$(COMPOSE) logs -f
-
-restart: ## Restart containers
-	@echo "Restarting $(APP_NAME) container..."
-	$(COMPOSE) restart
-
-rebuild: ## Rebuild image and start
-	@echo "Rebuilding and starting $(APP_NAME) container..."
-	$(COMPOSE) up -d --build
-
-# Build
-build: ## [For gogocoin developers] Build the reference binary (no strategy registered — not for production use)
-	@echo "Building $(APP_NAME)..."
-	@echo "NOTE: This binary has no strategy registered. See example/ or docs/DESIGN_DOC.md for library usage."
-	@go build -o bin/$(APP_NAME) ./cmd/$(APP_NAME)
-	@echo "Build complete: bin/$(APP_NAME)"
+# Note: Docker commands have moved to example/
+# Run: cd example && make up
 
 # Initialization
 init: ## Initialize setup (create config file)

@@ -87,43 +87,31 @@ go get github.com/bmf-san/gogocoin@latest
 
 `example/` ディレクトリに動作するサンプルがあります。詳細は [example ディレクトリの使い方](#example-ディレクトリの使い方) を参照してください。
 
-### B. Docker で素早く試す（動作確認・開発向け）
+### B. Docker で素早く試す
 
-> **注意**: この方法でビルドされるバイナリは戦略が登録されていないため、実際のトレードは行えません。動作確認・開発目的専用です。
+`example/` ディレクトリには `Dockerfile` と `docker-compose.yml` があり、同梱の EMA+RSI スキャルピング戦略が登録された完全に動作するバイナリをビルドできます。
 
 #### 前提条件
 
 - Docker と Docker Compose
 - bitFlyer APIキー（[管理画面](https://bitflyer.com/ja-jp/api)で取得）
 
-> ローカル開発（Docker なし）の場合は Go 1.25.0 以上が必要です。
-
 #### セットアップ
 
 ```bash
 # 1. リポジトリのクローン
 git clone https://github.com/bmf-san/gogocoin.git
-cd gogocoin
+cd gogocoin/example
 
-# 2. 環境変数の設定
-cp .env.example .env
-# .envファイルを編集してAPIキーを設定
+# 2. 設定ファイルの作成
+cp configs/config.example.yaml configs/config.yaml
+# configs/config.yaml を編集して API キーを設定
 
-# 3. 設定ファイルの作成
-make init
-
-# 4. 起動
+# 3. 起動（ビルドコンテキストはリポジトリルートのため、example/ から実行）
 make up
 
-# 5. Web UIにアクセス
+# 4. Web UIにアクセス
 open http://localhost:8080
-```
-
-#### .envファイルの設定例
-
-```bash
-BITFLYER_API_KEY=your_actual_api_key_here
-BITFLYER_API_SECRET=your_actual_api_secret_here
 ```
 
 **⚠️ 注意**: このボットはライブトレードのみ対応しています。実資金を使用するため、設定を十分に確認してから使用してください。
@@ -154,10 +142,23 @@ example/
 ├── configs/
 │   └── config.example.yaml      # 設定ファイルのテンプレート
 ├── go.mod                       # 独立した Go モジュール
-└── Makefile                     # build / run ショートカット
+├── Makefile                     # build / run / Docker ショートカット
+├── Dockerfile                   # Docker イメージ（ビルドコンテキスト: リポジトリルート）
+└── docker-compose.yml           # Docker Compose 設定
 ```
 
 ### 動かし方
+
+**Docker を使う場合（最も簡単）:**
+
+```bash
+cd example
+cp configs/config.example.yaml configs/config.yaml
+# configs/config.yaml を編集して API キーを設定
+make up
+```
+
+**Docker を使わない場合:**
 
 ```bash
 cd example
