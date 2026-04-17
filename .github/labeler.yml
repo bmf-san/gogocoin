@@ -15,22 +15,22 @@ github_actions:
       - any-glob-to-any-file:
           - .github/**
 
-go:
+test:
   - changed-files:
       - any-glob-to-any-file:
-          - "**/*.go"
+          - "**/*_test.go"
 
 config:
   - changed-files:
-      - all-globs-to-any-file:
-          - "!.github/**"
       - any-glob-to-any-file:
           - configs/**
+          - internal/config/**
 
 web:
   - changed-files:
       - any-glob-to-any-file:
           - web/**
+          - internal/adapter/http/**
 
 engine:
   - changed-files:
@@ -47,3 +47,11 @@ example:
   - changed-files:
       - any-glob-to-any-file:
           - example/**
+
+core:
+  - changed-files:
+      - any-glob-to-any-file:
+          - internal/domain/**
+          - internal/usecase/**
+          - internal/infra/**
+          - internal/adapter/worker/**
