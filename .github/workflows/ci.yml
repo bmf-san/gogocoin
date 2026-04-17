@@ -24,8 +24,8 @@ jobs:
     - name: Verify dependencies
       run: go mod verify
 
-    - name: Run tests
-      run: make test
+    - name: Run tests (race + shuffle)
+      run: go test -race -shuffle=on ./...
 
     - name: Generate coverage report
       run: go test -coverprofile=coverage.out ./...
@@ -54,8 +54,10 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
-    - name: Tidy go.mod
-      run: go mod tidy
+    - name: Verify go.mod is tidy
+      run: |
+        go mod tidy
+        git diff --exit-code -- go.mod go.sum
 
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v9
@@ -129,7 +131,8 @@ jobs:
     - name: Run Gosec Security Scanner
       uses: securego/gosec@master
       with:
-        args: '-no-fail -fmt sarif -out results.sarif ./...'
+        args: '-fmt sarif -out results.sarif ./...'
+      continue-on-error: false
 
     - name: Upload SARIF file
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'

@@ -1,6 +1,6 @@
 # gogocoin Makefile
 
-.PHONY: help init test test-coverage fmt lint deps install-tools generate generate-check clean
+.PHONY: help init test test-race test-coverage fmt fmt-check lint tidy-check vuln deps install-tools generate generate-check clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -31,11 +31,11 @@ init: ## Initialize setup (create config file)
 # Testing
 test: ## Run tests
 	@echo "Running tests..."
-	@if find . -name "*_test.go" -not -path "./vendor/*" | grep -q . 2>/dev/null; then \
-		go test -v ./... || echo "Some tests failed"; \
-	else \
-		echo "No test files found - skipping tests"; \
-	fi
+	@go test ./...
+
+test-race: ## Run tests with race detector and shuffle
+	@echo "Running tests with -race -shuffle=on..."
+	@go test -race -shuffle=on ./...
 
 test-coverage: ## Generate test coverage report
 	@echo "Running tests with coverage..."
@@ -48,9 +48,21 @@ fmt: ## Format code
 	@echo "Formatting code..."
 	@go fmt ./...
 
+fmt-check: ## Check code is gofmt'd
+	@diff=$$(gofmt -s -l .); \
+	if [ -n "$$diff" ]; then echo "Files not gofmt'd:"; echo "$$diff"; exit 1; fi
+
 lint: ## Run linter
 	@echo "Running linter..."
 	@golangci-lint run --max-issues-per-linter=0 --max-same-issues=0
+
+tidy-check: ## Verify go.mod/go.sum are tidy
+	@go mod tidy
+	@git diff --exit-code -- go.mod go.sum
+
+vuln: ## Run govulncheck
+	@command -v govulncheck >/dev/null 2>&1 || go install golang.org/x/vuln/cmd/govulncheck@latest
+	@govulncheck ./...
 
 # Dependencies
 deps: ## Update dependencies
