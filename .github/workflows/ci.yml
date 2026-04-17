@@ -131,8 +131,10 @@ jobs:
     - name: Run Gosec Security Scanner
       uses: securego/gosec@master
       with:
-        # HIGH severity / HIGH confidence のみで fail。MEDIUM/LOW は SARIF 経由で Security タブに集約する
-        args: '-severity high -confidence high -fmt sarif -out results.sarif ./...'
+        # HIGH severity / HIGH confidence のみで fail。MEDIUM/LOW は SARIF 経由 で Security タブに集約する。
+        # example/ は別 Go モジュール (example/go.mod) のため除外。含めると
+        # "could not import" の golang-errors で gosec が exit 1 になる。
+        args: '-severity high -confidence high -exclude-dir=example -fmt sarif -out results.sarif ./...'
 
     - name: Upload SARIF file
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
