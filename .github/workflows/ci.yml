@@ -128,16 +128,18 @@ jobs:
         go-version: '1.26.x'
         cache: true
 
+    - name: Install Gosec
+      run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
     - name: Run Gosec Security Scanner
-      uses: securego/gosec@master
-      with:
-        # HIGH severity / HIGH confidence のみで fail。MEDIUM/LOW は SARIF 経由 で Security タブに集約する。
-        # example/ は別 Go モジュール (example/go.mod) のため除外。含めると
-        # "could not import" の golang-errors で gosec が exit 1 になる。
-        args: '-severity high -confidence high -exclude-dir=example -fmt sarif -out results.sarif ./...'
+      # HIGH severity / HIGH confidence のみで fail。MEDIUM/LOW は SARIF 経由で
+      # Security タブに集約する。example/ は別 Go モジュール (example/go.mod)
+      # のため除外。go install でバージョンを固定 (ghcr.io の 2.25 は golang-errors
+      # で誤 fail する挙動差があった)。
+      run: gosec -severity high -confidence high -exclude-dir=example -fmt sarif -out results.sarif ./...
 
     - name: Upload SARIF file
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: results.sarif
