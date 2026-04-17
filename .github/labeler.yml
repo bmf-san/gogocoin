@@ -1,5 +1,6 @@
 # Configuration for actions/labeler
 # Automatically applies labels to pull requests based on changed file paths.
+# Note: `dependencies` is intentionally omitted here because Dependabot attaches it directly.
 
 documentation:
   - changed-files:
@@ -9,19 +10,10 @@ documentation:
           - README*
           - LICENSE
 
-ci:
+github_actions:
   - changed-files:
       - any-glob-to-any-file:
           - .github/**
-          - Makefile
-
-dependencies:
-  - changed-files:
-      - any-glob-to-any-file:
-          - go.mod
-          - go.sum
-          - "**/go.mod"
-          - "**/go.sum"
 
 go:
   - changed-files:
@@ -30,10 +22,10 @@ go:
 
 config:
   - changed-files:
+      - all-globs-to-any-file:
+          - "!.github/**"
       - any-glob-to-any-file:
           - configs/**
-          - "**/*.yaml"
-          - "**/*.yml"
 
 web:
   - changed-files:
