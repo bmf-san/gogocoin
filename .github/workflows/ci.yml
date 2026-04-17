@@ -132,11 +132,24 @@ jobs:
       run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
     - name: Run Gosec Security Scanner
-      # HIGH severity / HIGH confidence のみで fail。MEDIUM/LOW は SARIF 経由で
-      # Security タブに集約する。example/ は別 Go モジュール (example/go.mod)
-      # のため除外。go install でバージョンを固定 (ghcr.io の 2.25 は golang-errors
-      # で誤 fail する挙動差があった)。
-      run: gosec -severity high -confidence high -exclude-dir=example -fmt sarif -out results.sarif ./...
+      # HIGH severity / HIGH confidence のみを対象。MEDIUM/LOW は SARIF 経由で
+      # Security タブに集約。example/ は別 Go モジュール (example/go.mod) のため除外。
+      # -no-fail でツール自身の exit code に依存せず、SARIF の results 数で判定
+      # (gosec は golang-errors 等 "issue 以外" でも exit 1 になるケースがある)。
+      run: |
+        gosec -severity high -confidence high -exclude-dir=example -no-fail \
+              -fmt sarif -out results.sarif ./...
+        echo "=== SARIF results summary ==="
+        jq '[.runs[].results] | flatten | length' results.sarif
+
+    - name: Fail if HIGH/HIGH issues found
+      run: |
+        count=$(jq '[.runs[].results] | flatten | length' results.sarif)
+        if [ "$count" -gt 0 ]; then
+          echo "::error::gosec found $count HIGH severity / HIGH confidence issue(s)"
+          jq '.runs[].results' results.sarif
+          exit 1
+        fi
 
     - name: Upload SARIF file
       if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
