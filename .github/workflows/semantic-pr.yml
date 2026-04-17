@@ -34,7 +34,10 @@ jobs:
             chore
             revert
           requireScope: false
-          subjectPattern: ^(?![A-Z]).+$
+          # Subject must start with lowercase AND contain only ASCII characters
+          # (i.e. no Japanese / full-width characters). PR titles are English-only.
+          subjectPattern: ^(?![A-Z])[\x20-\x7E]+$
           subjectPatternError: |
             The subject "{subject}" found in the pull request title "{title}"
-            must start with a lowercase character.
+            must start with a lowercase character and contain ASCII characters
+            only. Please write PR titles in English.
