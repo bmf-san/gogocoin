@@ -1,0 +1,57 @@
+# Configuration for actions/labeler
+# Automatically applies labels to pull requests based on changed file paths.
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/**
+          - "**/*.md"
+          - README*
+          - LICENSE
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+          - Makefile
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - go.mod
+          - go.sum
+          - "**/go.mod"
+          - "**/go.sum"
+
+go:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.go"
+
+config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - configs/**
+          - "**/*.yaml"
+          - "**/*.yml"
+
+web:
+  - changed-files:
+      - any-glob-to-any-file:
+          - web/**
+
+engine:
+  - changed-files:
+      - any-glob-to-any-file:
+          - pkg/engine/**
+
+strategy:
+  - changed-files:
+      - any-glob-to-any-file:
+          - pkg/strategy/**
+          - example/strategy/**
+
+example:
+  - changed-files:
+      - any-glob-to-any-file:
+          - example/**
