@@ -136,8 +136,11 @@ jobs:
       # Security タブに集約。example/ は別 Go モジュール (example/go.mod) のため除外。
       # -no-fail でツール自身の exit code に依存せず、SARIF の results 数で判定
       # (gosec は golang-errors 等 "issue 以外" でも exit 1 になるケースがある)。
+      # G703 (path traversal via taint) 除外: HTTP API は request からファイルパスを
+      #   一切受け取らず、全ファイル I/O は起動時 config 由来のパスのみ使用。
       run: |
-        gosec -severity high -confidence high -exclude-dir=example -no-fail \
+        gosec -severity high -confidence high \
+              -exclude-dir=example -exclude=G703 -no-fail \
               -fmt sarif -out results.sarif ./...
         echo "=== SARIF results summary ==="
         jq '[.runs[].results] | flatten | length' results.sarif
