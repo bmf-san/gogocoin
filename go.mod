@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/bmf-san/go-bitflyer-api-client v1.2.0
-	github.com/mattn/go-sqlite3 v1.14.37
+	github.com/mattn/go-sqlite3 v1.14.42
 	github.com/oapi-codegen/runtime v1.3.1
 	gopkg.in/yaml.v3 v3.0.1
 )
