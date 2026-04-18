@@ -25,8 +25,5 @@ jobs:
           go-version: '1.26.x'
           cache: true
 
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
-
       - name: Run govulncheck
-        run: govulncheck ./...
+        run: make vuln
