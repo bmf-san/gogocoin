@@ -1267,7 +1267,7 @@ High-frequency DEBUG logs written directly to the DB would cause the log table t
 
 ### 9.4 Resource Management
 
-- **DB retention period**: `data_retention.retention_days` (default: 1 day) deletes old records daily. See [docs/DATA_MANAGEMENT.md](DATA_MANAGEMENT.md) for details.
+- **DB retention period**: `data_retention.retention_days` (example default: 90 days; code fallback: 1 day) deletes old records daily. See [docs/DATA_MANAGEMENT.md](DATA_MANAGEMENT.md) for details.
 - **Low resource consumption design**: Workers use goroutines + ticker-based loops to minimize CPU usage when idle.
 
 ---

@@ -11,7 +11,7 @@ gogocoin prioritizes a lightweight footprint and retains only a configurable num
 | Item | Details |
 |---|---|
 | Run time | Daily at 00:00 (midnight) |
-| Retention period | Configurable (default: 1 day = current day only) |
+| Retention period | Configurable (example default: 90 days; code fallback: 1 day when unset) |
 | Deleted records | Data older than the retention period |
 
 ### Cleanup flow (retention_days = 1)

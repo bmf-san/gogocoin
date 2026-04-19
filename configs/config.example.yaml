@@ -82,6 +82,11 @@ logging:
     strategy: "debug"
     ui: "info"
 
-# Data retention: 1 = today only, 7 = last 7 days
+# Data retention: 1 = today only, 7 = last 7 days, 90 = last 90 days.
+# Affects trades, performance_metrics, logs, market_data, balances (one knob).
+# File logs are rotated independently by the logger (max_size_mb /
+# max_backups / max_age_days), so this value does not affect on-disk *.log
+# files. 90 days keeps the full "総損益" window visible on the dashboard and
+# still stays comfortably under ~100 MB SQLite for a typical scalping setup.
 data_retention:
-  retention_days: 1
+  retention_days: 90
