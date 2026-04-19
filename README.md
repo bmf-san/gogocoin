@@ -19,8 +19,8 @@ gogocoin is an automated trading bot for the bitFlyer cryptocurrency exchange, w
 ### Features
 
 - **Pluggable strategy architecture**: Implement the `pkg/strategy.Strategy` interface to plug in your own trading strategy
-- Bundled default strategy: EMA crossover + RSI filter scalping strategy
-- Risk management (take-profit, stop-loss, daily trade limit, cooldown)
+- Bundled minimal reference strategy: EMA crossover scalping (see [`pkg/strategy/scalping/README.md`](./pkg/strategy/scalping/README.md); an extended EMA + RSI + cooldown implementation lives in [`example/strategy/scalping/`](./example/strategy/scalping/))
+- Engine-level risk management (daily loss caps, per-trade loss caps, min trade interval, max daily trades — configured under `trading.risk_management`)
 - Web UI for starting and stopping trading
 - Real-time market data ingestion and analysis via WebSocket
 - Real-time monitoring dashboard (`http://localhost:8080`)
