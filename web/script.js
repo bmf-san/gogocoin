@@ -111,6 +111,19 @@ class GogocoinUI {
     // Load initial data
     async loadInitialData() {
         try {
+            // Best-effort: fetch retention setting so the "総損益" caption can
+            // honestly reflect that it represents only the retained window.
+            this.fetchAPI('/api/config').then(cfg => {
+                const days = cfg && cfg.data_retention && cfg.data_retention.retention_days;
+                if (days && Number.isFinite(days)) {
+                    this.retentionDays = days;
+                    const cap = document.getElementById('total-pnl-caption');
+                    if (cap) cap.textContent = days === 1 ? '本日累計' : `直近${days}日累計`;
+                }
+            }).catch(() => {
+                /* optional feature — keep default caption on failure */
+            });
+
             await this.loadDashboardData();
             // Dashboard also shows logs, so load on init
             this.loadLogs().catch(err => {
@@ -126,15 +139,20 @@ class GogocoinUI {
     // Load dashboard data
     async loadDashboardData() {
         try {
-            // Call each API individually to capture detailed errors
+            // Call each API individually to capture detailed errors.
+            // Trades are fetched twice:
+            //   - limit=200: recent rows for the trade list & table
+            //   - since=today: all of today's rows for accurate "本日の損益"
+            //     (the limit=200 slice can truncate heavy scalping days).
             const results = await Promise.allSettled([
                 this.fetchAPI(`/api/status?symbol=${this.selectedSymbol}`),
                 this.fetchAPI('/api/balance'),
                 this.fetchAPI('/api/performance'),
-                this.fetchAPI('/api/trades?limit=200')
+                this.fetchAPI('/api/trades?limit=200'),
+                this.fetchAPI('/api/trades?since=today')
             ]);
 
-            const [statusResult, balanceResult, performanceResult, tradesResult] = results;
+            const [statusResult, balanceResult, performanceResult, tradesResult, todayTradesResult] = results;
 
             // Update only successful data (always update what we can)
             if (statusResult.status === 'fulfilled') {
@@ -151,14 +169,15 @@ class GogocoinUI {
             }
 
             const trades = tradesResult.status === 'fulfilled' ? tradesResult.value : [];
+            const todayTrades = todayTradesResult.status === 'fulfilled' ? todayTradesResult.value : trades;
 
             if (performanceResult.status === 'fulfilled') {
-                this.updatePerformance(performanceResult.value, false, trades);
-                this.updatePerformanceTable(performanceResult.value, false);
+                this.updatePerformance(performanceResult.value, false, todayTrades);
+                this.updatePerformanceTable(performanceResult.value, false, todayTrades);
             } else {
                 console.error('Failed to load performance:', performanceResult.reason);
-                this.updatePerformance(null, true, trades);
-                this.updatePerformanceTable(null, true);
+                this.updatePerformance(null, true, todayTrades);
+                this.updatePerformanceTable(null, true, todayTrades);
             }
 
             if (tradesResult.status === 'fulfilled') {
@@ -482,7 +501,9 @@ class GogocoinUI {
     }
 
     // Update PnL history table
-    updatePerformanceTable(performance, hasError) {
+    // todayTrades: optional array of today's trades, used to reconstruct the
+    // current-day row when there is no previous-day snapshot to diff against.
+    updatePerformanceTable(performance, hasError, todayTrades = []) {
         const tbody = document.querySelector('#pnl-history-table');
 
         if (!tbody) {
@@ -515,18 +536,56 @@ class GogocoinUI {
             .sort((a, b) => (a < b ? 1 : -1))
             .map(d => ({ ...byDate[d], _jstDate: d }));
 
+        const todayStr = new Date(Date.now() + jstOffsetMs).toISOString().split('T')[0];
+
+        // Reconstruct today's totals from actual trade rows when possible.
+        // This is used as the fallback daily delta for the oldest-displayed row
+        // (which has no prev snapshot) when that row happens to be today.
+        let todayPnLFromTrades = null;
+        let todayTradesCount = 0;
+        let todayWinningCount = 0;
+        (todayTrades || []).forEach(t => {
+            if (!t.executed_at) return;
+            const d = new Date(new Date(t.executed_at).getTime() + jstOffsetMs)
+                .toISOString().split('T')[0];
+            if (d !== todayStr) return;
+            if (t.pnl !== undefined && t.pnl !== null) {
+                todayPnLFromTrades = (todayPnLFromTrades || 0) + t.pnl;
+                if (t.pnl > 0.01) todayWinningCount++;
+            }
+            todayTradesCount++;
+        });
+
         // Display up to 10 days, using sorted for delta calculation beyond the cutoff
         const recentData = sorted.slice(0, 10);
 
         tbody.innerHTML = recentData.map((p, i) => {
             const prev = sorted[i + 1]; // older entry for delta
-            const dailyPnL = prev ? p.total_pnl - prev.total_pnl : p.total_pnl;
-            const dailyTrades = prev
-                ? (p.total_trades || 0) - (prev.total_trades || 0)
-                : (p.total_trades || 0);
-            const dailyWinning = prev
-                ? (p.winning_trades || 0) - (prev.winning_trades || 0)
-                : (p.winning_trades || 0);
+            let dailyPnL;
+            let dailyTrades;
+            let dailyWinning;
+            if (prev) {
+                dailyPnL = p.total_pnl - prev.total_pnl;
+                dailyTrades = (p.total_trades || 0) - (prev.total_trades || 0);
+                dailyWinning = (p.winning_trades || 0) - (prev.winning_trades || 0);
+            } else if (p._jstDate === todayStr && todayPnLFromTrades !== null) {
+                // Oldest displayed row is today: compute from trade log directly
+                // instead of using cumulative total as "daily" (would overstate).
+                dailyPnL = todayPnLFromTrades;
+                dailyTrades = todayTradesCount;
+                dailyWinning = todayWinningCount;
+            } else {
+                // No prev snapshot AND no trade-log fallback: show a dash
+                // rather than the misleading cumulative value.
+                return `
+            <tr>
+                <td class="text-sm">${this.escapeHtml(p._jstDate)}</td>
+                <td class="text-right text-secondary">—</td>
+                <td class="text-right text-secondary">—</td>
+                <td class="text-right text-secondary">—</td>
+            </tr>
+        `;
+            }
             const dailyWinRate = dailyTrades > 0 ? (dailyWinning / dailyTrades) * 100 : 0;
             return `
             <tr>

@@ -1,10 +1,15 @@
 package domain
 
+import "time"
+
 // TradeRepository is the interface for trade data persistence
 type TradeRepository interface {
 	SaveTrade(trade *Trade) error
 	GetRecentTrades(limit int) ([]Trade, error)
 	GetAllTrades() ([]Trade, error)
+	// GetTradesSince returns trades whose executed_at >= since, ordered by
+	// executed_at DESC. Limit is applied only when > 0.
+	GetTradesSince(since time.Time, limit int) ([]Trade, error)
 }
 
 // PositionRepository is the interface for position data persistence
