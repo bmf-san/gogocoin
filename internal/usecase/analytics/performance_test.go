@@ -179,6 +179,25 @@ func TestCalculateFromTrades_ZeroPnLHandling(t *testing.T) {
 	}
 }
 
+// TestCalculateFromTrades_SellZeroPnLNoDoubleFee asserts that a SELL row whose
+// stored PnL is exactly 0 (a rare break-even sale where sellRevenue-totalCost
+// equals totalFees) is NOT re-subtracted for fees by CalculateFromTrades.
+// calculator.go already subtracts fees when computing PnL, so substituting
+// pnl = -fee here would double-count the fee.
+func TestCalculateFromTrades_SellZeroPnLNoDoubleFee(t *testing.T) {
+	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
+
+	trades := []domain.Trade{
+		{Side: "SELL", PnL: 0, Fee: 15},
+	}
+
+	metrics := pa.CalculateFromTrades(trades)
+
+	if math.Abs(metrics.TotalPnL) > 0.01 {
+		t.Errorf("Expected SELL PnL=0 to stay 0 (no double fee), got %.2f", metrics.TotalPnL)
+	}
+}
+
 func TestCalculateSharpeRatio(t *testing.T) {
 	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
 
@@ -255,9 +274,12 @@ func TestCalculateMaxDrawdown(t *testing.T) {
 			expected: 0.6, // (1000-400)/100000*100 = 0.6%
 		},
 		{
-			name: "Zero PnL with fee",
+			name: "Zero PnL with fee (legacy BUY row)",
 			trades: []domain.Trade{
-				{PnL: 0, Fee: 15}, // Should count as -15
+				// Legacy rows where PnL was never stored have Side="BUY" & PnL=0.
+				// SELL rows with PnL=0 must NOT be substituted to avoid
+				// double-counting fees (calculator.go already subtracts them).
+				{Side: "BUY", PnL: 0, Fee: 15}, // Should count as -15
 			},
 			expected: 0.015, // 15/100000*100 = 0.015%
 		},

@@ -87,6 +87,15 @@ paths:
       summary: 取引履歴の取得
       parameters:
         - $ref: "#/components/parameters/LimitParam"
+        - name: since
+          in: query
+          description: |
+            取得範囲を時刻で絞り込む。
+            - `today`: JST 当日 0:00 以降の全トレード（limit は無視）
+            - RFC3339 タイムスタンプ (例: `2026-04-19T00:00:00+09:00`): その時刻以降のトレード
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: 取引履歴（新しい順）

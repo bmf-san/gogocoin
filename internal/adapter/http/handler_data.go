@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -109,6 +110,31 @@ func (s *Server) GetApiTrades(ctx context.Context, request GetApiTradesRequestOb
 		limit = *request.Params.Limit
 	}
 
+	// Optional since filter. Supports "today" (JST calendar day) or RFC3339.
+	if request.Params.Since != nil && *request.Params.Since != "" {
+		since, err := parseSince(*request.Params.Since)
+		if err != nil {
+			s.logger.System().WithError(err).WithField("since", *request.Params.Since).
+				Warn("Invalid since parameter for /api/trades")
+			msg := "Invalid 'since' parameter: " + err.Error()
+			return GetApiTrades500JSONResponse{InternalServerErrorJSONResponse{Message: &msg}}, nil
+		}
+		// "today" returns all rows for the day; other since values respect limit.
+		effectiveLimit := limit
+		if *request.Params.Since == "today" {
+			effectiveLimit = 0
+		}
+		trades, err := s.db.GetTradesSince(since, effectiveLimit)
+		if err != nil {
+			s.logger.Error("Failed to get trades since: " + err.Error())
+			msg := "Internal server error"
+			return GetApiTrades500JSONResponse{InternalServerErrorJSONResponse{Message: &msg}}, nil
+		}
+		s.logger.System().WithField("count", len(trades)).WithField("since", since).
+			Info("Returning trades from API (since)")
+		return GetApiTrades200JSONResponse(domainTradesToAPI(trades)), nil
+	}
+
 	trades, err := s.db.GetRecentTrades(limit)
 	if err != nil {
 		s.logger.Error("Failed to get trades: " + err.Error())
@@ -118,6 +144,27 @@ func (s *Server) GetApiTrades(ctx context.Context, request GetApiTradesRequestOb
 
 	s.logger.System().WithField("count", len(trades)).Info("Returning trades from API")
 	return GetApiTrades200JSONResponse(domainTradesToAPI(trades)), nil
+}
+
+// parseSince resolves the `since` query parameter into an absolute time.
+// Accepted values:
+//   - "today": JST calendar day start (00:00:00 JST)
+//   - any value parseable as RFC3339
+func parseSince(raw string) (time.Time, error) {
+	if raw == "today" {
+		jst, err := time.LoadLocation("Asia/Tokyo")
+		if err != nil {
+			// Fallback: fixed +09:00 offset
+			jst = time.FixedZone("JST", 9*60*60)
+		}
+		now := time.Now().In(jst)
+		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, jst), nil
+	}
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return t, nil
 }
 
 // GetApiPerformance implements StrictServerInterface - get performance metrics

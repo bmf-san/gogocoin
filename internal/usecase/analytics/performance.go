@@ -114,19 +114,15 @@ func (pa *PerformanceAnalytics) CalculateFromTrades(trades []domain.Trade) domai
 	for i := range trades {
 		trade := &trades[i]
 
-		// Use PnL saved to database
+		// Use PnL saved to database.
+		// Note: calculator.go already persists BUY.PnL = -fee and
+		// SELL.PnL = sellRevenue - totalCost - totalFees, so fees are
+		// already baked in. We only substitute for legacy BUY rows where
+		// PnL was not stored (pnl==0 && fee>0). Substituting for SELL
+		// would double-count fees on any break-even SELL.
 		pnl := trade.PnL
-
-		// Improved handling for PnL = 0 case
-		if pnl == 0 {
-			switch trade.Side {
-			case "BUY":
-				// For BUY trades, record only fee as loss
-				pnl = -trade.Fee
-			case "SELL":
-				// For SELL trades with PnL=0, record only fee as loss
-				pnl = -trade.Fee
-			}
+		if pnl == 0 && trade.Side == "BUY" && trade.Fee > 0 {
+			pnl = -trade.Fee
 		}
 
 		totalPnL += pnl
@@ -229,7 +225,9 @@ func (pa *PerformanceAnalytics) calculateMaxDrawdown(trades []domain.Trade) floa
 
 	for i := range trades {
 		pnl := trades[i].PnL
-		if pnl == 0 && trades[i].Fee > 0 {
+		// Same logic as CalculateFromTrades: only substitute for legacy BUY
+		// rows where PnL was never stored. SELL.PnL already includes fees.
+		if pnl == 0 && trades[i].Side == "BUY" && trades[i].Fee > 0 {
 			pnl = -trades[i].Fee
 		}
 		runningPnL += pnl
