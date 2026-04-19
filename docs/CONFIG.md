@@ -127,6 +127,6 @@ Log levels can be configured per category.
 
 | Key | Default | Description |
 |---|---|---|
-| `data_retention.retention_days` | `1` | Number of days to retain data in the DB. `1` = current day only (lightest) |
+| `data_retention.retention_days` | `90` (example) | Number of days to retain data in the DB. `1` = current day only (lightest), `90` = last 90 days (keeps full "総損益" window). Code falls back to `1` when unset. |
 
 Data older than `retention_days` is automatically deleted at 00:00 every day. If you need historical trade records, download them from the bitFlyer dashboard.

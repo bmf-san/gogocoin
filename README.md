@@ -40,7 +40,7 @@ gogocoin is an automated trading bot for the bitFlyer cryptocurrency exchange, w
 - **Architecture**: Layered modular architecture
 - **Public API** (`pkg/`): `pkg/engine.Run()` + `pkg/strategy.Strategy` interface allow strategy injection from external repositories. Stable, semantically versioned API
 - **Database**: SQLite (lightweight, embedded, no external DB required)
-  - Retention: configurable via `retention_days` (default: 1 day)
+  - Retention: configurable via `retention_days` (example default: 90 days; the code falls back to 1 day when unset)
   - Historical data: accessible via bitFlyer
 - **Concurrency**: Asynchronous workers via Goroutines + Channels
 - **Transport**: WebSocket (real-time) + REST API (Web UI)
