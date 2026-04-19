@@ -11,7 +11,7 @@ gogocoin の戦略は**プラガブル**設計になっており、`pkg/strategy
 
 | 戦略名 | パッケージ | 説明 |
 |---|---|---|
-| `scalping` | `pkg/strategy/scalping` | EMA クロスオーバー + RSI フィルタによるスキャルピング戦略 |
+| `scalping` | `pkg/strategy/scalping` | EMA クロスオーバーによる最小スキャルピング戦略（リファレンス実装 — RSI / クールダウン / 日次上限は含まない） |
 
 各戦略の設定パラメータ・シグナル生成ロジックの詳細は、パッケージ内の README を参照してください:
 

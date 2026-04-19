@@ -11,7 +11,7 @@ gogocoin's strategy system is **pluggable** — implement the `pkg/strategy.Stra
 
 | Strategy Name | Package | Description |
 |---|---|---|
-| `scalping` | `pkg/strategy/scalping` | EMA crossover + RSI filter scalping strategy |
+| `scalping` | `pkg/strategy/scalping` | Minimal EMA crossover scalping strategy (reference implementation — no RSI/cooldown/daily-limit) |
 
 For detailed configuration parameters and signal generation logic for each strategy, refer to the README in the respective package:
 
