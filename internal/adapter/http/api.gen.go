@@ -476,6 +476,11 @@ type GetApiStatusParams struct {
 type GetApiTradesParams struct {
 	// Limit 取得件数（デフォルト: 50）
 	Limit *LimitParam `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Since 取得範囲を時刻で絞り込む。
+	// - `today`: JST 当日 0:00 以降の全トレード（limit は無視）
+	// - RFC3339 タイムスタンプ (例: `2026-04-19T00:00:00+09:00`): その時刻以降のトレード
+	Since *string `form:"since,omitempty" json:"since,omitempty"`
 }
 
 // PostApiConfigJSONRequestBody defines body for PostApiConfig for application/json ContentType.
@@ -713,6 +718,14 @@ func (siw *ServerInterfaceWrapper) GetApiTrades(w http.ResponseWriter, r *http.R
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
 		return
 	}
 

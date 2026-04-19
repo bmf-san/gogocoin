@@ -1,6 +1,8 @@
 package persistence
 
 import (
+	"time"
+
 	"github.com/bmf-san/gogocoin/internal/domain"
 )
 
@@ -42,6 +44,9 @@ func (r *Repository) GetRecentTrades(limit int) ([]domain.Trade, error) {
 }
 func (r *Repository) GetAllTrades() ([]domain.Trade, error) {
 	return r.trade.GetAllTrades()
+}
+func (r *Repository) GetTradesSince(since time.Time, limit int) ([]domain.Trade, error) {
+	return r.trade.GetTradesSince(since, limit)
 }
 func (r *Repository) GetTradesCount() (int, error) {
 	return r.trade.GetTradesCount()

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"time"
 
 	"github.com/bmf-san/gogocoin/internal/domain"
 	strategy "github.com/bmf-san/gogocoin/pkg/strategy"
@@ -17,6 +18,7 @@ type DatabaseService interface {
 
 	// Trade operations
 	GetRecentTrades(limit int) ([]domain.Trade, error)
+	GetTradesSince(since time.Time, limit int) ([]domain.Trade, error)
 	GetTradesCount() (int, error)
 	GetTodayTradesCount() (int, error)
 

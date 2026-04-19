@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/bmf-san/gogocoin/internal/domain"
@@ -71,6 +72,40 @@ func (r *TradeRepository) GetAllTrades() ([]domain.Trade, error) {
 			  executed_at, created_at, updated_at, strategy_name, pnl
 			  FROM trades ORDER BY executed_at ASC`
 	rows, err := r.db.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+	var trades []domain.Trade
+	for rows.Next() {
+		var t domain.Trade
+		if err := rows.Scan(&t.ID, &t.Symbol, &t.Side, &t.Type, &t.Size, &t.Price, &t.Fee,
+			&t.Status, &t.OrderID, &t.ExecutedAt, &t.CreatedAt,
+			&t.UpdatedAt, &t.StrategyName, &t.PnL); err != nil {
+			return nil, err
+		}
+		trades = append(trades, t)
+	}
+	return trades, rows.Err()
+}
+
+// GetTradesSince returns trades whose executed_at >= since, ordered by
+// executed_at DESC. When limit > 0 it caps the number of rows; otherwise
+// all matching rows are returned.
+func (r *TradeRepository) GetTradesSince(since time.Time, limit int) ([]domain.Trade, error) {
+	base := `SELECT id, symbol, side, type, size, price, fee, status, order_id,
+			 executed_at, created_at, updated_at, strategy_name, pnl
+			 FROM trades WHERE executed_at >= ?
+			 ORDER BY executed_at DESC`
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if limit > 0 {
+		rows, err = r.db.db.Query(base+" LIMIT ?", since, limit)
+	} else {
+		rows, err = r.db.db.Query(base, since)
+	}
 	if err != nil {
 		return nil, err
 	}
