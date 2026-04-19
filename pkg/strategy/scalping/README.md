@@ -1,3 +1,56 @@
+# Scalping Strategy (bundled minimal reference)
+
+A **minimal EMA-crossover** scalping strategy bundled with gogocoin as a reference implementation of the `pkg/strategy.Strategy` interface.
+
+This strategy is intentionally small: it demonstrates how to plug a strategy into `pkg/engine` and nothing more. For production use you are expected to implement your own strategy in a separate module and register it via a blank import.
+
+> For a richer reference implementation that adds RSI, trend EMA, cooldowns, and daily limits, see [`example/strategy/scalping/`](../../../example/strategy/scalping/) and [`example/configs/config.example.yaml`](../../../example/configs/config.example.yaml).
+
+---
+
+## Signal generation
+
+| Signal | Condition |
+|---|---|
+| BUY  | `fastEMA > slowEMA` |
+| SELL | `fastEMA < slowEMA` |
+| HOLD | otherwise, or when history is shorter than `ema_slow_period` |
+
+Order quantity is `order_notional / current_price`. There is no RSI filter, no cooldown, no daily-trade limit, and no auto-scaling inside this strategy — those features live either at the engine level (`trading.risk_management.*`) or in the extended example strategy.
+
+---
+
+## Configuration parameters (`strategy_params.scalping`)
+
+| Key | Default (`NewDefault`) | Description |
+|---|---|---|
+| `ema_fast_period` | `9`    | Fast EMA period (bars). Must be `> 0` and `< ema_slow_period`. |
+| `ema_slow_period` | `21`   | Slow EMA period (bars). Must be `> 0`. |
+| `take_profit_pct` | `1.5`  | Take-profit threshold in percent. Must be `> 0`. |
+| `stop_loss_pct`   | `1.0`  | Stop-loss threshold in percent. Enforced every tick by `StrategyWorker` — see [docs/STRATEGY.md § Engine-Level Stop Loss](../../../docs/STRATEGY.md). Must be `> 0`. |
+| `order_notional`  | `1000` | Notional size per order (quote currency, e.g. JPY). Must be `> 0`. |
+
+Any other keys (e.g. `rsi_period`, `cooldown_sec`, `max_daily_trades`, `trend_ema_period`, `auto_scale_*`, `symbol_params`) are **silently ignored** by this strategy. Use `example/strategy/scalping` if you need them.
+
+### Minimal config example
+
+```yaml
+strategy_params:
+  scalping:
+    ema_fast_period: 9
+    ema_slow_period: 21
+    take_profit_pct: 1.5
+    stop_loss_pct: 1.0
+    order_notional: 1000
+```
+
+---
+
+## Related documentation
+
+- Strategy system overview: [docs/STRATEGY.md](../../../docs/STRATEGY.md)
+- Engine-level risk management (daily loss limits, min trade interval, etc.): [docs/CONFIG.md § trading.risk_management](../../../docs/CONFIG.md)
+- Extended reference strategy: [example/strategy/scalping/](../../../example/strategy/scalping/)
 # Scalping Strategy
 
 EMAベースのステートレス・スキャルピング戦略。gogocoin 同梱のデフォルト戦略として提供される。
