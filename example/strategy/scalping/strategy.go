@@ -31,6 +31,12 @@ type Strategy struct {
 	lastTradeTime   time.Time
 	dailyTradeCount int
 	lastTradeDate   string
+	// lastSeenTimestamp is the timestamp of the most recently observed MarketData.
+	// Cooldown / daily-limit decisions are evaluated against this value so that
+	// backtest replay (which processes long periods of ticks in seconds of wall
+	// clock) advances the simulated clock correctly. Falls back to time.Now()
+	// when zero (e.g. unit tests that don't set Timestamp).
+	lastSeenTimestamp time.Time
 }
 
 // New creates a Strategy from Params.
@@ -146,6 +152,14 @@ func (s *Strategy) GenerateSignal(_ context.Context, data *strategy.MarketData, 
 		return nil, fmt.Errorf("market data is nil")
 	}
 
+	// Remember the observed tick timestamp so cooldown/daily-limit can be
+	// evaluated in simulated time during backtest replay.
+	if !data.Timestamp.IsZero() {
+		s.mu.Lock()
+		s.lastSeenTimestamp = data.Timestamp
+		s.mu.Unlock()
+	}
+
 	s.mu.RLock()
 	fastPeriod := s.emaFastPeriod
 	slowPeriod := s.emaSlowPeriod
@@ -226,11 +240,20 @@ func (s *Strategy) Analyze(data []strategy.MarketData) (*strategy.Signal, error)
 }
 
 // RecordTrade updates cooldown and daily trade counter.
+//
+// Uses the most recently observed MarketData.Timestamp as "now" so that the
+// strategy works correctly under backtest replay (where wall-clock barely
+// advances). Live operation is unaffected because tick timestamps track
+// wall-clock in real time.
 func (s *Strategy) RecordTrade() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.lastTradeTime = time.Now()
-	today := jstToday()
+	now := s.lastSeenTimestamp
+	if now.IsZero() {
+		now = time.Now()
+	}
+	s.lastTradeTime = now
+	today := jstDate(now)
 	if s.lastTradeDate != today {
 		s.dailyTradeCount = 1
 		s.lastTradeDate = today
@@ -323,13 +346,21 @@ func (s *Strategy) isInCooldown(cooldownSec int) bool {
 	if s.lastTradeTime.IsZero() || cooldownSec == 0 {
 		return false
 	}
-	return time.Since(s.lastTradeTime).Seconds() < float64(cooldownSec)
+	now := s.lastSeenTimestamp
+	if now.IsZero() {
+		now = time.Now()
+	}
+	return now.Sub(s.lastTradeTime).Seconds() < float64(cooldownSec)
 }
 
 func (s *Strategy) isDailyLimitReached(maxDailyTrades int) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.lastTradeDate != jstToday() {
+	now := s.lastSeenTimestamp
+	if now.IsZero() {
+		now = time.Now()
+	}
+	if s.lastTradeDate != jstDate(now) {
 		return false
 	}
 	return s.dailyTradeCount >= maxDailyTrades
@@ -338,7 +369,12 @@ func (s *Strategy) isDailyLimitReached(maxDailyTrades int) bool {
 // jstToday returns today's date string in JST (UTC+9).
 // Counters reset at midnight JST, not UTC, to align with the Japanese trading day.
 func jstToday() string {
-	return time.Now().UTC().Add(9 * time.Hour).Format("2006-01-02")
+	return jstDate(time.Now())
+}
+
+// jstDate returns the JST date string for the given instant.
+func jstDate(t time.Time) string {
+	return t.UTC().Add(9 * time.Hour).Format("2006-01-02")
 }
 
 // calcEMA computes the Exponential Moving Average for the given period.
