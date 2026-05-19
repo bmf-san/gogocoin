@@ -194,14 +194,20 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	// ── 10. Workers ───────────────────────────────────────────────────────────
 	clientFactory := &marketDataAdapter{client: bfClient, marketDataSvc: bfMarketDataSvc}
 
+	// Subscribe to trade symbols + observe-only symbols (data-collection only).
+	// Observe symbols are persisted to the DB by the exchange adapter but are
+	// filtered out before the strategy worker, so they never produce signals.
+	subscribeSymbols := mergeSymbols(cfg.Trading.Symbols, cfg.Trading.ObserveSymbols)
+
 	marketDataWorker := adapterworker.NewMarketDataWorker(
-		log, cfg.Trading.Symbols, marketDataCh, clientFactory,
+		log, subscribeSymbols, marketDataCh, clientFactory,
 		cfg.Worker.ReconnectIntervalSeconds,
 		cfg.Worker.MaxReconnectIntervalSeconds,
 		cfg.Worker.ConnectionCheckIntervalSeconds,
 		cfg.Worker.StaleDataTimeoutSeconds,
 	)
 	strategyWorker := adapterworker.NewStrategyWorker(log, strat, marketDataCh, signalCh)
+	strategyWorker.SetTradeSymbols(cfg.Trading.Symbols)
 	strategyWorker.SetPositionReader(repo)
 	signalWorker := adapterworker.NewSignalWorker(
 		log, signalCh, tradingCtrl, riskMgr, trader, strat, perfAnalytics,
@@ -256,6 +262,36 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 
 	log.System().Info("gogocoin shut down successfully")
 	return nil
+}
+
+// mergeSymbols returns the union of two symbol lists, preserving the order of
+// `primary` first and appending any additional unique entries from `extra`.
+// Empty strings are skipped. Used to combine trade symbols with observe-only
+// symbols for a single WebSocket subscription pass.
+func mergeSymbols(primary, extra []string) []string {
+	seen := make(map[string]struct{}, len(primary)+len(extra))
+	out := make([]string, 0, len(primary)+len(extra))
+	for _, s := range primary {
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	for _, s := range extra {
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
 }
 
 // buildStrategy creates and initializes the strategy from the global registry.
