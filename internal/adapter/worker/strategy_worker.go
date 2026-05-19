@@ -65,6 +65,12 @@ type StrategyWorker struct {
 
 	// positionReader is optional; when set, stop-loss is checked on every tick.
 	positionReader PositionReader
+
+	// tradeSymbols, when non-nil, restricts strategy processing to the given
+	// symbols. Market data for symbols outside this set is dropped before the
+	// strategy is invoked (observe-only / data-collection symbols). nil means
+	// "all incoming symbols" (legacy behavior).
+	tradeSymbols map[string]struct{}
 }
 
 // NewStrategyWorker creates a new strategy worker
@@ -88,6 +94,23 @@ func NewStrategyWorker(
 
 // Name returns the worker name.
 func (w *StrategyWorker) Name() string { return "strategy-worker" }
+
+// SetTradeSymbols restricts strategy processing to the given symbols.
+// Market data for other symbols (typically subscribed via observe_symbols
+// for data collection) is dropped before the strategy is invoked, so no
+// trade signals are produced for them. Passing nil or an empty slice
+// disables the filter and processes all incoming symbols.
+func (w *StrategyWorker) SetTradeSymbols(symbols []string) {
+	if len(symbols) == 0 {
+		w.tradeSymbols = nil
+		return
+	}
+	m := make(map[string]struct{}, len(symbols))
+	for _, s := range symbols {
+		m[s] = struct{}{}
+	}
+	w.tradeSymbols = m
+}
 
 // Run starts the strategy worker
 func (w *StrategyWorker) Run(ctx context.Context) error {
@@ -129,6 +152,15 @@ func (w *StrategyWorker) Run(ctx context.Context) error {
 			if !ok {
 				w.logger.Strategy().Info("Market data channel closed")
 				return nil
+			}
+
+			// Drop observe-only symbols before any per-tick work. Persistence
+			// happens in the exchange adapter independently, so historical data
+			// is still collected for these symbols.
+			if w.tradeSymbols != nil {
+				if _, ok := w.tradeSymbols[marketData.Symbol]; !ok {
+					continue
+				}
 			}
 
 			// Check context before spawning new goroutine

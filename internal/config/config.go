@@ -55,6 +55,11 @@ type TradingConfig struct {
 	FeeRate        float64              `yaml:"fee_rate"`
 	InitialBalance float64              `yaml:"initial_balance"`
 	Symbols        []string             `yaml:"symbols"`
+	// ObserveSymbols are subscribed to for market-data collection only.
+	// They are NOT fed to the strategy and never produce trade signals.
+	// Use this to warm up historical data for new symbols before promoting
+	// them into `symbols` for live trading.
+	ObserveSymbols []string             `yaml:"observe_symbols"`
 	Strategy       StrategyConfig       `yaml:"strategy"`
 	RiskManagement RiskManagementConfig `yaml:"risk_management"`
 }
