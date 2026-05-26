@@ -33,6 +33,19 @@ type symbolHistory struct {
 	data       []strategy.MarketData
 	lastAccess time.Time
 	mu         sync.RWMutex
+
+	// Bar aggregation state. Used only when StrategyWorker.barPeriod > 0.
+	// When in bar-aggregation mode, `data` above holds COMPLETED BARS
+	// (one MarketData per finalized bar, Price=Close, Timestamp=bucket start)
+	// rather than raw ticks.
+	barOpen    bool
+	barStart   time.Time
+	barHigh    float64
+	barLow     float64
+	barClose   float64
+	barVolume  float64
+	barBestBid float64
+	barBestAsk float64
 }
 
 // StrategyWorker processes market data and generates trading signals
@@ -44,6 +57,7 @@ type StrategyWorker struct {
 	historyLimit       int
 	maxSymbols         int           // Maximum number of symbols to track
 	symbolExpiryPeriod time.Duration // Period after which inactive symbols are removed
+	barPeriod          time.Duration // When > 0, aggregate ticks into bars of this length and invoke strategy on bar close only.
 
 	// Symbol histories with per-symbol locking for better concurrency
 	histories sync.Map // map[string]*symbolHistory
@@ -94,6 +108,34 @@ func NewStrategyWorker(
 
 // Name returns the worker name.
 func (w *StrategyWorker) Name() string { return "strategy-worker" }
+
+// SetBarPeriod configures bar aggregation. When period > 0, the worker
+// aggregates incoming ticks into UTC-aligned OHLCV bars of the given length
+// and invokes the strategy once per completed bar (instead of on every tick).
+// The bar's Close becomes MarketData.Price exposed to the strategy. Stop-loss
+// and take-profit checks continue to run on every tick. Calling with 0 or a
+// negative value disables aggregation (legacy per-tick behavior). Safe to
+// call before Run().
+func (w *StrategyWorker) SetBarPeriod(period time.Duration) {
+	if period < 0 {
+		period = 0
+	}
+	w.barPeriod = period
+}
+
+// barBucketStart returns the UTC-aligned start of the bucket containing t for
+// the given period. Mirrors the resampling logic used by the backtest engine
+// so that live bar boundaries match backtest bar boundaries exactly.
+func barBucketStart(t time.Time, period time.Duration) time.Time {
+	u := t.UTC()
+	ns := u.UnixNano()
+	bucketNs := period.Nanoseconds()
+	startNs := ns - (ns % bucketNs)
+	if ns < 0 && ns%bucketNs != 0 {
+		startNs -= bucketNs
+	}
+	return time.Unix(0, startNs).UTC()
+}
 
 // SetTradeSymbols restricts strategy processing to the given symbols.
 // Market data for other symbols (typically subscribed via observe_symbols
@@ -168,6 +210,16 @@ func (w *StrategyWorker) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return nil
 			default:
+			}
+
+			// In bar-aggregation mode, process ticks synchronously in the
+			// main loop to preserve FIFO ordering per symbol. Bar updates
+			// and forced-exit checks are microsecond-scale operations, so
+			// the throughput cost is negligible compared to the correctness
+			// gain (out-of-order tick processing would corrupt OHLCV bars).
+			if w.barPeriod > 0 {
+				w.processTickBarMode(ctx, &marketData)
+				continue
 			}
 
 			// Process market data asynchronously to prevent blocking the channel
@@ -397,6 +449,161 @@ func (w *StrategyWorker) checkTakeProfit(symbol string, currentPrice float64) *s
 		}
 	}
 	return nil
+}
+
+// processTickBarMode handles a single market data tick when bar aggregation
+// is enabled (BarPeriod > 0). Called synchronously from the main Run loop to
+// guarantee per-symbol FIFO ordering, which is essential for correct OHLCV
+// aggregation. Ticks whose timestamps fall before the currently-open bucket
+// are treated as stale and dropped from aggregation (but SL/TP still runs).
+func (w *StrategyWorker) processTickBarMode(ctx context.Context, data *domain.MarketData) {
+	defer func() {
+		if r := recover(); r != nil {
+			w.logger.Strategy().WithField("panic", r).Error("Bar-mode tick processing panicked")
+		}
+	}()
+
+	strategyData := strategy.MarketData{
+		Symbol:    data.Symbol,
+		Price:     data.Price,
+		Volume:    data.Volume,
+		BestBid:   data.BestBid,
+		BestAsk:   data.BestAsk,
+		Spread:    data.Spread,
+		Timestamp: data.Timestamp,
+	}
+
+	hist := w.getOrCreateHistory(data.Symbol)
+	bucket := barBucketStart(strategyData.Timestamp, w.barPeriod)
+
+	hist.mu.Lock()
+	var completedBar *strategy.MarketData
+	switch {
+	case !hist.barOpen:
+		hist.barOpen = true
+		hist.barStart = bucket
+		hist.barHigh = strategyData.Price
+		hist.barLow = strategyData.Price
+		hist.barClose = strategyData.Price
+		hist.barVolume = strategyData.Volume
+		hist.barBestBid = strategyData.BestBid
+		hist.barBestAsk = strategyData.BestAsk
+	case bucket.Equal(hist.barStart):
+		if strategyData.Price > hist.barHigh {
+			hist.barHigh = strategyData.Price
+		}
+		if strategyData.Price < hist.barLow {
+			hist.barLow = strategyData.Price
+		}
+		hist.barClose = strategyData.Price
+		hist.barVolume += strategyData.Volume
+		hist.barBestBid = strategyData.BestBid
+		hist.barBestAsk = strategyData.BestAsk
+	case bucket.After(hist.barStart):
+		// Finalize the prior bar.
+		bar := strategy.MarketData{
+			Symbol:    data.Symbol,
+			Price:     hist.barClose,
+			Volume:    hist.barVolume,
+			BestBid:   hist.barBestBid,
+			BestAsk:   hist.barBestAsk,
+			Spread:    hist.barBestAsk - hist.barBestBid,
+			Timestamp: hist.barStart,
+		}
+		completedBar = &bar
+		hist.data = append(hist.data, bar)
+		if len(hist.data) > w.historyLimit {
+			hist.data = hist.data[len(hist.data)-w.historyLimit:]
+		}
+		// Open a new bucket from the current tick.
+		hist.barStart = bucket
+		hist.barHigh = strategyData.Price
+		hist.barLow = strategyData.Price
+		hist.barClose = strategyData.Price
+		hist.barVolume = strategyData.Volume
+		hist.barBestBid = strategyData.BestBid
+		hist.barBestAsk = strategyData.BestAsk
+	default:
+		// bucket.Before(hist.barStart) — stale out-of-order tick; ignore
+		// for aggregation. Risk-management still runs on the tick price.
+	}
+	hist.lastAccess = time.Now()
+	var historyCopy []strategy.MarketData
+	if completedBar != nil {
+		historyCopy = make([]strategy.MarketData, len(hist.data))
+		copy(historyCopy, hist.data)
+	}
+	hist.mu.Unlock()
+
+	// Risk management always runs on the live tick price, even when no bar
+	// finalizes on this tick.
+	w.dispatchForcedExitIfAny(ctx, data)
+
+	if completedBar == nil {
+		return
+	}
+
+	barDomain := domain.MarketData{
+		Symbol:    completedBar.Symbol,
+		Price:     completedBar.Price,
+		Volume:    completedBar.Volume,
+		BestBid:   completedBar.BestBid,
+		BestAsk:   completedBar.BestAsk,
+		Spread:    completedBar.Spread,
+		Timestamp: completedBar.Timestamp,
+	}
+	w.logger.Strategy().
+		WithField("symbol", data.Symbol).
+		WithField("bar_close", completedBar.Price).
+		WithField("history_count", len(historyCopy)).
+		Debug("Bar finalized, invoking strategy")
+	w.executeStrategy(ctx, &barDomain, historyCopy)
+}
+
+// dispatchForcedExitIfAny checks SL/TP on the current tick and emits a SELL
+// signal if either is triggered. Used in bar-aggregation mode where strategy
+// signals are produced only on bar close, but risk-management exits must
+// remain tick-level. The per-symbol ForcedExitCooldown prevents flooding
+// when an order is still settling.
+func (w *StrategyWorker) dispatchForcedExitIfAny(ctx context.Context, marketData *domain.MarketData) {
+	var sig *strategy.Signal
+	if s := w.checkStopLoss(marketData.Symbol, marketData.Price); s != nil {
+		sig = s
+	} else if s := w.checkTakeProfit(marketData.Symbol, marketData.Price); s != nil {
+		sig = s
+	}
+	if sig == nil {
+		return
+	}
+	if last, ok := w.lastForcedExitAttempt.Load(sig.Symbol); ok {
+		if time.Since(last.(time.Time)) < ForcedExitCooldown {
+			return
+		}
+	}
+	// Clear standard dedup so a stale BUY/SELL doesn't block the forced exit.
+	w.lastSentSignals.Delete(sig.Symbol)
+
+	w.logger.LogStrategySignal(
+		w.strategy.Name(),
+		sig.Symbol,
+		string(sig.Action),
+		sig.Strength,
+		sig.Metadata,
+	)
+	select {
+	case w.signalCh <- sig:
+		w.lastSentSignals.Store(sig.Symbol, sig.Action)
+		w.lastForcedExitAttempt.Store(sig.Symbol, time.Now())
+	case <-ctx.Done():
+		return
+	default:
+		droppedCount := atomic.AddInt64(&w.droppedSignals, 1)
+		w.logger.Strategy().
+			WithField("dropped_count", droppedCount).
+			WithField("symbol", sig.Symbol).
+			WithField("action", sig.Action).
+			Warn("Signal channel is full, dropping forced-exit signal")
+	}
 }
 
 // executeStrategy executes the strategy

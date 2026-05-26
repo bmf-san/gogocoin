@@ -208,6 +208,7 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	)
 	strategyWorker := adapterworker.NewStrategyWorker(log, strat, marketDataCh, signalCh)
 	strategyWorker.SetTradeSymbols(cfg.Trading.Symbols)
+	strategyWorker.SetBarPeriod(cfg.Worker.Strategy.BarPeriod)
 	strategyWorker.SetPositionReader(repo)
 	signalWorker := adapterworker.NewSignalWorker(
 		log, signalCh, tradingCtrl, riskMgr, trader, strat, perfAnalytics,
