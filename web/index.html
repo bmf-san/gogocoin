@@ -81,83 +81,31 @@
               <h1 class="text-2xl font-bold">ダッシュボード</h1>
             </div>
             <!-- Stat Cards -->
-            <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-8 gap-4 mb-6">
-              <!-- Realized-Basis Asset -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <!-- Total P&L -->
               <div class="card stat-card">
                 <div class="card-body p-4">
                   <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm text-secondary">実現ベース資産</span>
-                    <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M3 3h14v14H3zM6 12h2v3H6zM9 9h2v6H9zM12 6h2v9h-2z" />
-                    </svg>
-                  </div>
-                  <p id="realized-asset" class="text-2xl font-bold mb-1">¥0</p>
-                  <span id="realized-asset-caption" class="text-xs text-secondary">初期資金 + 累計実現損益</span>
-                </div>
-              </div>
-              <!-- Account Valuation (Now) -->
-              <div class="card stat-card">
-                <div class="card-body p-4">
-                  <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm text-secondary">総資産(現在推定)</span>
-                    <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M2 4h16v12H2zM4 6v8h12V6z" />
-                    </svg>
-                  </div>
-                  <p id="account-asset" class="text-2xl font-bold mb-1">¥0</p>
-                  <span id="account-asset-caption" class="text-xs text-secondary">JPY + 保有資産の時価</span>
-                </div>
-              </div>
-              <!-- Total Realized P&L -->
-              <div class="card stat-card">
-                <div class="card-body p-4">
-                  <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm text-secondary">累計実現損益</span>
+                    <span class="text-sm text-secondary">総損益</span>
                     <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M2 16L7 9l3 4 4-7 4-1V16z" />
                     </svg>
                   </div>
                   <p id="total-pnl" class="text-2xl font-bold mb-1">¥0</p>
-                  <span id="total-pnl-caption" class="text-xs text-secondary">DB保持期間内</span>
-                </div>
-              </div>
-              <!-- Net P&L (Realized + Unrealized) -->
-              <div class="card stat-card">
-                <div class="card-body p-4">
-                  <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm text-secondary">総評価損益</span>
-                    <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10 2l2.5 5.5L18 8l-4 3.9L15 18l-5-2.8L5 18l1-6.1L2 8l5.5-.5L10 2z" />
-                    </svg>
-                  </div>
-                  <p id="net-pnl" class="text-2xl font-bold mb-1">¥0</p>
-                  <span class="text-xs text-secondary">実現 + 含み(概算)</span>
+                  <span id="total-pnl-caption" class="text-xs text-secondary">累計</span>
                 </div>
               </div>
               <!-- Today's P&L -->
               <div class="card stat-card">
                 <div class="card-body p-4">
                   <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm text-secondary">本日実現損益</span>
+                    <span class="text-sm text-secondary">本日損益</span>
                     <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm1 5H9v5l4 2.5-.75-1.23L11 12V7z" />
                     </svg>
                   </div>
                   <p id="today-pnl" class="text-2xl font-bold mb-1">¥0</p>
-                  <span class="text-xs text-secondary">本日(確定)</span>
-                </div>
-              </div>
-              <!-- Current Unrealized P&L -->
-              <div class="card stat-card">
-                <div class="card-body p-4">
-                  <div class="flex items-center justify-between mb-3">
-                    <span class="text-sm text-secondary">未実現損益</span>
-                    <svg class="icon-base text-disabled" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M3 3h14v2H3V3zm0 4h10v2H3V7zm0 4h14v2H3v-2zm0 4h10v2H3v-2z" />
-                    </svg>
-                  </div>
-                  <p id="today-unrealized-pnl" class="text-2xl font-bold mb-1">¥0</p>
-                  <span id="today-unrealized-caption" class="text-xs text-secondary">建玉ベース</span>
+                  <span class="text-xs text-secondary">本日</span>
                 </div>
               </div>
               <!-- Win Rate -->
@@ -183,7 +131,7 @@
                     </svg>
                   </div>
                   <p id="total-trades" class="text-2xl font-bold mb-1">-</p>
-                  <span class="text-xs text-secondary">累計</span>
+                  <span class="text-xs text-secondary">本日</span>
                 </div>
               </div>
             </div>
@@ -227,7 +175,7 @@
               <!-- Balance -->
               <div class="card flex flex-col">
                 <div class="card-header">
-                  <h2 class="text-base font-semibold">資産残高</h2>
+                  <h2 class="text-base font-semibold">残高</h2>
                 </div>
                 <div class="card-body flex-1 overflow-y-auto">
                   <table class="table table-sm w-full">
@@ -236,12 +184,10 @@
                         <th>通貨</th>
                         <th class="text-right">総量</th>
                         <th class="text-right">利用可能</th>
-                        <th class="text-right">評価額(JPY)</th>
-                        <th class="text-right">構成比</th>
                       </tr>
                     </thead>
                     <tbody id="balance-table">
-                      <tr><td colspan="5" class="text-center text-secondary py-6">読み込み中...</td></tr>
+                      <tr><td colspan="3" class="text-center text-secondary py-6">読み込み中...</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -292,49 +238,6 @@
                   </table>
                 </div>
               </div>
-              <!-- Total Asset Trend -->
-              <div class="card flex flex-col">
-                <div class="card-header">
-                  <h2 class="text-base font-semibold">資産推移(実現ベース)</h2>
-                </div>
-                <div class="card-body flex-1 overflow-y-auto">
-                  <table class="table table-sm w-full">
-                    <thead>
-                      <tr>
-                        <th>日付</th>
-                        <th class="text-right">実現ベース資産</th>
-                        <th class="text-right">前日比</th>
-                      </tr>
-                    </thead>
-                    <tbody id="asset-history-table">
-                      <tr><td colspan="3" class="text-center text-secondary py-6">読み込み中...</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <!-- Open Positions -->
-              <div class="card flex flex-col md:col-span-2">
-                <div class="card-header">
-                  <h2 class="text-base font-semibold">建玉一覧</h2>
-                </div>
-                <div class="card-body flex-1 overflow-y-auto">
-                  <table class="table table-sm w-full">
-                    <thead>
-                      <tr>
-                        <th>通貨ペア</th>
-                        <th class="text-right">数量</th>
-                        <th class="text-right">平均取得</th>
-                        <th class="text-right">現在値</th>
-                        <th class="text-right">未実現損益</th>
-                        <th class="text-right">騰落率</th>
-                      </tr>
-                    </thead>
-                    <tbody id="open-positions-table">
-                      <tr><td colspan="6" class="text-center text-secondary py-6">読み込み中...</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
           </div>
           <!-- /page-performance -->
@@ -355,7 +258,7 @@
                       <th class="text-right">価格</th>
                       <th class="text-right">数量</th>
                       <th class="text-right">手数料</th>
-                      <th class="text-right">実現損益</th>
+                      <th class="text-right">損益</th>
                     </tr>
                   </thead>
                   <tbody id="trades-table">
@@ -412,6 +315,6 @@
     </div>
     <!-- /dashboard -->
 
-    <script src="script.js?v=20260529"></script>
+    <script src="script.js?v=20260319"></script>
   </body>
 </html>
