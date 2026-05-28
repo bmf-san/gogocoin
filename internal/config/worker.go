@@ -54,6 +54,16 @@ type StrategyWorkerConfig struct {
 
 	// History retention
 	HistoryRetentionHours int `yaml:"history_retention_hours"`
+
+	// BarPeriod, when > 0, causes the strategy worker to aggregate incoming
+	// market data ticks into time-aligned OHLCV bars (UTC-aligned) of this
+	// length and invoke the strategy once per completed bar instead of on
+	// every tick. The bar's Close price is exposed to the strategy as the
+	// MarketData.Price for both the latest data point and each history
+	// entry. Stop-loss and take-profit checks continue to run on every tick.
+	// When 0 (the default) the worker uses the legacy per-tick behavior and
+	// passes raw ticks through to the strategy unchanged.
+	BarPeriod time.Duration `yaml:"bar_period"`
 }
 
 // MaintenanceWorkerConfig represents maintenance worker configuration

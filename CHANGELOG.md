@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.7.0](https://github.com/bmf-san/gogocoin/compare/v1.6.1...v1.7.0) (2026-05-28)
+
+
+### Features
+
+* **config:** add trading.observe_symbols for data-collection-only subscriptions ([#107](https://github.com/bmf-san/gogocoin/issues/107)) ([97ee6bd](https://github.com/bmf-san/gogocoin/commit/97ee6bd05f8e2b5a8d957cdab1645f146e7b2da5))
+* **web:** align dashboard with exchange-style pnl and positions ([c399371](https://github.com/bmf-san/gogocoin/commit/c39937107b4948702aba48a5a92f23f76f33a440))
+* **web:** align dashboard with exchange-style pnl and positions ([#112](https://github.com/bmf-san/gogocoin/issues/112)) ([e7687be](https://github.com/bmf-san/gogocoin/commit/e7687bebfa7c52f8ee774734e98de5619ef242d4))
+* **worker:** bar aggregation for strategy worker ([#110](https://github.com/bmf-san/gogocoin/issues/110)) ([d6f7020](https://github.com/bmf-san/gogocoin/commit/d6f70208e7904ed295e2269029fd8c0438c0f85b))
+
+
+### Bug Fixes
+
+* **example/scalping:** evaluate cooldown/daily-limit against MarketData.Timestamp ([#105](https://github.com/bmf-san/gogocoin/issues/105)) ([4db8add](https://github.com/bmf-san/gogocoin/commit/4db8add99a776e9072801d713ea25a3e7b5d8b67))
+* **pnl:** correct dashboard PnL aggregation and retention semantics ([#100](https://github.com/bmf-san/gogocoin/issues/100)) ([33cffb0](https://github.com/bmf-san/gogocoin/commit/33cffb0a61e77d1ec6c8a2c6528cb0ff83917467))
+
+
+### Documentation
+
+* align bundled scalping strategy docs with actual minimal implementation ([#102](https://github.com/bmf-san/gogocoin/issues/102)) ([abb09e1](https://github.com/bmf-san/gogocoin/commit/abb09e1bbb9bafcac922849e1b40e7ca61b7bc56))
+
+
+### Build System
+
+* **deps:** bump github.com/mattn/go-sqlite3 from 1.14.42 to 1.14.44 ([#104](https://github.com/bmf-san/gogocoin/issues/104)) ([187eeeb](https://github.com/bmf-san/gogocoin/commit/187eeeb3cd91215f160adf5bf7ce41f50c84c189))
+* **deps:** bump github.com/oapi-codegen/runtime from 1.3.1 to 1.4.0 ([#90](https://github.com/bmf-san/gogocoin/issues/90)) ([56124fe](https://github.com/bmf-san/gogocoin/commit/56124feca6f23f69df312613115d9e4af03920a8))
+
+
+### Continuous Integration
+
+* **dependabot:** add example/ ecosystem and use Conventional Commits prefixes ([#96](https://github.com/bmf-san/gogocoin/issues/96)) ([9810bb0](https://github.com/bmf-san/gogocoin/commit/9810bb0f7ae42ffea84a45b71cae88ef7709c824))
+* **deps:** bump actions/labeler from 5 to 6 ([#99](https://github.com/bmf-san/gogocoin/issues/99)) ([1c9f113](https://github.com/bmf-san/gogocoin/commit/1c9f1137073506f0db27ae31fa9a8d3d728b188a))
+* **deps:** bump amannn/action-semantic-pull-request from 5 to 6 ([#98](https://github.com/bmf-san/gogocoin/issues/98)) ([d1fd61b](https://github.com/bmf-san/gogocoin/commit/d1fd61bfb5feb312b1a10ff925622587a24930d0))
+* **deps:** bump googleapis/release-please-action from 4 to 5 ([#103](https://github.com/bmf-san/gogocoin/issues/103)) ([0989ba6](https://github.com/bmf-san/gogocoin/commit/0989ba62c007d729fc90a771e47eb24e95504e59))
+* **deps:** bump kentaro-m/auto-assign-action from 2.0.0 to 2.0.2 ([#97](https://github.com/bmf-san/gogocoin/issues/97)) ([25521da](https://github.com/bmf-san/gogocoin/commit/25521da178cde17bae6a6108a94d197a56121eb5))
+
+
+### Miscellaneous
+
+* **config:** bump example retention_days from 1 to 90 ([#101](https://github.com/bmf-san/gogocoin/issues/101)) ([b2b1a3c](https://github.com/bmf-san/gogocoin/commit/b2b1a3c1efd2c99f33b4e41b01a839547f57df17))
+* **main:** release 1.6.1 ([#106](https://github.com/bmf-san/gogocoin/issues/106)) ([a340e4a](https://github.com/bmf-san/gogocoin/commit/a340e4acb003087cfb43e6f64507a31346a63c77))
+
 ## [1.6.1](https://github.com/bmf-san/gogocoin/compare/v1.6.0...v1.6.1) (2026-05-11)
 
 
