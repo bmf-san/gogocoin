@@ -1,0 +1,65 @@
+# Minimal backtest scenarios for gogocoin.
+
+data:
+  source: sqlite
+  path: data/gogocoin.db
+  symbol: BTC_JPY
+  from: ""
+  to: ""
+
+simulator:
+  initial_balance: 100000
+  fee_rate: 0.0015
+  slippage_bps: 5
+  same_bar_rule: sl_priority
+  min_volume_ratio: 0
+
+scenarios:
+  scalping_xrp_default:
+    strategy: scalping
+    data_override:
+      symbol: XRP_JPY
+    params:
+      ema_fast_period: 12
+      ema_slow_period: 26
+      ema_spread_threshold_pct: 0.025
+      take_profit_pct: 1.2
+      stop_loss_pct: 0.5
+      cooldown_sec: 1800
+      max_daily_trades: 3
+      order_notional: 3000
+      fee_rate: 0.0015
+      rsi_period: 14
+      rsi_overbought: 65.0
+      rsi_oversold: 35.0
+      trend_filter_enabled: true
+      trend_ema_period: 100
+      atr_period: 20
+      atr_min_pct: 0.05
+      atr_max_pct: 1.2
+      entry_confirmation_ticks: 3
+
+  scalping_xrp_grid:
+    strategy: scalping
+    data_override:
+      symbol: XRP_JPY
+    grid:
+      ema_fast_period: [8, 12, 15, 20]
+      ema_slow_period: [21, 26, 35, 50]
+      take_profit_pct: [0.6, 1.0, 1.2, 1.5]
+      stop_loss_pct: [0.4, 0.6, 0.8]
+    fixed:
+      ema_spread_threshold_pct: 0.025
+      cooldown_sec: 1800
+      max_daily_trades: 10
+      order_notional: 3000
+      fee_rate: 0.0015
+      rsi_period: 14
+      rsi_overbought: 65.0
+      rsi_oversold: 35.0
+      trend_filter_enabled: true
+      trend_ema_period: 100
+      atr_period: 20
+      atr_min_pct: 0.05
+      atr_max_pct: 1.2
+      entry_confirmation_ticks: 3
