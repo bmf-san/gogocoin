@@ -22,3 +22,11 @@ type PerformanceMetric struct {
 	ConsecutiveLoss int       `json:"consecutive_loss"`
 	TotalPnL        float64   `json:"total_pnl"`
 }
+
+// SymbolPerformance represents realized performance aggregated by symbol.
+type SymbolPerformance struct {
+	Symbol      string  `json:"symbol"`
+	TotalTrades int     `json:"total_trades"`
+	WinRate     float64 `json:"win_rate"`
+	TotalPnL    float64 `json:"total_pnl"`
+}

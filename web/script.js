@@ -158,13 +158,14 @@ class GogocoinUI {
                 this.fetchAPI(`/api/status?symbol=${this.selectedSymbol}`),
                 this.fetchAPI('/api/balance'),
                 this.fetchAPI('/api/performance'),
+                this.fetchAPI('/api/v1/performance/symbols'),
                 this.fetchAPI('/api/trades?limit=200'),
                 this.fetchAPI('/api/trades?since=today'),
                 this.fetchAPI('/api/trades?limit=2000'),
                 this.fetchAPI(`/api/trades?since=${encodeURIComponent(new Date(Date.now() - (30 * 24 * 60 * 60 * 1000)).toISOString())}`)
             ]);
 
-            const [statusResult, balanceResult, performanceResult, tradesResult, todayTradesResult, wideTradesResult, trades30dResult] = results;
+            const [statusResult, balanceResult, performanceResult, symbolPerformanceResult, tradesResult, todayTradesResult, wideTradesResult, trades30dResult] = results;
 
             // Update only successful data (always update what we can)
             if (statusResult.status === 'fulfilled') {
@@ -177,6 +178,8 @@ class GogocoinUI {
             const todayTrades = todayTradesResult.status === 'fulfilled' ? todayTradesResult.value : trades;
             const wideTrades = wideTradesResult.status === 'fulfilled' ? wideTradesResult.value : trades;
             const trades30d = trades30dResult.status === 'fulfilled' ? trades30dResult.value : [];
+            const symbolPerformance = symbolPerformanceResult.status === 'fulfilled' ? symbolPerformanceResult.value : [];
+            const symbolPerformanceHasError = symbolPerformanceResult.status === 'rejected';
 
             const statusData = statusResult.status === 'fulfilled' ? statusResult.value : null;
             const monitoringPrices = statusData && statusData.monitoring_prices ? statusData.monitoring_prices : {};
@@ -203,6 +206,8 @@ class GogocoinUI {
                 this.updateOpenPositionsTable(wideTrades, statusData, true);
             }
 
+            this.updateSymbolPerformanceTable(symbolPerformance, symbolPerformanceHasError, trades30d);
+
             if (tradesResult.status === 'fulfilled') {
                 this.updateTrades(trades, false);
             } else {
@@ -219,6 +224,79 @@ class GogocoinUI {
             console.error('Failed to load dashboard data:', error);
             throw error; // Re-throw to trigger backoff
         }
+    }
+
+    // Update symbol-level realized PnL table.
+    // If API fails, a fallback aggregation from trade rows is used.
+    updateSymbolPerformanceTable(symbolPerformance, hasError, tradesFallback = []) {
+        const tbody = document.querySelector('#symbol-performance-table');
+
+        if (!tbody) {
+            console.error('Symbol performance table not found');
+            return;
+        }
+
+        let rows = [];
+
+        if (!hasError && Array.isArray(symbolPerformance) && symbolPerformance.length > 0) {
+            rows = symbolPerformance.map(item => ({
+                symbol: item.symbol,
+                total_trades: Number(item.total_trades) || 0,
+                win_rate: Number(item.win_rate),
+                total_pnl: Number(item.total_pnl) || 0,
+            }));
+        } else {
+            // Fallback: derive realized metrics from SELL rows only.
+            const bySymbol = {};
+            (tradesFallback || []).forEach(t => {
+                if (!t) return;
+                const side = String(t.side || '').toUpperCase();
+                if (side !== 'SELL') return;
+                const symbol = String(t.symbol || '').trim();
+                if (!symbol) return;
+
+                if (!bySymbol[symbol]) {
+                    bySymbol[symbol] = { symbol, total_trades: 0, wins: 0, total_pnl: 0 };
+                }
+
+                const pnl = Number(t.pnl);
+                if (Number.isFinite(pnl)) {
+                    bySymbol[symbol].total_pnl += pnl;
+                    if (pnl > 0) bySymbol[symbol].wins += 1;
+                }
+                bySymbol[symbol].total_trades += 1;
+            });
+
+            rows = Object.values(bySymbol).map(item => ({
+                symbol: item.symbol,
+                total_trades: item.total_trades,
+                win_rate: item.total_trades > 0 ? item.wins / item.total_trades : 0,
+                total_pnl: item.total_pnl,
+            }));
+        }
+
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-secondary py-6">銘柄別実現損益なし</td></tr>';
+            return;
+        }
+
+        rows.sort((a, b) => {
+            if (b.total_pnl !== a.total_pnl) return b.total_pnl - a.total_pnl;
+            if (b.total_trades !== a.total_trades) return b.total_trades - a.total_trades;
+            return String(a.symbol).localeCompare(String(b.symbol));
+        });
+
+        tbody.innerHTML = rows.map(row => {
+            const pnlClass = row.total_pnl >= 0 ? 'text-success' : 'text-danger';
+            return `
+            <tr>
+                <td class="font-bold text-sm">${this.escapeHtml(String(row.symbol || '-'))}</td>
+                <td class="text-right">${this.escapeHtml(String(row.total_trades || 0))}</td>
+                <td class="text-right">${this.escapeHtml(this.formatRate(row.win_rate))}</td>
+                <td class="text-right font-semibold ${pnlClass}">${this.escapeHtml(this.formatCurrency(row.total_pnl || 0))}</td>
+            </tr>
+        `;
+        }).join('');
     }
 
     // Update system status
@@ -1113,6 +1191,14 @@ class GogocoinUI {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         }).format(num / 100);
+    }
+
+    // Format a rate value that may come as ratio (0..1) or percent (0..100).
+    formatRate(value) {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return '-';
+        const percentValue = num <= 1 ? num * 100 : num;
+        return this.formatPercent(percentValue);
     }
 
     // API call helper

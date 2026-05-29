@@ -48,6 +48,9 @@ func (r *Repository) GetAllTrades() ([]domain.Trade, error) {
 func (r *Repository) GetTradesSince(since time.Time, limit int) ([]domain.Trade, error) {
 	return r.trade.GetTradesSince(since, limit)
 }
+func (r *Repository) GetSymbolPerformance() ([]domain.SymbolPerformance, error) {
+	return r.trade.GetSymbolPerformance()
+}
 func (r *Repository) GetTradesCount() (int, error) {
 	return r.trade.GetTradesCount()
 }

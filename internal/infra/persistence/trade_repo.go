@@ -123,6 +123,37 @@ func (r *TradeRepository) GetTradesSince(since time.Time, limit int) ([]domain.T
 	return trades, rows.Err()
 }
 
+// GetSymbolPerformance returns realized performance grouped by symbol.
+// Realized metrics are based on SELL rows only.
+func (r *TradeRepository) GetSymbolPerformance() ([]domain.SymbolPerformance, error) {
+	query := `SELECT
+			symbol,
+			COUNT(*) AS total_trades,
+			AVG(CASE WHEN pnl > 0 THEN 1.0 ELSE 0.0 END) AS win_rate,
+			COALESCE(SUM(pnl), 0) AS total_pnl
+		FROM trades
+		WHERE side = 'SELL'
+		GROUP BY symbol
+		ORDER BY total_pnl DESC, total_trades DESC, symbol ASC`
+
+	rows, err := r.db.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+
+	result := make([]domain.SymbolPerformance, 0)
+	for rows.Next() {
+		var item domain.SymbolPerformance
+		if err := rows.Scan(&item.Symbol, &item.TotalTrades, &item.WinRate, &item.TotalPnL); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+
+	return result, rows.Err()
+}
+
 // GetTradesCount returns the total number of trade records.
 func (r *TradeRepository) GetTradesCount() (int, error) {
 	var count int

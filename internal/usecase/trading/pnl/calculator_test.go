@@ -54,6 +54,10 @@ func (m *mockTradingRepo) GetTradesSince(_ time.Time, _ int) ([]domain.Trade, er
 	return nil, nil
 }
 
+func (m *mockTradingRepo) GetSymbolPerformance() ([]domain.SymbolPerformance, error) {
+	return nil, nil
+}
+
 func (m *mockTradingRepo) SavePosition(p *domain.Position) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

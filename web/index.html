@@ -335,6 +335,27 @@
                   </table>
                 </div>
               </div>
+              <!-- Symbol Performance -->
+              <div class="card flex flex-col md:col-span-2">
+                <div class="card-header">
+                  <h2 class="text-base font-semibold">銘柄別 実現損益</h2>
+                </div>
+                <div class="card-body flex-1 overflow-y-auto">
+                  <table class="table table-sm w-full">
+                    <thead>
+                      <tr>
+                        <th>通貨ペア</th>
+                        <th class="text-right">決済数</th>
+                        <th class="text-right">勝率</th>
+                        <th class="text-right">実現損益(JPY)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="symbol-performance-table">
+                      <tr><td colspan="4" class="text-center text-secondary py-6">読み込み中...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
           <!-- /page-performance -->

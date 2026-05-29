@@ -156,6 +156,24 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/performance/symbols:
+    get:
+      operationId: GetApiV1PerformanceSymbols
+      tags: [data]
+      summary: 銘柄別の実現損益集計を取得
+      description: trades テーブルの SELL 約定を銘柄ごとに集計して返す。
+      responses:
+        "200":
+          description: 銘柄別実現損益
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SymbolPerformance"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/logs:
     get:
       operationId: GetApiLogs
@@ -545,6 +563,23 @@ components:
           type: integer
         total_pnl:
           type: number
+
+    SymbolPerformance:
+      type: object
+      properties:
+        symbol:
+          type: string
+          example: BTC_JPY
+        total_trades:
+          type: integer
+          example: 42
+        win_rate:
+          type: number
+          description: 勝率（0.0 〜 1.0）
+          example: 0.64
+        total_pnl:
+          type: number
+          example: 3200.0
 
     LogEntry:
       type: object
