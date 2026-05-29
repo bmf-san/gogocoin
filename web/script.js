@@ -836,8 +836,10 @@ class GogocoinUI {
         }
     }
 
-    // Update PnL history table
-    // tradesForDaily: trade rows used for robust per-day aggregation.
+    // Update daily realized PnL table.
+    // tradesForDaily: trade rows used for day aggregation.
+    // Exchange-style semantics: realized PnL and win-rate are based on
+    // closing executions (SELL in current long-only strategy).
     updatePerformanceTable(performance, hasError, tradesForDaily = []) {
         const tbody = document.querySelector('#pnl-history-table');
 
@@ -857,6 +859,7 @@ class GogocoinUI {
         const perDay = {};
         (tradesForDaily || []).forEach(t => {
             if (!t || !t.executed_at) return;
+            if (String(t.side || '').toUpperCase() !== 'SELL') return;
             const d = new Date(new Date(t.executed_at).getTime() + jstOffsetMs).toISOString().split('T')[0];
             if (!perDay[d]) {
                 perDay[d] = { pnl: 0, trades: 0, wins: 0 };
