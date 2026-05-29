@@ -1,6 +1,6 @@
 # gogocoin Makefile
 
-.PHONY: help init test test-race test-coverage fmt fmt-check lint tidy-check vuln deps install-tools generate generate-check clean
+.PHONY: help init test test-race test-coverage fmt fmt-check lint tidy-check vuln deps install-tools generate generate-check backtest backtest-grid backtest-walkforward clean
 
 # Default target
 .DEFAULT_GOAL := help
@@ -89,6 +89,20 @@ generate-check: generate ## Verify generated code is in sync with OpenAPI spec (
 		exit 1; \
 	fi
 	@echo "Generated code is up-to-date."
+
+# Backtest
+BACKTEST_SCENARIO ?= scalping_xrp_default
+BACKTEST_OUT      ?= out/backtest
+BACKTEST_CONFIG   ?= configs/backtest.yaml
+
+backtest: ## Run a single backtest scenario (BACKTEST_SCENARIO=name)
+	@go run ./cmd/backtest run --config $(BACKTEST_CONFIG) --scenario $(BACKTEST_SCENARIO) --out $(BACKTEST_OUT)
+
+backtest-grid: ## Grid search optimisation (BACKTEST_SCENARIO=name with grid block)
+	@go run ./cmd/backtest optimize --config $(BACKTEST_CONFIG) --scenario $(BACKTEST_SCENARIO) --out out/optimize
+
+backtest-walkforward: ## Walk-forward analysis
+	@go run ./cmd/backtest walkforward --config $(BACKTEST_CONFIG) --scenario $(BACKTEST_SCENARIO) --out out/walkforward
 
 # Cleanup
 clean: ## Clean build artifacts and test cache

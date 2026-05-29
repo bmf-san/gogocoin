@@ -836,8 +836,8 @@ class GogocoinUI {
         }
     }
 
-    // Update daily realized PnL table.
-    // tradesForDaily: trade rows used for day aggregation.
+    // Update PnL history table
+    // tradesForDaily: trade rows used for robust per-day aggregation.
     // Exchange-style semantics: realized PnL and win-rate are based on
     // closing executions (SELL in current long-only strategy).
     updatePerformanceTable(performance, hasError, tradesForDaily = []) {

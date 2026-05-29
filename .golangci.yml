@@ -27,6 +27,8 @@ linters:
       - ".*\\.pb\\.go"
       - "testdata/.*"
     rules:
+      - path: "^pkg/backtest/.*\\.go$"
+        linters: [gocritic]         # backtest core import: keep runtime checks, relax style-only copies
       - path: "_test\\.go"
         linters: [gocritic, errcheck]  # test files: gocritic & errcheck suppressed
       - path: "_test\\.go"
