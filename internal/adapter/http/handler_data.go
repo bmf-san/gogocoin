@@ -180,6 +180,19 @@ func (s *Server) GetApiPerformance(ctx context.Context, request GetApiPerformanc
 	return GetApiPerformance200JSONResponse(domainMetricsToAPI(metrics)), nil
 }
 
+// GetApiV1PerformanceSymbols implements StrictServerInterface - get realized performance grouped by symbol.
+func (s *Server) GetApiV1PerformanceSymbols(ctx context.Context, request GetApiV1PerformanceSymbolsRequestObject) (GetApiV1PerformanceSymbolsResponseObject, error) {
+	items, err := s.db.GetSymbolPerformance()
+	if err != nil {
+		s.logger.Error("Failed to get symbol performance: " + err.Error())
+		msg := "Internal server error"
+		return GetApiV1PerformanceSymbols500JSONResponse{InternalServerErrorJSONResponse{Message: &msg}}, nil
+	}
+
+	s.logger.System().WithField("count", len(items)).Info("Returning symbol performance from API")
+	return GetApiV1PerformanceSymbols200JSONResponse(domainSymbolPerformanceToAPI(items)), nil
+}
+
 // GetApiConfig implements StrictServerInterface - get current config
 func (s *Server) GetApiConfig(ctx context.Context, request GetApiConfigRequestObject) (GetApiConfigResponseObject, error) {
 	cfg := s.getConfig()
@@ -424,6 +437,25 @@ func domainMetricsToAPI(metrics []domain.PerformanceMetric) []PerformanceMetric 
 			ConsecutiveWins: &consWins,
 			ConsecutiveLoss: &consLoss,
 			TotalPnl:        &totalPnl,
+		}
+	}
+	return result
+}
+
+// domainSymbolPerformanceToAPI converts []domain.SymbolPerformance to []SymbolPerformance.
+func domainSymbolPerformanceToAPI(items []domain.SymbolPerformance) []SymbolPerformance {
+	result := make([]SymbolPerformance, len(items))
+	for i := range items {
+		item := &items[i]
+		symbol := item.Symbol
+		totalTrades := item.TotalTrades
+		winRate := float32(item.WinRate)
+		totalPnl := float32(item.TotalPnL)
+		result[i] = SymbolPerformance{
+			Symbol:      &symbol,
+			TotalTrades: &totalTrades,
+			WinRate:     &winRate,
+			TotalPnl:    &totalPnl,
 		}
 	}
 	return result

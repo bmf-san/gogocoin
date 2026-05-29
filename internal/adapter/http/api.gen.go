@@ -394,6 +394,16 @@ type StatusResponse struct {
 	Uptime            *string             `json:"uptime,omitempty"`
 }
 
+// SymbolPerformance defines model for SymbolPerformance.
+type SymbolPerformance struct {
+	Symbol      *string  `json:"symbol,omitempty"`
+	TotalPnl    *float32 `json:"total_pnl,omitempty"`
+	TotalTrades *int     `json:"total_trades,omitempty"`
+
+	// WinRate 勝率（0.0 〜 1.0）
+	WinRate *float32 `json:"win_rate,omitempty"`
+}
+
 // Trade defines model for Trade.
 type Trade struct {
 	Amount       *float32     `json:"amount,omitempty"`
@@ -525,6 +535,9 @@ type ServerInterface interface {
 	// 取引停止
 	// (POST /api/trading/stop)
 	PostApiTradingStop(w http.ResponseWriter, r *http.Request)
+	// 銘柄別の実現損益集計を取得
+	// (GET /api/v1/performance/symbols)
+	GetApiV1PerformanceSymbols(w http.ResponseWriter, r *http.Request)
 	// ヘルスチェック
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -822,6 +835,20 @@ func (siw *ServerInterfaceWrapper) PostApiTradingStop(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// GetApiV1PerformanceSymbols operation middleware
+func (siw *ServerInterfaceWrapper) GetApiV1PerformanceSymbols(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiV1PerformanceSymbols(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
@@ -968,6 +995,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/trading/start", wrapper.PostApiTradingStart)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/trading/status", wrapper.GetApiTradingStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/trading/stop", wrapper.PostApiTradingStop)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/performance/symbols", wrapper.GetApiV1PerformanceSymbols)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
 
 	return m
@@ -1474,6 +1502,43 @@ func (response PostApiTradingStop503JSONResponse) VisitPostApiTradingStopRespons
 	return err
 }
 
+type GetApiV1PerformanceSymbolsRequestObject struct {
+}
+
+type GetApiV1PerformanceSymbolsResponseObject interface {
+	VisitGetApiV1PerformanceSymbolsResponse(w http.ResponseWriter) error
+}
+
+type GetApiV1PerformanceSymbols200JSONResponse []SymbolPerformance
+
+func (response GetApiV1PerformanceSymbols200JSONResponse) VisitGetApiV1PerformanceSymbolsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetApiV1PerformanceSymbols500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetApiV1PerformanceSymbols500JSONResponse) VisitGetApiV1PerformanceSymbolsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHealthRequestObject struct {
 }
 
@@ -1533,6 +1598,9 @@ type StrictServerInterface interface {
 	// 取引停止
 	// (POST /api/trading/stop)
 	PostApiTradingStop(ctx context.Context, request PostApiTradingStopRequestObject) (PostApiTradingStopResponseObject, error)
+	// 銘柄別の実現損益集計を取得
+	// (GET /api/v1/performance/symbols)
+	GetApiV1PerformanceSymbols(ctx context.Context, request GetApiV1PerformanceSymbolsRequestObject) (GetApiV1PerformanceSymbolsResponseObject, error)
 	// ヘルスチェック
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -1863,6 +1931,30 @@ func (sh *strictHandler) PostApiTradingStop(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PostApiTradingStopResponseObject); ok {
 		if err := validResponse.VisitPostApiTradingStopResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetApiV1PerformanceSymbols operation middleware
+func (sh *strictHandler) GetApiV1PerformanceSymbols(w http.ResponseWriter, r *http.Request) {
+	var request GetApiV1PerformanceSymbolsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetApiV1PerformanceSymbols(ctx, request.(GetApiV1PerformanceSymbolsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetApiV1PerformanceSymbols")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetApiV1PerformanceSymbolsResponseObject); ok {
+		if err := validResponse.VisitGetApiV1PerformanceSymbolsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
