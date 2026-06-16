@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.8.1](https://github.com/bmf-san/gogocoin/compare/v1.8.0...v1.8.1) (2026-06-16)
+
+
+### Bug Fixes
+
+* sync example go.sum and regenerate API code ([#121](https://github.com/bmf-san/gogocoin/issues/121)) ([ac50866](https://github.com/bmf-san/gogocoin/commit/ac50866c168f05f6a683259b9f3675bf02c1e3bd))
+
+
+### Build System
+
+* **deps:** bump github.com/mattn/go-sqlite3 from 1.14.44 to 1.14.45 ([#117](https://github.com/bmf-san/gogocoin/issues/117)) ([09de8df](https://github.com/bmf-san/gogocoin/commit/09de8df8f92e5f0e784db30b0f5557dbbb3afbb7))
+
+
+### Continuous Integration
+
+* add Dependabot auto-merge workflow ([#119](https://github.com/bmf-san/gogocoin/issues/119)) ([17c3521](https://github.com/bmf-san/gogocoin/commit/17c3521cd2d79a09bfe9886b98d9a73e2c8e0ac0))
+* **deps:** bump codecov/codecov-action from 6 to 7 ([#118](https://github.com/bmf-san/gogocoin/issues/118)) ([86c700b](https://github.com/bmf-san/gogocoin/commit/86c700b994d0662834a11ca268f649a8d5b66fb5))
+
 ## [1.8.0](https://github.com/bmf-san/gogocoin/compare/v1.7.0...v1.8.0) (2026-05-29)
 
 
