@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.8.2](https://github.com/bmf-san/gogocoin/compare/v1.8.1...v1.8.2) (2026-07-19)
+
+
+### Build System
+
+* **deps:** bump github.com/mattn/go-sqlite3 from 1.14.45 to 1.14.46 ([#123](https://github.com/bmf-san/gogocoin/issues/123)) ([b01e21d](https://github.com/bmf-san/gogocoin/commit/b01e21d42750eda8a1fcc12fad554272b597a0bb))
+* **deps:** bump github.com/mattn/go-sqlite3 from 1.14.46 to 1.14.47 ([#126](https://github.com/bmf-san/gogocoin/issues/126)) ([9fc90d0](https://github.com/bmf-san/gogocoin/commit/9fc90d0168966ebbc38084d56476f1da4f8d35c6))
+* **deps:** bump github.com/mattn/go-sqlite3 from 1.14.47 to 1.14.48 ([#129](https://github.com/bmf-san/gogocoin/issues/129)) ([a13a57c](https://github.com/bmf-san/gogocoin/commit/a13a57c425f5ea5dadcf219efe225f9c1cba517b))
+* **deps:** bump github.com/oapi-codegen/runtime from 1.4.1 to 1.4.2 ([#125](https://github.com/bmf-san/gogocoin/issues/125)) ([66be303](https://github.com/bmf-san/gogocoin/commit/66be30342876292fc4d8b35510c77f581fc6ae58))
+* **deps:** bump github.com/oapi-codegen/runtime from 1.4.2 to 1.6.0 ([#128](https://github.com/bmf-san/gogocoin/issues/128)) ([6ae5a7c](https://github.com/bmf-san/gogocoin/commit/6ae5a7cac36410740030a33aeb197fca44233cec))
+
+
+### Continuous Integration
+
+* **deps:** bump actions/checkout from 6 to 7 ([#124](https://github.com/bmf-san/gogocoin/issues/124)) ([0bc3328](https://github.com/bmf-san/gogocoin/commit/0bc3328deea160abdf3bd87687d02b366262c66e))
+* **deps:** bump actions/setup-go from 6 to 7 ([#127](https://github.com/bmf-san/gogocoin/issues/127)) ([e3f14d2](https://github.com/bmf-san/gogocoin/commit/e3f14d26d6901e28363c260c444ad9dfd41ac3dc))
+* **deps:** bump dependabot/fetch-metadata from 2 to 3 ([#122](https://github.com/bmf-san/gogocoin/issues/122)) ([613d9a6](https://github.com/bmf-san/gogocoin/commit/613d9a669209e1cb57d7062c8f17dc32149c8686))
+
 ## [1.8.1](https://github.com/bmf-san/gogocoin/compare/v1.8.0...v1.8.1) (2026-06-16)
 
 
