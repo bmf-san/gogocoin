@@ -7,6 +7,7 @@
 
 # Variable definitions
 APP_NAME := gogocoin
+OAPI_CODEGEN_VERSION ?= v2.7.1
 
 # Help
 help: ## Show this help
@@ -73,7 +74,7 @@ deps: ## Update dependencies
 install-tools: ## Install development tools (golangci-lint, oapi-codegen)
 	@echo "Installing development tools..."
 	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+	@go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION)
 
 # Code generation
 generate: ## Generate API code from OpenAPI spec
