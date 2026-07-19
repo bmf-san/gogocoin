@@ -78,7 +78,7 @@ jobs:
         cache: true
 
     - name: Install oapi-codegen
-      run: go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+      run: go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.1
 
     - name: Check generated code is up-to-date
       run: make generate-check
