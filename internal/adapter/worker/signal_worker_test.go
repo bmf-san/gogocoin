@@ -588,6 +588,111 @@ func TestGetAvailableSellSize(t *testing.T) {
 	}
 }
 
+// TestGetAvailableSellSize_CappedByOpenPosition covers the case where the wallet
+// holds more of the coin than the strategy actually bought, which happens with
+// pre-existing inventory, manual transfers, or fractional remainders left by an
+// earlier lot-rounded exit. Sizing the exit from the balance alone sells the
+// surplus too, and that surplus has no cost basis to match against.
+func TestGetAvailableSellSize_CappedByOpenPosition(t *testing.T) {
+	tests := []struct {
+		name          string
+		positions     []domain.Position
+		readerErr     error
+		balance       float64
+		requestedSize float64
+		want          float64
+	}{
+		{
+			// Reproduces the production dust sale: balance 1.039 XRP with only
+			// 0.702 XRP still open. Without the cap this returned a full 1.0 lot.
+			name:          "dust sale is skipped instead of overselling",
+			positions:     []domain.Position{{Symbol: "XRP_JPY", Side: "BUY", RemainingSize: 0.702}},
+			balance:       1.039,
+			requestedSize: 25,
+			want:          0,
+		},
+		{
+			name: "position smaller than balance caps the lot-floor",
+			positions: []domain.Position{
+				{Symbol: "XRP_JPY", Side: "BUY", RemainingSize: 4},
+				{Symbol: "XRP_JPY", Side: "BUY", RemainingSize: 3},
+			},
+			balance:       50,
+			requestedSize: 100,
+			// floor(7 * 0.95 / 1.0) * 1.0 = 6, not floor(50 * 0.95) = 47
+			want: 6,
+		},
+		{
+			name:          "balance smaller than position stays the binding limit",
+			positions:     []domain.Position{{Symbol: "XRP_JPY", Side: "BUY", RemainingSize: 50}},
+			balance:       7,
+			requestedSize: 100,
+			want:          6,
+		},
+		{
+			name:          "no open positions means nothing to sell",
+			positions:     nil,
+			balance:       12,
+			requestedSize: 100,
+			want:          0,
+		},
+		{
+			// A repository failure must not block exits: fall back to the wallet
+			// balance rather than treating the position size as zero.
+			name:          "reader error falls back to wallet balance",
+			readerErr:     errors.New("db unavailable"),
+			balance:       7,
+			requestedSize: 100,
+			want:          6,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newSellWorker(t, []domain.Balance{{Currency: "XRP", Available: tc.balance}}, 0.95)
+			w.SetPositionReader(&mockPositionReader{positions: tc.positions, err: tc.readerErr})
+
+			got := w.getAvailableSellSize(context.Background(), "XRP_JPY", tc.requestedSize)
+			if math.Abs(got-tc.want) > 1e-9 {
+				t.Errorf("getAvailableSellSize = %v; want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestRoundBuyQuantityToLotSize verifies that entries are floored to whole lots
+// even when auto scale is off. An un-rounded entry leaves a remainder that is
+// below the exchange minimum order size and therefore can never be sold on its
+// own, so the tracked position and the wallet balance drift apart.
+func TestRoundBuyQuantityToLotSize(t *testing.T) {
+	tests := []struct {
+		name    string
+		symbol  string
+		qty     float64
+		wantOK  bool
+		wantQty float64
+	}{
+		{name: "fractional XRP quantity is floored", symbol: "XRP_JPY", qty: 14.7022790908813, wantOK: true, wantQty: 14},
+		{name: "already whole lots is unchanged", symbol: "XRP_JPY", qty: 14, wantOK: true, wantQty: 14},
+		{name: "below one lot is rejected", symbol: "XRP_JPY", qty: 0.9, wantOK: false},
+		{name: "ETH honors its smaller lot size", symbol: "ETH_JPY", qty: 0.0345, wantOK: true, wantQty: 0.03},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newSellWorker(t, nil, 0.95)
+			signal := &strategy.Signal{Symbol: tc.symbol, Action: strategy.SignalBuy, Price: 160, Quantity: tc.qty}
+
+			if got := w.roundBuyQuantityToLotSize(signal); got != tc.wantOK {
+				t.Fatalf("roundBuyQuantityToLotSize() = %v; want %v", got, tc.wantOK)
+			}
+			if tc.wantOK && math.Abs(signal.Quantity-tc.wantQty) > 1e-9 {
+				t.Errorf("signal.Quantity = %v; want %v", signal.Quantity, tc.wantQty)
+			}
+		})
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Ghost position auto-close tests
 // ---------------------------------------------------------------------------

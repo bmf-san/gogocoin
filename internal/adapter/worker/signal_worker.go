@@ -28,6 +28,9 @@ type SignalWorker struct {
 	// positionCloser is optional; when set, ghost PARTIAL positions are closed
 	// automatically when a stop-loss SELL cannot execute due to dust balance.
 	positionCloser PositionCloser
+	// positionReader is optional; when set, SELL sizing is capped at the size
+	// actually held in open positions instead of the whole wallet balance.
+	positionReader PositionReader
 }
 
 // TradingEnabledGetter defines the interface for checking if trading is enabled
@@ -85,6 +88,11 @@ func NewSignalWorker(
 // PARTIAL positions are automatically closed if a stop-loss SELL is skipped
 // because the actual exchange balance is below the minimum lot size.
 func (w *SignalWorker) SetPositionCloser(c PositionCloser) { w.positionCloser = c }
+
+// SetPositionReader injects an optional PositionReader. When set, SELL orders
+// are capped at the remaining size of the open positions for the symbol, so the
+// bot never liquidates holdings it did not buy itself.
+func (w *SignalWorker) SetPositionReader(r PositionReader) { w.positionReader = r }
 
 // Name returns the worker name.
 func (w *SignalWorker) Name() string { return "signal-worker" }
@@ -237,7 +245,9 @@ func (w *SignalWorker) applyAutoScaleToBuySignal(ctx context.Context, signal *st
 
 	cfg := w.currentStrategy.GetAutoScaleConfig()
 	if !cfg.Enabled {
-		return true
+		// Auto scale off still requires lot rounding: the raw quantity is
+		// order_notional/price, which is almost never a whole number of lots.
+		return w.roundBuyQuantityToLotSize(signal)
 	}
 
 	availableJPY, ok := w.getAvailableBalance(ctx, "JPY")
@@ -259,15 +269,8 @@ func (w *SignalWorker) applyAutoScaleToBuySignal(ctx context.Context, signal *st
 		return false
 	}
 
-	rawQty := effectiveNotional / signal.Price
-	lotSize := w.resolveLotsSize(signal.Symbol)
-	signal.Quantity = math.Floor(rawQty/lotSize) * lotSize
-	if signal.Quantity <= 0 {
-		w.logger.Trading().
-			WithField("symbol", signal.Symbol).
-			WithField("raw_qty", rawQty).
-			WithField("lot_size", lotSize).
-			Warn("Skipping BUY signal - scaled quantity below minimum lot size after rounding")
+	signal.Quantity = effectiveNotional / signal.Price
+	if !w.roundBuyQuantityToLotSize(signal) {
 		return false
 	}
 	if signal.Metadata == nil {
@@ -276,6 +279,28 @@ func (w *SignalWorker) applyAutoScaleToBuySignal(ctx context.Context, signal *st
 	signal.Metadata["order_notional_effective"] = effectiveNotional
 	signal.Metadata["order_notional_base"] = baseNotional
 
+	return true
+}
+
+// roundBuyQuantityToLotSize floors signal.Quantity down to a whole multiple of
+// the symbol's lot size, reporting false when nothing is left to buy.
+//
+// Buying an un-rounded quantity leaves a fractional remainder that can never be
+// sold on its own, because it sits below the exchange minimum order size. Those
+// remainders accumulate and make the tracked position drift away from the wallet
+// balance, which in turn distorts exit sizing.
+func (w *SignalWorker) roundBuyQuantityToLotSize(signal *strategy.Signal) bool {
+	rawQty := signal.Quantity
+	lotSize := w.resolveLotsSize(signal.Symbol)
+	signal.Quantity = math.Floor(rawQty/lotSize) * lotSize
+	if signal.Quantity <= 0 {
+		w.logger.Trading().
+			WithField("symbol", signal.Symbol).
+			WithField("raw_qty", rawQty).
+			WithField("lot_size", lotSize).
+			Warn("Skipping BUY signal - quantity below minimum lot size after rounding")
+		return false
+	}
 	return true
 }
 
@@ -370,31 +395,67 @@ func (w *SignalWorker) getAvailableSellSize(ctx context.Context, symbol string, 
 		return 0
 	}
 
-	// Return the smaller of requested size and available balance
-	if requestedSize > 0 && requestedSize < availableBalance {
+	// The wallet balance is an upper bound, not the position size. It also
+	// contains coins the strategy never bought — pre-existing inventory, manual
+	// transfers, and fractional remainders left behind by earlier exits. Sizing
+	// exits from the balance alone makes the bot sell more than it holds, which
+	// books the unmatched surplus as if it had no cost basis.
+	sellable := availableBalance
+	if openSize, ok := w.openPositionSize(symbol); ok && openSize < sellable {
+		sellable = openSize
+	}
+
+	// Return the smaller of requested size and the sellable holdings
+	if requestedSize > 0 && requestedSize < sellable {
 		return requestedSize
 	}
 
 	// Sell a portion of holdings rounded down to the nearest lot size.
 	lotSize := w.resolveLotsSize(symbol)
-	result := math.Floor(availableBalance*w.sellSizePercentage/lotSize) * lotSize
+	result := math.Floor(sellable*w.sellSizePercentage/lotSize) * lotSize
 	if result <= 0 {
-		// The percentage-adjusted balance rounds down to zero lots (e.g. dust just
+		// The percentage-adjusted size rounds down to zero lots (e.g. dust just
 		// below a lot boundary with sell_size_percentage < 1.0).  Fall back to
-		// selling exactly one lot when the raw balance covers it, rather than
+		// selling exactly one lot when the position covers it, rather than
 		// sending a non-lot-rounded quantity that the exchange would reject.
-		if availableBalance >= lotSize {
+		if sellable >= lotSize {
 			return lotSize
 		}
-		// Balance is below the minimum lot size; cannot place a valid sell order.
+		// Holdings are below the minimum lot size; cannot place a valid sell
+		// order. The caller closes the leftover position record instead.
 		w.logger.Trading().
 			WithField("symbol", symbol).
 			WithField("available", availableBalance).
+			WithField("sellable", sellable).
 			WithField("lot_size", lotSize).
-			Warn("Available balance below minimum lot size – cannot place SELL order")
+			Warn("Sellable size below minimum lot size – cannot place SELL order")
 		return 0
 	}
 	return result
+}
+
+// openPositionSize totals the unmatched size of the open BUY positions for a
+// symbol. The second return value reports whether the figure is usable; when it
+// is false the caller must fall back to the wallet balance rather than treating
+// the position size as zero, so that a repository failure cannot silently block
+// every exit.
+func (w *SignalWorker) openPositionSize(symbol string) (float64, bool) {
+	if w.positionReader == nil {
+		return 0, false
+	}
+
+	positions, err := w.positionReader.GetOpenPositions(symbol, "BUY")
+	if err != nil {
+		w.logger.Trading().WithError(err).WithField("symbol", symbol).
+			Warn("Failed to read open positions - falling back to wallet balance for SELL sizing")
+		return 0, false
+	}
+
+	var total float64
+	for i := range positions {
+		total += positions[i].RemainingSize
+	}
+	return total, true
 }
 
 // closeGhostPositions marks all open/partial BUY positions for symbol as CLOSED
