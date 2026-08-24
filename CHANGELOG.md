@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.5](https://github.com/bmf-san/gogocoin/compare/v1.8.4...v1.8.5) (2026-08-24)
+
+
+### Bug Fixes
+
+* **pnl:** do not book unmatched SELL size as profit ([3fe0104](https://github.com/bmf-san/gogocoin/commit/3fe0104259fbc9825004747122c2074feaaed5a7))
+* **pnl:** do not book unmatched SELL size as profit ([1911abe](https://github.com/bmf-san/gogocoin/commit/1911abe239888413188c0c06bd89aedc3c713187))
+
 ## [1.8.4](https://github.com/bmf-san/gogocoin/compare/v1.8.3...v1.8.4) (2026-08-24)
 
 
