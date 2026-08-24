@@ -57,9 +57,10 @@ lint: ## Run linter
 	@echo "Running linter..."
 	@golangci-lint run --max-issues-per-linter=0 --max-same-issues=0
 
-tidy-check: ## Verify go.mod/go.sum are tidy
+tidy-check: ## Verify go.mod/go.sum are tidy (root and example modules)
 	@go mod tidy
-	@git diff --exit-code -- go.mod go.sum
+	@cd example && go mod tidy
+	@git diff --exit-code -- go.mod go.sum example/go.mod example/go.sum
 
 vuln: ## Run govulncheck
 	@command -v govulncheck >/dev/null 2>&1 || go install golang.org/x/vuln/cmd/govulncheck@latest
