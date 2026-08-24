@@ -78,6 +78,23 @@ type RiskManagementConfig struct {
 	MaxDailyTrades               int     `yaml:"max_daily_trades"`
 	MinTradeInterval             string  `yaml:"min_trade_interval"`
 	MaxOpenPositionsPerSymbol    int     `yaml:"max_open_positions_per_symbol"` // 0 = unlimited
+	// PnLEpoch is an optional RFC3339 timestamp. When set, the total-loss limit
+	// ignores trades executed before it. Use it to draw a line under a period of
+	// PnL that is known to be mis-recorded, without deleting the trades.
+	PnLEpoch string `yaml:"pnl_epoch"`
+}
+
+// ParsePnLEpoch converts the configured pnl_epoch into a time. An empty value
+// yields the zero time, meaning the whole trade history is used.
+func (r *RiskManagementConfig) ParsePnLEpoch() (time.Time, error) {
+	if r.PnLEpoch == "" {
+		return time.Time{}, nil
+	}
+	epoch, err := time.Parse(time.RFC3339, r.PnLEpoch)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("risk_management.pnl_epoch must be an RFC3339 timestamp, got %q: %w", r.PnLEpoch, err)
+	}
+	return epoch, nil
 }
 
 // StrategyParams holds strategy-specific parameters keyed by strategy name.
@@ -174,6 +191,10 @@ func (c *Config) Validate() error {
 
 	if rm.MaxTradeAmountPercent <= 0 || rm.MaxTradeAmountPercent > 100 {
 		return fmt.Errorf("risk_management.max_trade_amount_percent must be between 0 and 100")
+	}
+
+	if _, err := rm.ParsePnLEpoch(); err != nil {
+		return err
 	}
 
         // Default API timeout to 30 s if not set in config.

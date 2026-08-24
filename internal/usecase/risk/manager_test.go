@@ -2,6 +2,7 @@ package risk
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -12,6 +13,11 @@ import (
 // Mock implementations
 type mockTradingRepo struct {
 	trades []domain.Trade
+	// sinceTrades is returned by GetTradesSince; sinceErr takes precedence.
+	sinceTrades []domain.Trade
+	sinceErr    error
+	// sinceArg records the timestamp the manager asked for.
+	sinceArg time.Time
 }
 
 func (m *mockTradingRepo) GetRecentTrades(limit int) ([]domain.Trade, error) {
@@ -19,6 +25,14 @@ func (m *mockTradingRepo) GetRecentTrades(limit int) ([]domain.Trade, error) {
 		return m.trades, nil
 	}
 	return m.trades[:limit], nil
+}
+
+func (m *mockTradingRepo) GetTradesSince(since time.Time, _ int) ([]domain.Trade, error) {
+	m.sinceArg = since
+	if m.sinceErr != nil {
+		return nil, m.sinceErr
+	}
+	return m.sinceTrades, nil
 }
 
 type mockAnalyticsRepo struct {
@@ -63,7 +77,7 @@ func TestCheckTradeAmount(t *testing.T) {
 		FeeRate:               0.001, // 0.1%
 	}
 
-	rm := NewRiskManager(cfg, nil, nil, nil, nil)
+	rm := NewRiskManager(&cfg, nil, nil, nil, nil)
 
 	tests := []struct {
 		name        string
@@ -162,7 +176,7 @@ func TestCheckDailyTradeLimit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tradingRepo := &mockTradingRepo{trades: tt.trades}
-			rm := NewRiskManager(cfg, tradingRepo, nil, nil, nil)
+			rm := NewRiskManager(&cfg, tradingRepo, nil, nil, nil)
 
 			err := rm.checkDailyTradeLimit()
 			if (err != nil) != tt.expectError {
@@ -208,7 +222,7 @@ func TestCheckTradeInterval(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tradingRepo := &mockTradingRepo{trades: tt.trades}
-			rm := NewRiskManager(cfg, tradingRepo, nil, nil, nil)
+			rm := NewRiskManager(&cfg, tradingRepo, nil, nil, nil)
 
 			err := rm.checkTradeInterval()
 			if (err != nil) != tt.expectError {
@@ -266,11 +280,76 @@ func TestCheckTotalLossLimit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			analyticsRepo := &mockAnalyticsRepo{metrics: tt.metrics}
 			trader := &mockTrader{balances: tt.balances}
-			rm := NewRiskManager(cfg, nil, analyticsRepo, trader, nil)
+			rm := NewRiskManager(&cfg, nil, analyticsRepo, trader, nil)
 
 			err := rm.checkTotalLossLimit(context.Background())
 			if (err != nil) != tt.expectError {
 				t.Errorf("checkTotalLossLimit() error = %v, expectError %v", err, tt.expectError)
+			}
+		})
+	}
+}
+
+// TestCheckTotalLossLimit_PnLEpoch covers the case where part of the recorded
+// trade history is known to be wrong. The stored performance aggregate spans
+// every trade ever made, so a period of mis-calculated PnL keeps distorting the
+// limit forever. Setting an epoch makes the limit read the trades directly and
+// ignore everything before it.
+func TestCheckTotalLossLimit_PnLEpoch(t *testing.T) {
+	epoch := time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC)
+	cfg := ManagerConfig{
+		MaxTotalLossPercent: 10.0,
+		InitialBalance:      100000,
+		PnLEpoch:            epoch,
+	}
+
+	tests := []struct {
+		name        string
+		metrics     []domain.PerformanceMetric
+		sinceTrades []domain.Trade
+		sinceErr    error
+		expectError bool
+	}{
+		{
+			// The aggregate claims a profit, which would disable the limit
+			// entirely. The post-epoch trades are what actually counts.
+			name:        "post-epoch loss triggers despite a profitable aggregate",
+			metrics:     []domain.PerformanceMetric{{TotalPnL: 20000}},
+			sinceTrades: []domain.Trade{{PnL: -8000}, {PnL: -7000}},
+			expectError: true,
+		},
+		{
+			name:        "post-epoch loss within the limit",
+			metrics:     []domain.PerformanceMetric{{TotalPnL: -50000}},
+			sinceTrades: []domain.Trade{{PnL: -3000}, {PnL: 500}},
+			expectError: false,
+		},
+		{
+			name:        "no trades since the epoch",
+			metrics:     []domain.PerformanceMetric{{TotalPnL: -50000}},
+			sinceTrades: nil,
+			expectError: false,
+		},
+		{
+			name:        "repository error is reported",
+			sinceErr:    errors.New("db unavailable"),
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tradingRepo := &mockTradingRepo{sinceTrades: tt.sinceTrades, sinceErr: tt.sinceErr}
+			analyticsRepo := &mockAnalyticsRepo{metrics: tt.metrics}
+			trader := &mockTrader{balances: []domain.Balance{{Currency: "JPY", Available: 100000}}}
+			rm := NewRiskManager(&cfg, tradingRepo, analyticsRepo, trader, nil)
+
+			err := rm.checkTotalLossLimit(context.Background())
+			if (err != nil) != tt.expectError {
+				t.Errorf("checkTotalLossLimit() error = %v, expectError %v", err, tt.expectError)
+			}
+			if tt.sinceErr == nil && !tradingRepo.sinceArg.Equal(epoch) {
+				t.Errorf("GetTradesSince called with %v; want %v", tradingRepo.sinceArg, epoch)
 			}
 		})
 	}
@@ -368,7 +447,7 @@ func TestCheckRiskManagement(t *testing.T) {
 			tradingRepo := &mockTradingRepo{trades: tt.trades}
 			analyticsRepo := &mockAnalyticsRepo{metrics: tt.metrics}
 			trader := &mockTrader{balances: tt.balances}
-			rm := NewRiskManager(cfg, tradingRepo, analyticsRepo, trader, nil)
+			rm := NewRiskManager(&cfg, tradingRepo, analyticsRepo, trader, nil)
 
 			err := rm.CheckRiskManagement(context.Background(), tt.signal)
 			if (err != nil) != tt.expectError {
@@ -453,7 +532,7 @@ func TestForcedExitSellBypassesPortfolioChecks(t *testing.T) {
 			tradingRepo := &mockTradingRepo{trades: blockedTrades}
 			analyticsRepo := &mockAnalyticsRepo{metrics: blockedMetrics}
 			trader := &mockTrader{balances: blockedBalances}
-			rm := NewRiskManager(cfg, tradingRepo, analyticsRepo, trader, nil)
+			rm := NewRiskManager(&cfg, tradingRepo, analyticsRepo, trader, nil)
 
 			err := rm.CheckRiskManagement(context.Background(), signal)
 			if (err != nil) != tt.expectError {

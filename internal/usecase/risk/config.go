@@ -13,6 +13,15 @@ type ManagerConfig struct {
 	MaxDailyTrades             int
 	MinTradeInterval           time.Duration
 	MaxOpenPositionsPerSymbol  int // 0 = unlimited
+	// PnLEpoch discards trade history recorded before this instant when the
+	// total-loss limit is evaluated. Zero means "use the whole history".
+	//
+	// The limit is normally read from the stored performance metrics, which
+	// aggregate every trade ever recorded. That is only trustworthy while the
+	// recorded PnL is trustworthy: a period of mis-calculated PnL keeps
+	// distorting the limit forever, in whichever direction the error ran. The
+	// epoch draws a line under such a period without deleting the trades.
+	PnLEpoch time.Time
 
 	// Trading parameters (from TradingConfig)
 	FeeRate        float64

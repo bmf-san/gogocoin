@@ -44,6 +44,9 @@ func (rm *Manager) SetPositionRepository(repo PositionRepository) { rm.positionR
 // TradingRepository defines database operations needed for risk checks
 type TradingRepository interface {
 	GetRecentTrades(limit int) ([]domain.Trade, error)
+	// GetTradesSince returns trades whose executed_at >= since. Limit is
+	// applied only when > 0.
+	GetTradesSince(since time.Time, limit int) ([]domain.Trade, error)
 }
 
 // AnalyticsRepository defines analytics operations needed for risk checks
@@ -53,14 +56,14 @@ type AnalyticsRepository interface {
 
 // NewRiskManager creates a new risk manager
 func NewRiskManager(
-	cfg ManagerConfig,
+	cfg *ManagerConfig,
 	tradingRepo TradingRepository,
 	analyticsRepo AnalyticsRepository,
 	trader trading.Trader,
 	log logger.LoggerInterface,
 ) *Manager {
 	return &Manager{
-		cfg:           cfg,
+		cfg:           *cfg,
 		tradingRepo:   tradingRepo,
 		analyticsRepo: analyticsRepo,
 		trader:        trader,
@@ -225,20 +228,15 @@ func (rm *Manager) checkTradeInterval() error {
 
 // checkTotalLossLimit validates total loss against configured maximum loss percentage
 func (rm *Manager) checkTotalLossLimit(ctx context.Context) error {
-	// Get recent performance metrics
-	metrics, err := rm.analyticsRepo.GetPerformanceMetrics(30) // Past 30 days
+	totalPnL, ok, err := rm.cumulativePnL()
 	if err != nil {
-		return fmt.Errorf("failed to get performance metrics: %w", err)
+		return err
 	}
-
-	if len(metrics) == 0 {
+	if !ok {
 		return nil // OK if no data
 	}
 
-	// GetPerformanceMetrics returns rows ORDER BY date DESC, so metrics[0] is the
-	// most recent entry.  Using metrics[len-1] was a bug that read the oldest record.
-	latestMetric := metrics[0]
-	totalLoss := -latestMetric.TotalPnL // Negative value indicates loss
+	totalLoss := -totalPnL // Negative value indicates loss
 
 	if totalLoss <= 0 {
 		return nil // OK if no loss
@@ -282,6 +280,42 @@ func (rm *Manager) checkTotalLossLimit(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// cumulativePnL returns the realized PnL the total-loss limit is measured
+// against, and whether there was any data to measure.
+//
+// Without an epoch this is the stored performance aggregate, which already
+// covers the whole trade history. With an epoch the aggregate cannot be used,
+// because it has no notion of a starting point, so the figure is summed from
+// the trades themselves.
+func (rm *Manager) cumulativePnL() (float64, bool, error) {
+	if rm.cfg.PnLEpoch.IsZero() {
+		metrics, err := rm.analyticsRepo.GetPerformanceMetrics(30) // Past 30 days
+		if err != nil {
+			return 0, false, fmt.Errorf("failed to get performance metrics: %w", err)
+		}
+		if len(metrics) == 0 {
+			return 0, false, nil
+		}
+		// GetPerformanceMetrics returns rows ORDER BY date DESC, so metrics[0] is the
+		// most recent entry.  Using metrics[len-1] was a bug that read the oldest record.
+		return metrics[0].TotalPnL, true, nil
+	}
+
+	trades, err := rm.tradingRepo.GetTradesSince(rm.cfg.PnLEpoch, 0)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to get trades since PnL epoch: %w", err)
+	}
+	if len(trades) == 0 {
+		return 0, false, nil
+	}
+
+	var totalPnL float64
+	for i := range trades {
+		totalPnL += trades[i].PnL
+	}
+	return totalPnL, true, nil
 }
 
 // checkMaxOpenPositions rejects a BUY when the symbol already has too many

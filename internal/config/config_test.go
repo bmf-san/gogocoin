@@ -433,3 +433,34 @@ func TestValidate_RuntimeInvalidSellSizePercentage(t *testing.T) {
 		})
 	}
 }
+
+func TestParsePnLEpoch(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     string
+		wantZero  bool
+		wantError bool
+	}{
+		{name: "empty means no epoch", value: "", wantZero: true},
+		{name: "RFC3339 with offset", value: "2026-08-24T00:00:00+09:00"},
+		{name: "RFC3339 in UTC", value: "2026-08-24T00:00:00Z"},
+		{name: "date only is rejected", value: "2026-08-24", wantError: true},
+		{name: "garbage is rejected", value: "yesterday", wantError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rm := RiskManagementConfig{PnLEpoch: tt.value}
+			got, err := rm.ParsePnLEpoch()
+			if (err != nil) != tt.wantError {
+				t.Fatalf("ParsePnLEpoch(%q) error = %v; wantError %v", tt.value, err, tt.wantError)
+			}
+			if err != nil {
+				return
+			}
+			if got.IsZero() != tt.wantZero {
+				t.Errorf("ParsePnLEpoch(%q).IsZero() = %v; want %v", tt.value, got.IsZero(), tt.wantZero)
+			}
+		})
+	}
+}
