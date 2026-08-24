@@ -8,6 +8,11 @@ class GogocoinUI {
         this.maxUpdateInterval = 60000; // 60 seconds max
         this.selectedSymbol = 'BTC_JPY'; // Default symbol
         this.initialBalance = null;
+        // Set from risk_management.pnl_epoch. When present, every cumulative
+        // figure on this page counts only trades at or after it, so the label
+        // has to say so — an unlabelled total invites the reader to assume it
+        // covers the whole account history.
+        this.pnlEpochLabel = null;
         this.lastMonitoringPrices = {};
 
         this.init();
@@ -123,11 +128,13 @@ class GogocoinUI {
                 if (Number.isFinite(Number(initialBalance))) {
                     this.initialBalance = Number(initialBalance);
                 }
+                const risk = (cfg && cfg.trading && cfg.trading.risk_management)
+                    || (cfg && cfg.Trading && cfg.Trading.RiskManagement);
+                this.pnlEpochLabel = this.formatEpochLabel(risk && (risk.pnl_epoch || risk.PnLEpoch));
                 if (days && Number.isFinite(days)) {
                     this.retentionDays = days;
-                    const cap = document.getElementById('total-pnl-caption');
-                    if (cap) cap.textContent = `DB保持${days}日`; 
                 }
+                this.applyCumulativeCaptions();
             }).catch(() => {
                 /* optional feature — keep default caption on failure */
             });
@@ -139,6 +146,53 @@ class GogocoinUI {
             });
         } catch (error) {
             console.error('Failed to load initial data:', error);
+        }
+    }
+
+    // Turn an RFC3339 pnl_epoch into a short YYYY-MM-DD label, or null when
+    // unset or unparseable.
+    formatEpochLabel(raw) {
+        if (!raw) return null;
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) return null;
+        const jst = new Date(parsed.getTime() + (9 * 60 * 60 * 1000));
+        return jst.toISOString().split('T')[0];
+    }
+
+    // Describes what the cumulative realized figures actually cover.
+    // The epoch takes precedence over the retention window: when a cut-off is
+    // configured the server counts only trades after it, so mentioning the DB
+    // retention window instead would be misleading.
+    cumulativeScopeLabel() {
+        if (this.pnlEpochLabel) {
+            return `累計実現損益(${this.pnlEpochLabel}以降)`;
+        }
+        const days = Number(this.retentionDays);
+        if (Number.isFinite(days) && days > 0) {
+            return `累計実現損益(DB保持${days}日)`;
+        }
+        return '累計実現損益';
+    }
+
+    // Applies the scope label to the captions that are not rewritten on every
+    // dashboard refresh.
+    applyCumulativeCaptions() {
+        const totalPnlCaption = document.getElementById('total-pnl-caption');
+        if (totalPnlCaption) {
+            if (this.pnlEpochLabel) {
+                totalPnlCaption.textContent = `${this.pnlEpochLabel}以降`;
+                totalPnlCaption.title = 'risk_management.pnl_epoch により、この日時より前の取引は集計から除外されています';
+            } else {
+                const days = Number(this.retentionDays);
+                if (Number.isFinite(days) && days > 0) {
+                    totalPnlCaption.textContent = `DB保持${days}日`;
+                }
+            }
+        }
+
+        const symbolCaption = document.getElementById('symbol-performance-caption');
+        if (symbolCaption) {
+            symbolCaption.textContent = this.pnlEpochLabel ? `${this.pnlEpochLabel}以降` : '全期間';
         }
     }
 
@@ -466,7 +520,7 @@ class GogocoinUI {
             if (totalPnlEl) { totalPnlEl.textContent = '取得エラー'; totalPnlEl.className = 'text-xl font-bold text-danger'; }
             if (netPnlEl) { netPnlEl.textContent = '-'; netPnlEl.className = 'text-lg font-bold text-secondary'; }
             if (realizedAssetEl) { realizedAssetEl.textContent = '-'; realizedAssetEl.className = 'text-lg font-bold text-secondary'; }
-            if (realizedAssetCaptionEl) { realizedAssetCaptionEl.textContent = '初期資金 + 累計実現損益'; }
+            if (realizedAssetCaptionEl) { realizedAssetCaptionEl.textContent = `初期資金 + ${this.cumulativeScopeLabel()}`; }
             if (accountAssetEl) { accountAssetEl.textContent = '-'; accountAssetEl.className = 'text-lg font-bold text-secondary'; }
             if (accountAssetCaptionEl) { accountAssetCaptionEl.textContent = 'JPY + 保有資産の時価'; }
             if (winRateEl) { winRateEl.textContent = '-'; winRateEl.className = 'text-lg font-bold text-secondary'; }
@@ -494,7 +548,7 @@ class GogocoinUI {
                 realizedAssetEl.className = 'text-2xl font-black';
             }
             if (realizedAssetCaptionEl) {
-                realizedAssetCaptionEl.textContent = '初期資金 + 累計実現損益';
+                realizedAssetCaptionEl.textContent = `初期資金 + ${this.cumulativeScopeLabel()}`;
             }
             if (accountAssetEl) {
                 accountAssetEl.textContent = '¥0';
@@ -554,12 +608,7 @@ class GogocoinUI {
                 realizedAssetEl.textContent = this.formatCurrency(strategicAsset);
                 realizedAssetEl.className = 'text-2xl font-bold';
                 if (realizedAssetCaptionEl) {
-                    const days = Number(this.retentionDays);
-                    if (Number.isFinite(days) && days > 0) {
-                        realizedAssetCaptionEl.textContent = `初期資金 + 累計実現損益(DB保持${days}日)`;
-                    } else {
-                        realizedAssetCaptionEl.textContent = '初期資金 + 累計実現損益';
-                    }
+                    realizedAssetCaptionEl.textContent = `初期資金 + ${this.cumulativeScopeLabel()}`;
                 }
             }
         }

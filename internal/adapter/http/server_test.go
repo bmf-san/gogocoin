@@ -344,6 +344,46 @@ func TestHandlePerformance(t *testing.T) {
 	}
 }
 
+// TestHandlePerformance_PnLEpoch verifies that snapshots recorded before the
+// configured epoch are withheld. Those rows hold cumulative totals that the
+// kill switch no longer trusts, so showing them on the dashboard would put a
+// figure in front of a human that the system itself has disowned.
+func TestHandlePerformance_PnLEpoch(t *testing.T) {
+	server, db, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	epoch := time.Now().Add(-24 * time.Hour)
+	server.config.Trading.RiskManagement.PnLEpoch = epoch.Format(time.RFC3339)
+
+	stale := &domain.PerformanceMetric{Date: epoch.Add(-72 * time.Hour), TotalPnL: 541.27, TotalTrades: 86}
+	fresh := &domain.PerformanceMetric{Date: epoch.Add(time.Hour), TotalPnL: -12.5, TotalTrades: 2}
+	for _, m := range []*domain.PerformanceMetric{stale, fresh} {
+		if err := db.SavePerformanceMetric(m); err != nil {
+			t.Fatalf("Failed to save performance metric: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/performance", nil)
+	w := httptest.NewRecorder()
+	testHandler(server).ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status code 200, got %d", w.Code)
+	}
+
+	var metrics []PerformanceMetric
+	if err := json.NewDecoder(w.Body).Decode(&metrics); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(metrics) != 1 {
+		t.Fatalf("Expected only the post-epoch snapshot, got %d", len(metrics))
+	}
+	if metrics[0].TotalPnl == nil || *metrics[0].TotalPnl != -12.5 {
+		t.Errorf("Expected the post-epoch total_pnl -12.5, got %v", metrics[0].TotalPnl)
+	}
+}
+
 func TestHandleConfig_Get(t *testing.T) {
 	server, _, cleanup := setupTestServer(t)
 	defer cleanup()

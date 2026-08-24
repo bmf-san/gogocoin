@@ -55,11 +55,13 @@ BITFLYER_API_SECRET=your_api_secret_here
 | `max_trade_amount_percent` | `80.0` | Maximum percentage of balance that can be used in a single trade (%) |
 | `max_daily_trades` | `100` | Maximum number of trades per day (risk management upper bound) |
 | `min_trade_interval` | `60s` | Minimum interval between trades |
-| `pnl_epoch` | _(empty)_ | Optional RFC3339 timestamp. When set, `max_total_loss_percent` ignores trades executed before it |
+| `pnl_epoch` | _(empty)_ | Optional RFC3339 timestamp. When set, cumulative PnL ignores trades executed before it |
 
 > `max_daily_trades` is the risk management upper bound. Actual trade frequency is controlled by each strategy's own `max_daily_trades`.
 
 > `pnl_epoch` exists for the case where part of the recorded trade history is known to be wrong. The cumulative loss is normally read from the stored performance metrics, which span every trade ever made, so a period of mis-calculated PnL keeps distorting the limit forever. Setting an epoch draws a line under such a period without deleting the trades.
+
+> The epoch applies to everything that reports a cumulative figure, not just the loss limit: the metrics written after each trade, `GET /api/performance`, `GET /api/v1/performance/symbols`, and the dashboard totals derived from them. Performance snapshots recorded before the epoch are withheld from the API rather than rebased, because the per-trade PnL behind them cannot be recomputed. The dashboard labels the affected figures with the cut-off date so the narrower scope is visible. Expect the totals to read ¥0 until the first trade after the epoch settles — that is the honest answer, not a fault.
 
 ---
 

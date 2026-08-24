@@ -10,8 +10,10 @@ type TradeRepository interface {
 	// GetTradesSince returns trades whose executed_at >= since, ordered by
 	// executed_at DESC. Limit is applied only when > 0.
 	GetTradesSince(since time.Time, limit int) ([]Trade, error)
-	// GetSymbolPerformance returns realized PnL metrics grouped by symbol.
-	GetSymbolPerformance() ([]SymbolPerformance, error)
+	// GetSymbolPerformanceSince returns realized PnL metrics grouped by symbol,
+	// counting only trades whose executed_at >= since. Pass the zero time to
+	// aggregate the entire history.
+	GetSymbolPerformanceSince(since time.Time) ([]SymbolPerformance, error)
 }
 
 // PositionRepository is the interface for position data persistence
