@@ -85,3 +85,51 @@ func TestSaveToDatabase_SkipsDataCategory(t *testing.T) {
 		})
 	}
 }
+
+// TestSaveToDatabase_BuffersUntilDatabaseIsSet covers the startup window. The
+// database is attached after the logger is constructed, so migration results and
+// other boot-time entries reach saveToDatabase before there is anywhere to store
+// them. They must be held and replayed rather than discarded.
+func TestSaveToDatabase_BuffersUntilDatabaseIsSet(t *testing.T) {
+	l, err := New(&Config{Level: "DEBUG", Format: "json", Output: "console"})
+	if err != nil {
+		t.Fatalf("New() failed: %v", err)
+	}
+
+	l.saveToDatabase("INFO", "system", "Migration executed", nil)
+	l.saveToDatabase("DEBUG", "system", "noisy debug", nil)
+	l.saveToDatabase("INFO", string(CategoryData), "ticker", nil)
+
+	mock := &mockLogRepository{}
+	l.SetDatabase(mock)
+
+	if len(mock.savedEntries) != 1 {
+		t.Fatalf("flushed %d entries; want 1", len(mock.savedEntries))
+	}
+	if got := mock.savedEntries[0].Message; got != "Migration executed" {
+		t.Errorf("flushed message = %q; want %q", got, "Migration executed")
+	}
+
+	// The buffer must not be replayed a second time.
+	l.SetDatabase(mock)
+	if len(mock.savedEntries) != 1 {
+		t.Errorf("re-flushed on second SetDatabase: %d entries", len(mock.savedEntries))
+	}
+}
+
+// TestSaveToDatabase_BufferIsBounded guards against unbounded growth when a
+// database is never attached.
+func TestSaveToDatabase_BufferIsBounded(t *testing.T) {
+	l, err := New(&Config{Level: "DEBUG", Format: "json", Output: "console"})
+	if err != nil {
+		t.Fatalf("New() failed: %v", err)
+	}
+
+	for i := 0; i < maxPendingLogEntries+50; i++ {
+		l.saveToDatabase("INFO", "system", "entry", nil)
+	}
+
+	if len(l.pending) != maxPendingLogEntries {
+		t.Errorf("buffered %d entries; want the cap of %d", len(l.pending), maxPendingLogEntries)
+	}
+}
