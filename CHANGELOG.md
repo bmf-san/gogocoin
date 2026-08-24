@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/bmf-san/gogocoin/compare/v1.8.6...v1.9.0) (2026-08-24)
+
+
+### Features
+
+* add pnl_epoch to scope the total-loss limit ([9cc4880](https://github.com/bmf-san/gogocoin/commit/9cc488055879262712cdff4a52a427bdcb8801da))
+* add pnl_epoch to scope the total-loss limit ([2227a01](https://github.com/bmf-san/gogocoin/commit/2227a0108360f89743e1fe5d2239dc97f7e1a600))
+
 ## [1.8.6](https://github.com/bmf-san/gogocoin/compare/v1.8.5...v1.8.6) (2026-08-24)
 
 
