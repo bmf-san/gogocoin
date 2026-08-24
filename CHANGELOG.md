@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.8.6](https://github.com/bmf-san/gogocoin/compare/v1.8.5...v1.8.6) (2026-08-24)
+
+
+### Bug Fixes
+
+* buffer log entries until the database is attached ([9285ea4](https://github.com/bmf-san/gogocoin/commit/9285ea4a9147cf4326cd0174adac496b2a1174e3))
+* buffer log entries until the database is attached ([68ece8c](https://github.com/bmf-san/gogocoin/commit/68ece8cb0fd30e0feeb32449491b9ea6369dbbea)), closes [#142](https://github.com/bmf-san/gogocoin/issues/142)
+* cap SELL size at the open position size ([685ed87](https://github.com/bmf-san/gogocoin/commit/685ed87d5175e1530275cac89fd5f6b5a0c85803))
+* cap SELL size at the open position size ([78bd8c0](https://github.com/bmf-san/gogocoin/commit/78bd8c0b0486d41c90378bd10db16a7c226ad29f)), closes [#143](https://github.com/bmf-san/gogocoin/issues/143)
+
 ## [1.8.5](https://github.com/bmf-san/gogocoin/compare/v1.8.4...v1.8.5) (2026-08-24)
 
 
