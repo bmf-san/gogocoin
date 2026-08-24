@@ -311,7 +311,7 @@ func TestCalculateAndSave_SELL_ExceedsOpenPositionSize(t *testing.T) {
 	}
 	calc := NewCalculator(repo, newLogger(t), "scalping")
 
-	// Sell 1.0 while only 0.3 is held. Only the matched 0.3 may be recognised:
+	// Sell 1.0 while only 0.3 is held. Only the matched 0.3 may be recognized:
 	// revenue 200*0.3 = 60, cost 100*0.3 = 30, fee 0.5 → 29.5.
 	// The buggy formula used revenue 200*1.0 = 200 → 169.5.
 	pnl, err := calc.CalculateAndSave(newResult("SELL", 1.0, 200.0, 0.5, "ORDER-SELL-1"))
