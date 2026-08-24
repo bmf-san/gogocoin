@@ -290,6 +290,40 @@ func TestCalculateAndSave_SELL_MultiplePositionsFIFO(t *testing.T) {
 	}
 }
 
+// TestCalculateAndSave_SELL_ExceedsOpenPositionSize guards against booking the
+// unmatched portion of an oversized SELL as pure profit.
+//
+// Live regression (my-gogocoin, 2026-05..08): the bot periodically sold a
+// minimum lot of 1.0 to clear accumulated dust while the remaining open
+// position was a fraction of that. Revenue was measured on the full FilledSize
+// while cost covered only the matched quantity, so each of those 12 trades
+// booked roughly `price * unmatchedSize` of profit that never existed —
+// +917 JPY in total, turning a real -376 JPY into a reported +541 JPY.
+func TestCalculateAndSave_SELL_ExceedsOpenPositionSize(t *testing.T) {
+	repo := &mockTradingRepo{
+		positions: []domain.Position{
+			{
+				Symbol: "XRP_JPY", Side: "BUY",
+				Size: 0.3, RemainingSize: 0.3, UsedSize: 0,
+				EntryPrice: 100.0, Status: "OPEN", OrderID: "ORDER-BUY-1",
+			},
+		},
+	}
+	calc := NewCalculator(repo, newLogger(t), "scalping")
+
+	// Sell 1.0 while only 0.3 is held. Only the matched 0.3 may be recognized:
+	// revenue 200*0.3 = 60, cost 100*0.3 = 30, fee 0.5 → 29.5.
+	// The buggy formula used revenue 200*1.0 = 200 → 169.5.
+	pnl, err := calc.CalculateAndSave(newResult("SELL", 1.0, 200.0, 0.5, "ORDER-SELL-1"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := 29.5
+	if !floatEq(pnl, want) {
+		t.Errorf("pnl = %.6f, want %.6f (unmatched size must not be booked as profit)", pnl, want)
+	}
+}
+
 // ── edge cases ───────────────────────────────────────────────────────────────
 
 func TestCalculateAndSave_TransactionFallback_SaveStillSucceeds(t *testing.T) {
