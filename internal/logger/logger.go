@@ -78,7 +78,17 @@ type Logger struct {
 	mu         sync.RWMutex
 	db         domain.LogRepository
 	file       io.Closer // File handle for cleanup (rotatingWriter or nil for console output)
+	// pending holds entries produced before SetDatabase was called, so that
+	// startup logs are persisted rather than dropped.
+	pending []*domain.LogEntry
+	// pendingOverflow records that the buffer filled up, so the warning about
+	// discarded entries is printed once instead of on every log call.
+	pendingOverflow bool
 }
+
+// maxPendingLogEntries caps the startup buffer so that a logger which never
+// receives a database cannot grow without bound.
+const maxPendingLogEntries = 512
 
 // Verify that Logger implements LoggerInterface at compile time
 var _ LoggerInterface = (*Logger)(nil)
@@ -227,24 +237,29 @@ func New(config *Config) (*Logger, error) {
 	}, nil
 }
 
-// SetDatabase sets the database logger
+// SetDatabase sets the database logger and flushes any entries buffered while
+// the database was unavailable.
 func (l *Logger) SetDatabase(db domain.LogRepository) {
 	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.db = db
+	pending := l.pending
+	l.pending = nil
+	l.pendingOverflow = false
+	l.mu.Unlock()
+
+	if db == nil {
+		return
+	}
+
+	for _, entry := range pending {
+		if err := db.SaveLog(entry); err != nil {
+			fmt.Fprintf(os.Stderr, "[LOGGER ERROR] Failed to save buffered log to database: %v (category: %s, message: %s)\n", err, entry.Category, entry.Message)
+		}
+	}
 }
 
 // saveToDatabase saves a log to the database
 func (l *Logger) saveToDatabase(level, category, message string, fields map[string]any) {
-	l.mu.RLock()
-	db := l.db
-	l.mu.RUnlock()
-
-	if db == nil {
-		fmt.Fprintf(os.Stderr, "[LOGGER ERROR] Database connection is nil, cannot save log (category: %s, message: %s)\n", category, message)
-		return
-	}
-
 	// Skip DEBUG level logs to prevent high-frequency logs from filling the database
 	// DEBUG logs are still output to console/file for real-time monitoring
 	if level == "DEBUG" {
@@ -271,6 +286,24 @@ func (l *Logger) saveToDatabase(level, category, message string, fields map[stri
 		Fields:    fieldsCopy, // Use the copy, not the pooled map
 		Timestamp: time.Now(),
 	}
+
+	l.mu.Lock()
+	db := l.db
+	if db == nil {
+		// The database is attached after the logger is constructed, so everything
+		// logged during startup — the migration results in particular — arrives
+		// here before there is anywhere to put it. Hold the entries until
+		// SetDatabase flushes them instead of discarding them.
+		if len(l.pending) < maxPendingLogEntries {
+			l.pending = append(l.pending, entry)
+		} else if !l.pendingOverflow {
+			l.pendingOverflow = true
+			fmt.Fprintf(os.Stderr, "[LOGGER ERROR] No database configured after %d entries, further logs will not be persisted\n", maxPendingLogEntries)
+		}
+		l.mu.Unlock()
+		return
+	}
+	l.mu.Unlock()
 
 	if err := db.SaveLog(entry); err != nil {
 		// Log database errors to console only (not to DB to avoid infinite loops)
