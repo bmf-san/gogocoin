@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.0](https://github.com/bmf-san/gogocoin/compare/v1.9.0...v1.10.0) (2026-08-24)
+
+
+### Features
+
+* honor pnl_epoch in performance aggregates and dashboard ([11455f1](https://github.com/bmf-san/gogocoin/commit/11455f1c89501e9684eb3d99c6f3363253685178))
+* honor pnl_epoch in performance aggregates and dashboard ([1997e5b](https://github.com/bmf-san/gogocoin/commit/1997e5b21429d91176e4a1d8aa9c36ae0e982992))
+
 ## [1.9.0](https://github.com/bmf-san/gogocoin/compare/v1.8.6...v1.9.0) (2026-08-24)
 
 
