@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.4](https://github.com/bmf-san/gogocoin/compare/v1.8.3...v1.8.4) (2026-08-24)
+
+
+### Continuous Integration
+
+* **deps:** bump actions/labeler from 6 to 7 ([26f7eff](https://github.com/bmf-san/gogocoin/commit/26f7eff278e4e0936f0310c6fb3042fbd3038064))
+* detect example module dependency drift instead of hiding it ([42923f5](https://github.com/bmf-san/gogocoin/commit/42923f5bf9862d2088f60f0349d379db525dd500))
+* detect example module dependency drift instead of hiding it ([50b97e4](https://github.com/bmf-san/gogocoin/commit/50b97e47ec99db6c2ddd31b6296c3f24d4524477))
+
 ## [1.8.3](https://github.com/bmf-san/gogocoin/compare/v1.8.2...v1.8.3) (2026-08-24)
 
 
