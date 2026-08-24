@@ -158,8 +158,12 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 
 	// ── 6. Risk manager ───────────────────────────────────────────────────────
 	minInterval, _ := time.ParseDuration(cfg.Trading.RiskManagement.MinTradeInterval)
+	pnlEpoch, err := cfg.Trading.RiskManagement.ParsePnLEpoch()
+	if err != nil {
+		return err
+	}
 	riskMgr := risk.NewRiskManager(
-		risk.ManagerConfig{
+		&risk.ManagerConfig{
 			MaxTotalLossPercent:       cfg.Trading.RiskManagement.MaxTotalLossPercent,
 			MaxTradeLossPercent:       cfg.Trading.RiskManagement.MaxTradeLossPercent,
 			MaxDailyLossPercent:       cfg.Trading.RiskManagement.MaxDailyLossPercent,
@@ -167,6 +171,7 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 			MaxDailyTrades:            cfg.Trading.RiskManagement.MaxDailyTrades,
 			MinTradeInterval:          minInterval,
 			MaxOpenPositionsPerSymbol: cfg.Trading.RiskManagement.MaxOpenPositionsPerSymbol,
+			PnLEpoch:                  pnlEpoch,
 			FeeRate:                   cfg.Trading.FeeRate,
 			InitialBalance:            cfg.Trading.InitialBalance,
 		},

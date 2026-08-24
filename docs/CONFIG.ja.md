@@ -55,8 +55,11 @@ BITFLYER_API_SECRET=your_api_secret_here
 | `max_trade_amount_percent` | `80.0` | 1回の取引で使用できる残高の上限（%） |
 | `max_daily_trades` | `100` | 1日の最大取引回数（リスク管理上限） |
 | `min_trade_interval` | `60s` | 取引間の最小インターバル |
+| `pnl_epoch` | _(空)_ | RFC3339 形式のタイムスタンプ (任意)。指定すると `max_total_loss_percent` はこの時刻より前の取引を無視する |
 
 > `max_daily_trades` はリスク管理の上限値です。実際の取引頻度は各戦略の `max_daily_trades` で制御します。
+
+> `pnl_epoch` は、記録済みの取引履歴の一部が誤っていると分かっている場合のための設定です。累積損失は通常、全取引を集計した performance メトリクスから読み取るため、損益の計算が誤っていた期間があると上限判定が永久に歪みます。エポックを指定すると、取引を削除せずにその期間に線を引けます。
 
 ---
 
