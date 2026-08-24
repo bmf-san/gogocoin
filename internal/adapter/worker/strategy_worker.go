@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,6 +27,14 @@ const (
 	// (stop-loss / take-profit) SELL signals for the same symbol. This prevents
 	// duplicate orders while still retrying if the first attempt failed.
 	ForcedExitCooldown = 30 * time.Second
+
+	// ForcedExitSendTimeout bounds how long a forced-exit (stop-loss /
+	// take-profit) SELL signal waits for room on the signal channel before it
+	// is finally given up on. Ordinary strategy signals are dropped immediately
+	// when the channel is full because the next tick regenerates them, but a
+	// forced exit protects an open position and must not be discarded just
+	// because the consumer is momentarily behind.
+	ForcedExitSendTimeout = 5 * time.Second
 )
 
 // symbolHistory holds market data history for a single symbol with its own lock
@@ -66,7 +75,8 @@ type StrategyWorker struct {
 	processingPool chan struct{} // Semaphore to limit concurrent processing goroutines
 
 	// Metrics
-	droppedSignals int64 // Atomic counter for dropped signals
+	droppedSignals       int64 // Atomic counter for dropped signals
+	positionReadFailures int64 // Atomic counter for failed open-position reads (SL/TP blind spots)
 
 	// Deduplication: track last sent signal action per symbol to avoid flooding the channel
 	// with identical signals on every tick during a sustained trend
@@ -358,17 +368,21 @@ func (w *StrategyWorker) SetPositionReader(r PositionReader) {
 }
 
 // checkStopLoss returns a SELL signal when the current price has fallen below the
-// stop-loss threshold of any open BUY position for the symbol. Returns nil when
-// stop-loss is not triggered or no position reader is configured.
-func (w *StrategyWorker) checkStopLoss(symbol string, currentPrice float64) *strategy.Signal {
+// stop-loss threshold of any open BUY position for the symbol. Returns a nil
+// signal when stop-loss is not triggered or no position reader is configured.
+//
+// A non-nil error means the open positions could not be read, so stop-loss
+// state is UNKNOWN for this tick. Callers must treat that as a risk-management
+// outage rather than as "stop-loss not triggered": an open position may be
+// breaching its stop without us being able to see it.
+func (w *StrategyWorker) checkStopLoss(symbol string, currentPrice float64) (*strategy.Signal, error) {
 	if w.positionReader == nil || w.strategy == nil {
-		return nil
+		return nil, nil
 	}
 
 	positions, err := w.positionReader.GetOpenPositions(symbol, "BUY")
 	if err != nil {
-		w.logger.Strategy().WithError(err).Warn("Failed to read open positions for stop-loss check")
-		return nil
+		return nil, fmt.Errorf("read open positions for stop-loss check (%s): %w", symbol, err)
 	}
 
 	for i := range positions {
@@ -398,24 +412,26 @@ func (w *StrategyWorker) checkStopLoss(symbol string, currentPrice float64) *str
 					"entry_price": pos.EntryPrice,
 					"stop_price":  stopPrice,
 				},
-			}
+			}, nil
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // checkTakeProfit returns a SELL signal when the current price has risen above the
-// take-profit threshold of any open BUY position for the symbol. Returns nil when
-// take-profit is not triggered or no position reader is configured.
-func (w *StrategyWorker) checkTakeProfit(symbol string, currentPrice float64) *strategy.Signal {
+// take-profit threshold of any open BUY position for the symbol. Returns a nil
+// signal when take-profit is not triggered or no position reader is configured.
+//
+// As with checkStopLoss, a non-nil error means position state is UNKNOWN for
+// this tick and must not be interpreted as "take-profit not triggered".
+func (w *StrategyWorker) checkTakeProfit(symbol string, currentPrice float64) (*strategy.Signal, error) {
 	if w.positionReader == nil || w.strategy == nil {
-		return nil
+		return nil, nil
 	}
 
 	positions, err := w.positionReader.GetOpenPositions(symbol, "BUY")
 	if err != nil {
-		w.logger.Strategy().WithError(err).Warn("Failed to read open positions for take-profit check")
-		return nil
+		return nil, fmt.Errorf("read open positions for take-profit check (%s): %w", symbol, err)
 	}
 
 	for i := range positions {
@@ -445,10 +461,10 @@ func (w *StrategyWorker) checkTakeProfit(symbol string, currentPrice float64) *s
 					"entry_price": pos.EntryPrice,
 					"take_price":  takePrice,
 				},
-			}
+			}, nil
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // processTickBarMode handles a single market data tick when bar aggregation
@@ -566,11 +582,10 @@ func (w *StrategyWorker) processTickBarMode(ctx context.Context, data *domain.Ma
 // remain tick-level. The per-symbol ForcedExitCooldown prevents flooding
 // when an order is still settling.
 func (w *StrategyWorker) dispatchForcedExitIfAny(ctx context.Context, marketData *domain.MarketData) {
-	var sig *strategy.Signal
-	if s := w.checkStopLoss(marketData.Symbol, marketData.Price); s != nil {
-		sig = s
-	} else if s := w.checkTakeProfit(marketData.Symbol, marketData.Price); s != nil {
-		sig = s
+	sig, err := w.forcedExitSignal(marketData.Symbol, marketData.Price)
+	if err != nil {
+		w.reportPositionReadFailure(marketData.Symbol, err)
+		return
 	}
 	if sig == nil {
 		return
@@ -590,19 +605,91 @@ func (w *StrategyWorker) dispatchForcedExitIfAny(ctx context.Context, marketData
 		sig.Strength,
 		sig.Metadata,
 	)
-	select {
-	case w.signalCh <- sig:
-		w.lastSentSignals.Store(sig.Symbol, sig.Action)
+	if w.sendSignal(ctx, sig, true) {
 		w.lastForcedExitAttempt.Store(sig.Symbol, time.Now())
+	}
+}
+
+// forcedExitSignal evaluates stop-loss first (risk priority) and take-profit
+// only when no stop-loss fires. A non-nil error means the position state could
+// not be read and neither check could be performed.
+func (w *StrategyWorker) forcedExitSignal(symbol string, price float64) (*strategy.Signal, error) {
+	slSignal, err := w.checkStopLoss(symbol, price)
+	if err != nil {
+		return nil, err
+	}
+	if slSignal != nil {
+		return slSignal, nil
+	}
+	tpSignal, err := w.checkTakeProfit(symbol, price)
+	if err != nil {
+		return nil, err
+	}
+	return tpSignal, nil
+}
+
+// reportPositionReadFailure logs a position-read outage at ERROR level. While
+// positions cannot be read, stop-loss and take-profit are effectively disabled,
+// so this must be loud enough to alert on rather than a routine warning.
+func (w *StrategyWorker) reportPositionReadFailure(symbol string, err error) {
+	failures := atomic.AddInt64(&w.positionReadFailures, 1)
+	w.logger.Trading().
+		WithError(err).
+		WithField("symbol", symbol).
+		WithField("failure_count", failures).
+		Error("Position read failed — stop-loss/take-profit cannot be evaluated for this tick")
+}
+
+// sendSignal queues a signal for execution, returning true when it was accepted.
+//
+// Ordinary strategy signals are dropped when the channel is full: they are
+// regenerated on the next tick, so blocking the worker would only add latency.
+// Forced exits (stop-loss / take-profit) are different — dropping one leaves a
+// losing position open with no protection — so they fall back to a bounded
+// blocking wait instead of being discarded outright.
+func (w *StrategyWorker) sendSignal(ctx context.Context, signal *strategy.Signal, isForcedExit bool) bool {
+	select {
+	case w.signalCh <- signal:
+		w.lastSentSignals.Store(signal.Symbol, signal.Action)
+		return true
 	case <-ctx.Done():
-		return
+		return false
 	default:
+	}
+
+	if !isForcedExit {
 		droppedCount := atomic.AddInt64(&w.droppedSignals, 1)
 		w.logger.Strategy().
 			WithField("dropped_count", droppedCount).
-			WithField("symbol", sig.Symbol).
-			WithField("action", sig.Action).
-			Warn("Signal channel is full, dropping forced-exit signal")
+			WithField("symbol", signal.Symbol).
+			WithField("action", signal.Action).
+			Warn("Signal channel is full, dropping signal")
+		return false
+	}
+
+	w.logger.Trading().
+		WithField("symbol", signal.Symbol).
+		WithField("action", signal.Action).
+		WithField("timeout", ForcedExitSendTimeout.String()).
+		Warn("Signal channel is full, blocking to enqueue forced-exit signal")
+
+	timer := time.NewTimer(ForcedExitSendTimeout)
+	defer timer.Stop()
+
+	select {
+	case w.signalCh <- signal:
+		w.lastSentSignals.Store(signal.Symbol, signal.Action)
+		return true
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		droppedCount := atomic.AddInt64(&w.droppedSignals, 1)
+		w.logger.Trading().
+			WithField("dropped_count", droppedCount).
+			WithField("symbol", signal.Symbol).
+			WithField("action", signal.Action).
+			Error("Forced-exit signal could not be enqueued before timeout — position remains unprotected")
+		return false
 	}
 }
 
@@ -635,11 +722,21 @@ func (w *StrategyWorker) executeStrategy(ctx context.Context, marketData *domain
 	// Stop-loss is checked first (risk priority); take-profit only when no SL fires.
 	isForcedExit := false
 	if signal.Action != strategy.SignalSell {
-		if slSignal := w.checkStopLoss(marketData.Symbol, marketData.Price); slSignal != nil {
-			signal = slSignal
-			isForcedExit = true
-		} else if tpSignal := w.checkTakeProfit(marketData.Symbol, marketData.Price); tpSignal != nil {
-			signal = tpSignal
+		forced, err := w.forcedExitSignal(marketData.Symbol, marketData.Price)
+		switch {
+		case err != nil:
+			w.reportPositionReadFailure(marketData.Symbol, err)
+			// Position state is unknown, so an existing position's stop-loss
+			// cannot be enforced. Opening a new one would add risk we are
+			// currently unable to manage — hold until reads recover.
+			if signal.Action == strategy.SignalBuy {
+				w.logger.Trading().
+					WithField("symbol", marketData.Symbol).
+					Error("Suppressing BUY signal while position state is unreadable")
+				return
+			}
+		case forced != nil:
+			signal = forced
 			isForcedExit = true
 		}
 	}
@@ -677,23 +774,8 @@ func (w *StrategyWorker) executeStrategy(ctx context.Context, marketData *domain
 		)
 
 		// Send signal to processing queue
-		select {
-		case w.signalCh <- signal:
-			// Record last sent action only on successful send
-			w.lastSentSignals.Store(signal.Symbol, signal.Action)
-			if isForcedExit {
-				w.lastForcedExitAttempt.Store(signal.Symbol, time.Now())
-			}
-		case <-ctx.Done():
-			return
-		default:
-			// Increment dropped signal counter atomically
-			droppedCount := atomic.AddInt64(&w.droppedSignals, 1)
-			w.logger.Strategy().
-				WithField("dropped_count", droppedCount).
-				WithField("symbol", signal.Symbol).
-				WithField("action", signal.Action).
-				Warn("Signal channel is full, dropping signal")
+		if w.sendSignal(ctx, signal, isForcedExit) && isForcedExit {
+			w.lastForcedExitAttempt.Store(signal.Symbol, time.Now())
 		}
 	} else if signal.Action == strategy.SignalHold {
 		// Reset last sent signal when strategy returns to HOLD (trend reversed or insufficient data)

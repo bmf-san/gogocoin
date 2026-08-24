@@ -71,8 +71,8 @@ func newTestStrategyWorker(t *testing.T, cfg map[string]any) *StrategyWorker {
 func TestCheckStopLoss_NoPositionReader(t *testing.T) {
 	w := newTestStrategyWorker(t, map[string]any{"stop_loss_pct": 1.0})
 	// No position reader set — must return nil
-	if got := w.checkStopLoss("XRP_JPY", 220.0); got != nil {
-		t.Fatalf("expected nil when no position reader, got %+v", got)
+	if got, err := w.checkStopLoss("XRP_JPY", 220.0); got != nil || err != nil {
+		t.Fatalf("expected nil when no position reader, got %+v (err=%v)", got, err)
 	}
 }
 
@@ -80,8 +80,8 @@ func TestCheckStopLoss_NoOpenPositions(t *testing.T) {
 	w := newTestStrategyWorker(t, map[string]any{"stop_loss_pct": 1.0})
 	w.SetPositionReader(&mockPositionReader{positions: []domain.Position{}})
 
-	if got := w.checkStopLoss("XRP_JPY", 220.0); got != nil {
-		t.Fatalf("expected nil for empty positions, got %+v", got)
+	if got, err := w.checkStopLoss("XRP_JPY", 220.0); got != nil || err != nil {
+		t.Fatalf("expected nil for empty positions, got %+v (err=%v)", got, err)
 	}
 }
 
@@ -94,8 +94,8 @@ func TestCheckStopLoss_StopLossNotTriggered(t *testing.T) {
 	})
 
 	// 1% below 230.0 = 227.70; current price 228.0 is above stop → no trigger
-	if got := w.checkStopLoss("XRP_JPY", 228.0); got != nil {
-		t.Fatalf("stop loss should not trigger at 228.0 (stop=227.7), got %+v", got)
+	if got, err := w.checkStopLoss("XRP_JPY", 228.0); got != nil || err != nil {
+		t.Fatalf("stop loss should not trigger at 228.0 (stop=227.7), got %+v (err=%v)", got, err)
 	}
 }
 
@@ -108,7 +108,10 @@ func TestCheckStopLoss_StopLossTriggered(t *testing.T) {
 	})
 
 	// 1% below 230.0 = 227.70; current price 227.5 is below stop → trigger
-	got := w.checkStopLoss("XRP_JPY", 227.5)
+	got, err := w.checkStopLoss("XRP_JPY", 227.5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got == nil {
 		t.Fatal("expected SELL signal when stop loss triggers, got nil")
 	}
@@ -132,7 +135,10 @@ func TestCheckStopLoss_ExactlyAtStopPrice(t *testing.T) {
 	})
 
 	// exactly at stop price (230 * 0.99 = 227.7) must trigger
-	got := w.checkStopLoss("XRP_JPY", 227.7)
+	got, err := w.checkStopLoss("XRP_JPY", 227.7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got == nil {
 		t.Fatal("expected SELL signal at exact stop price, got nil")
 	}
@@ -147,8 +153,8 @@ func TestCheckStopLoss_ZeroStopLossPct(t *testing.T) {
 	})
 
 	// stop_loss_pct=0 means disabled — should not trigger regardless of price
-	if got := w.checkStopLoss("XRP_JPY", 100.0); got != nil {
-		t.Fatalf("stop loss should be disabled when pct=0, got %+v", got)
+	if got, err := w.checkStopLoss("XRP_JPY", 100.0); got != nil || err != nil {
+		t.Fatalf("stop loss should be disabled when pct=0, got %+v (err=%v)", got, err)
 	}
 }
 
@@ -162,7 +168,10 @@ func TestCheckStopLoss_MultiplePositions_OnlyOneBreached(t *testing.T) {
 	})
 
 	// 226.5 is below 229 stop (226.71) → should trigger on first position
-	got := w.checkStopLoss("XRP_JPY", 226.5)
+	got, err := w.checkStopLoss("XRP_JPY", 226.5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got == nil {
 		t.Fatal("expected SELL signal, got nil")
 	}
@@ -183,7 +192,10 @@ func TestCheckStopLoss_PartialPosition_Triggered(t *testing.T) {
 	})
 
 	// 1% below 229.01 = 226.7199; current price 226.29 is below stop → trigger
-	got := w.checkStopLoss("XRP_JPY", 226.29)
+	got, err := w.checkStopLoss("XRP_JPY", 226.29)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got == nil {
 		t.Fatal("expected SELL signal for PARTIAL position below stop price, got nil")
 	}

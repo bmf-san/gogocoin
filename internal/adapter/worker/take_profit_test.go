@@ -10,8 +10,8 @@ import (
 func TestCheckTakeProfit_NoPositionReader(t *testing.T) {
 	w := newTestStrategyWorker(t, map[string]any{"take_profit_pct": 2.0})
 	// No position reader set — must return nil
-	if got := w.checkTakeProfit("ETH_JPY", 340000.0); got != nil {
-		t.Fatalf("expected nil when no position reader, got %+v", got)
+	if got, err := w.checkTakeProfit("ETH_JPY", 340000.0); got != nil || err != nil {
+		t.Fatalf("expected nil when no position reader, got %+v (err=%v)", got, err)
 	}
 }
 
@@ -19,8 +19,8 @@ func TestCheckTakeProfit_NoOpenPositions(t *testing.T) {
 	w := newTestStrategyWorker(t, map[string]any{"take_profit_pct": 2.0})
 	w.SetPositionReader(&mockPositionReader{positions: []domain.Position{}})
 
-	if got := w.checkTakeProfit("ETH_JPY", 340000.0); got != nil {
-		t.Fatalf("expected nil for empty positions, got %+v", got)
+	if got, err := w.checkTakeProfit("ETH_JPY", 340000.0); got != nil || err != nil {
+		t.Fatalf("expected nil for empty positions, got %+v (err=%v)", got, err)
 	}
 }
 
@@ -33,8 +33,8 @@ func TestCheckTakeProfit_NotTriggered(t *testing.T) {
 	})
 
 	// 2% above 330000 = 336600; current price 335000 is below TP → no trigger
-	if got := w.checkTakeProfit("ETH_JPY", 335000.0); got != nil {
-		t.Fatalf("take profit should not trigger at 335000 (tp=336600), got %+v", got)
+	if got, err := w.checkTakeProfit("ETH_JPY", 335000.0); got != nil || err != nil {
+		t.Fatalf("take profit should not trigger at 335000 (tp=336600), got %+v (err=%v)", got, err)
 	}
 }
 
@@ -47,7 +47,10 @@ func TestCheckTakeProfit_Triggered(t *testing.T) {
 	})
 
 	// 2% above 330000 = 336600; current price 340000 is above TP → trigger
-	got := w.checkTakeProfit("ETH_JPY", 340000.0)
+	got, err := w.checkTakeProfit("ETH_JPY", 340000.0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got == nil {
 		t.Fatal("expected SELL signal when take profit triggers, got nil")
 	}
@@ -71,7 +74,10 @@ func TestCheckTakeProfit_ExactlyAtTakePrice(t *testing.T) {
 	})
 
 	// exactly at take price (330000 * 1.02 = 336600) must trigger
-	got := w.checkTakeProfit("ETH_JPY", 336600.0)
+	got, err := w.checkTakeProfit("ETH_JPY", 336600.0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got == nil {
 		t.Fatal("expected SELL signal at exact take price, got nil")
 	}
@@ -86,8 +92,8 @@ func TestCheckTakeProfit_ZeroTakeProfitPct(t *testing.T) {
 	})
 
 	// take_profit_pct=0 means disabled
-	if got := w.checkTakeProfit("ETH_JPY", 999999.0); got != nil {
-		t.Fatalf("take profit should be disabled when pct=0, got %+v", got)
+	if got, err := w.checkTakeProfit("ETH_JPY", 999999.0); got != nil || err != nil {
+		t.Fatalf("take profit should be disabled when pct=0, got %+v (err=%v)", got, err)
 	}
 }
 
@@ -100,7 +106,10 @@ func TestCheckTakeProfit_PartialPosition_Triggered(t *testing.T) {
 	})
 
 	// 2% above 330792 = 337407.84; current price 340362 is above TP → trigger
-	got := w.checkTakeProfit("ETH_JPY", 340362.0)
+	got, err := w.checkTakeProfit("ETH_JPY", 340362.0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got == nil {
 		t.Fatal("expected SELL signal for PARTIAL position above take price, got nil")
 	}
@@ -122,7 +131,10 @@ func TestCheckTakeProfit_MultiplePositions_FirstTriggered(t *testing.T) {
 	})
 
 	// 340000 > 336600 (first) but < 341700 (second) → triggers on first position
-	got := w.checkTakeProfit("ETH_JPY", 340000.0)
+	got, err := w.checkTakeProfit("ETH_JPY", 340000.0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got == nil {
 		t.Fatal("expected SELL signal, got nil")
 	}

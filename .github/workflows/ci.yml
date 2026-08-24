@@ -106,9 +106,11 @@ jobs:
 
     - name: Build example
       working-directory: example
-      run: |
-        go mod tidy
-        go build -o /dev/null ./cmd/
+      # ここで go mod tidy を実行しないこと。以前は実行していたが、それにより
+      # example/go.mod の依存ずれがこのジョブでのみ自動修正されて成功し、
+      # tidy を行わない Docker Build Test だけが失敗する状態を招いていた。
+      # ずれの検出は Lint ジョブの tidy-check が担う。
+      run: go build -o /dev/null ./cmd/
 
   security:
     name: Security Scan

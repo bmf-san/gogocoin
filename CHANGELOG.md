@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.8.3](https://github.com/bmf-san/gogocoin/compare/v1.8.2...v1.8.3) (2026-08-24)
+
+
+### Bug Fixes
+
+* **example:** sync example module dependencies with the root module ([c96b62f](https://github.com/bmf-san/gogocoin/commit/c96b62f87d5a943a024d46196d00ef92ecb4fa1a))
+* **example:** sync example module dependencies with the root module ([d5da284](https://github.com/bmf-san/gogocoin/commit/d5da284c1fa5983b4c2f6bafe0b76c266ad6f2a0))
+* **worker:** never silently drop stop-loss and take-profit signals ([7a7804a](https://github.com/bmf-san/gogocoin/commit/7a7804aa835ea3a1498057a3fb37bda5a903ba72))
+* **worker:** never silently drop stop-loss and take-profit signals ([aa40762](https://github.com/bmf-san/gogocoin/commit/aa407627ab9a96313c06aec007252bb64ef5cb9f))
+
+
+### Build System
+
+* **deps:** bump github.com/mattn/go-sqlite3 from 1.14.48 to 1.14.49 ([#132](https://github.com/bmf-san/gogocoin/issues/132)) ([ee8121d](https://github.com/bmf-san/gogocoin/commit/ee8121d6fb8c1772b543dda0c76f87a611da13f2))
+* **deps:** bump github.com/mattn/go-sqlite3 from 1.14.49 to 1.14.50 ([#134](https://github.com/bmf-san/gogocoin/issues/134)) ([13c858c](https://github.com/bmf-san/gogocoin/commit/13c858cd56e74216424dd4bbcc18acb1e8848d01))
+* **deps:** bump github.com/oapi-codegen/runtime from 1.6.0 to 1.7.0 ([#133](https://github.com/bmf-san/gogocoin/issues/133)) ([de8b314](https://github.com/bmf-san/gogocoin/commit/de8b3144c8e2682a9b821f7f6f9d5b7392d2cf1e))
+
 ## [1.8.2](https://github.com/bmf-san/gogocoin/compare/v1.8.1...v1.8.2) (2026-07-19)
 
 
