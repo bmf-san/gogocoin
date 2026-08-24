@@ -270,8 +270,15 @@ func (pc *Calculator) prepareSellData(result *domain.OrderResult) (pnl float64, 
 		remainingSize -= matchSize
 	}
 
-	if totalCost > 0 {
-		sellRevenue := effectivePrice * result.FilledSize
+	// Only the portion matched against open positions has a known cost basis.
+	// Revenue must be measured on that same quantity: using the full FilledSize
+	// while totalCost covers only the matched quantity books the unmatched
+	// portion as pure profit. That happens whenever a SELL exceeds the total
+	// remaining open-position size (e.g. clearing accumulated dust), and it
+	// silently inflates reported PnL.
+	matchedSize := result.FilledSize - remainingSize
+	if matchedSize > 0 {
+		sellRevenue := effectivePrice * matchedSize
 		return sellRevenue - totalCost - totalFees, positions, nil
 	}
 
