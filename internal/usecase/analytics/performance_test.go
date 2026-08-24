@@ -3,6 +3,7 @@ package analytics
 import (
 	"context"
 	"math"
+	"sort"
 	"testing"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 // Mock implementations
 type mockTradingRepo struct {
 	trades []domain.Trade
+	// sinceArg records the cut-off GetTradesSince was called with.
+	sinceArg time.Time
 }
 
 func (m *mockTradingRepo) GetRecentTrades(limit int) ([]domain.Trade, error) {
@@ -23,6 +26,25 @@ func (m *mockTradingRepo) GetRecentTrades(limit int) ([]domain.Trade, error) {
 
 func (m *mockTradingRepo) GetAllTrades() ([]domain.Trade, error) {
 	return m.trades, nil
+}
+
+// GetTradesSince mirrors the real repository: filtered by executed_at and
+// returned newest first.
+func (m *mockTradingRepo) GetTradesSince(since time.Time, limit int) ([]domain.Trade, error) {
+	m.sinceArg = since
+	var out []domain.Trade
+	for i := range m.trades {
+		if !m.trades[i].ExecutedAt.Before(since) {
+			out = append(out, m.trades[i])
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].ExecutedAt.After(out[j].ExecutedAt)
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }
 
 type mockAnalyticsRepo struct {
@@ -43,7 +65,7 @@ func (m *mockAnalyticsRepo) GetPerformanceMetrics(days int) ([]domain.Performanc
 }
 
 func TestCalculateFromTrades_NoTrades(t *testing.T) {
-	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
+	pa := NewPerformanceAnalytics(nil, nil, nil, 100000, time.Time{})
 
 	metrics := pa.CalculateFromTrades([]domain.Trade{})
 
@@ -56,7 +78,7 @@ func TestCalculateFromTrades_NoTrades(t *testing.T) {
 }
 
 func TestCalculateFromTrades_SingleWinningTrade(t *testing.T) {
-	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
+	pa := NewPerformanceAnalytics(nil, nil, nil, 100000, time.Time{})
 
 	trades := []domain.Trade{
 		{
@@ -91,7 +113,7 @@ func TestCalculateFromTrades_SingleWinningTrade(t *testing.T) {
 }
 
 func TestCalculateFromTrades_SingleLosingTrade(t *testing.T) {
-	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
+	pa := NewPerformanceAnalytics(nil, nil, nil, 100000, time.Time{})
 
 	trades := []domain.Trade{
 		{
@@ -126,7 +148,7 @@ func TestCalculateFromTrades_SingleLosingTrade(t *testing.T) {
 }
 
 func TestCalculateFromTrades_MixedTrades(t *testing.T) {
-	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
+	pa := NewPerformanceAnalytics(nil, nil, nil, 100000, time.Time{})
 
 	trades := []domain.Trade{
 		{PnL: 100, Fee: 15},  // Win
@@ -160,7 +182,7 @@ func TestCalculateFromTrades_MixedTrades(t *testing.T) {
 }
 
 func TestCalculateFromTrades_ZeroPnLHandling(t *testing.T) {
-	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
+	pa := NewPerformanceAnalytics(nil, nil, nil, 100000, time.Time{})
 
 	trades := []domain.Trade{
 		{
@@ -185,7 +207,7 @@ func TestCalculateFromTrades_ZeroPnLHandling(t *testing.T) {
 // calculator.go already subtracts fees when computing PnL, so substituting
 // pnl = -fee here would double-count the fee.
 func TestCalculateFromTrades_SellZeroPnLNoDoubleFee(t *testing.T) {
-	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
+	pa := NewPerformanceAnalytics(nil, nil, nil, 100000, time.Time{})
 
 	trades := []domain.Trade{
 		{Side: "SELL", PnL: 0, Fee: 15},
@@ -199,7 +221,7 @@ func TestCalculateFromTrades_SellZeroPnLNoDoubleFee(t *testing.T) {
 }
 
 func TestCalculateSharpeRatio(t *testing.T) {
-	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
+	pa := NewPerformanceAnalytics(nil, nil, nil, 100000, time.Time{})
 
 	tests := []struct {
 		name          string
@@ -242,7 +264,7 @@ func TestCalculateSharpeRatio(t *testing.T) {
 }
 
 func TestCalculateMaxDrawdown(t *testing.T) {
-	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
+	pa := NewPerformanceAnalytics(nil, nil, nil, 100000, time.Time{})
 
 	tests := []struct {
 		name     string
@@ -306,7 +328,7 @@ func TestUpdateMetrics(t *testing.T) {
 	tradingRepo := &mockTradingRepo{trades: trades}
 	analyticsRepo := &mockAnalyticsRepo{}
 
-	pa := NewPerformanceAnalytics(tradingRepo, analyticsRepo, nil, 100000)
+	pa := NewPerformanceAnalytics(tradingRepo, analyticsRepo, nil, 100000, time.Time{})
 
 	err := pa.UpdateMetrics(context.Background())
 	if err != nil {
@@ -328,7 +350,7 @@ func TestUpdateMetrics_NoTrades(t *testing.T) {
 	tradingRepo := &mockTradingRepo{trades: []domain.Trade{}}
 	analyticsRepo := &mockAnalyticsRepo{}
 
-	pa := NewPerformanceAnalytics(tradingRepo, analyticsRepo, nil, 100000)
+	pa := NewPerformanceAnalytics(tradingRepo, analyticsRepo, nil, 100000, time.Time{})
 
 	err := pa.UpdateMetrics(context.Background())
 	if err != nil {
@@ -341,8 +363,95 @@ func TestUpdateMetrics_NoTrades(t *testing.T) {
 	}
 }
 
+// TestUpdateMetrics_PnLEpoch verifies that a configured epoch excludes earlier
+// trades entirely. The pre-epoch rows here carry the kind of inflated PnL the
+// epoch exists to ignore, so leaking even one of them into the total is the
+// exact failure this guards against.
+func TestUpdateMetrics_PnLEpoch(t *testing.T) {
+	epoch := time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC)
+	trades := []domain.Trade{
+		{PnL: 900, ExecutedAt: epoch.Add(-48 * time.Hour)},
+		{PnL: 17, ExecutedAt: epoch.Add(-1 * time.Second)},
+		{PnL: -30, ExecutedAt: epoch},
+		{PnL: -70, ExecutedAt: epoch.Add(72 * time.Hour)},
+	}
+
+	t.Run("epoch set excludes earlier trades", func(t *testing.T) {
+		tradingRepo := &mockTradingRepo{trades: trades}
+		analyticsRepo := &mockAnalyticsRepo{}
+		pa := NewPerformanceAnalytics(tradingRepo, analyticsRepo, nil, 100000, epoch)
+
+		if err := pa.UpdateMetrics(context.Background()); err != nil {
+			t.Fatalf("UpdateMetrics failed: %v", err)
+		}
+		if !tradingRepo.sinceArg.Equal(epoch) {
+			t.Errorf("expected GetTradesSince(%v), got %v", epoch, tradingRepo.sinceArg)
+		}
+		if len(analyticsRepo.savedMetrics) != 1 {
+			t.Fatalf("expected 1 saved metric, got %d", len(analyticsRepo.savedMetrics))
+		}
+		metric := analyticsRepo.savedMetrics[0]
+		if math.Abs(metric.TotalPnL-(-100)) > 0.01 {
+			t.Errorf("expected total PnL -100, got %.2f", metric.TotalPnL)
+		}
+		if metric.TotalTrades != 2 {
+			t.Errorf("expected 2 trades in scope, got %d", metric.TotalTrades)
+		}
+	})
+
+	t.Run("zero epoch keeps the full history", func(t *testing.T) {
+		tradingRepo := &mockTradingRepo{trades: trades}
+		analyticsRepo := &mockAnalyticsRepo{}
+		pa := NewPerformanceAnalytics(tradingRepo, analyticsRepo, nil, 100000, time.Time{})
+
+		if err := pa.UpdateMetrics(context.Background()); err != nil {
+			t.Fatalf("UpdateMetrics failed: %v", err)
+		}
+		metric := analyticsRepo.savedMetrics[0]
+		if math.Abs(metric.TotalPnL-817) > 0.01 {
+			t.Errorf("expected total PnL 817, got %.2f", metric.TotalPnL)
+		}
+	})
+
+	t.Run("no trades after epoch saves nothing", func(t *testing.T) {
+		tradingRepo := &mockTradingRepo{trades: trades[:2]}
+		analyticsRepo := &mockAnalyticsRepo{}
+		pa := NewPerformanceAnalytics(tradingRepo, analyticsRepo, nil, 100000, epoch)
+
+		if err := pa.UpdateMetrics(context.Background()); err != nil {
+			t.Fatalf("UpdateMetrics failed: %v", err)
+		}
+		if len(analyticsRepo.savedMetrics) != 0 {
+			t.Errorf("expected no saved metrics, got %d", len(analyticsRepo.savedMetrics))
+		}
+	})
+}
+
+// TestTradesInScope_OrdersAscending guards the drawdown calculation, which
+// walks the slice as a running equity curve and silently produces nonsense if
+// the newest-first order of GetTradesSince is passed through.
+func TestTradesInScope_OrdersAscending(t *testing.T) {
+	epoch := time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC)
+	tradingRepo := &mockTradingRepo{trades: []domain.Trade{
+		{PnL: 10, ExecutedAt: epoch.Add(3 * time.Hour)},
+		{PnL: 20, ExecutedAt: epoch.Add(1 * time.Hour)},
+		{PnL: 30, ExecutedAt: epoch.Add(2 * time.Hour)},
+	}}
+	pa := NewPerformanceAnalytics(tradingRepo, &mockAnalyticsRepo{}, nil, 100000, epoch)
+
+	got, err := pa.tradesInScope()
+	if err != nil {
+		t.Fatalf("tradesInScope failed: %v", err)
+	}
+	for i := 1; i < len(got); i++ {
+		if got[i].ExecutedAt.Before(got[i-1].ExecutedAt) {
+			t.Fatalf("trades are not in ascending order: %v", got)
+		}
+	}
+}
+
 func TestProfitFactor(t *testing.T) {
-	pa := NewPerformanceAnalytics(nil, nil, nil, 100000)
+	pa := NewPerformanceAnalytics(nil, nil, nil, 100000, time.Time{})
 
 	tests := []struct {
 		name           string

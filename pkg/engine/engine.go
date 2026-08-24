@@ -180,7 +180,9 @@ func run(ctx context.Context, cfg *config.Config, log logger.LoggerInterface, ec
 	riskMgr.SetPositionRepository(repo)
 
 	// ── 7. Performance analytics ──────────────────────────────────────────────
-	perfAnalytics := analytics.NewPerformanceAnalytics(repo, repo, log, cfg.Trading.InitialBalance)
+	// Shares pnlEpoch with the risk manager so the metrics the dashboard shows
+	// and the totals the kill switch acts on describe the same period.
+	perfAnalytics := analytics.NewPerformanceAnalytics(repo, repo, log, cfg.Trading.InitialBalance, pnlEpoch)
 
 	// ── 8. HTTP server ────────────────────────────────────────────────────────
 	appSvc := &appServiceAdapter{tc: tradingCtrl, trader: trader, strat: strat}

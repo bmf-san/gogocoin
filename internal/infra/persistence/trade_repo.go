@@ -123,20 +123,23 @@ func (r *TradeRepository) GetTradesSince(since time.Time, limit int) ([]domain.T
 	return trades, rows.Err()
 }
 
-// GetSymbolPerformance returns realized performance grouped by symbol.
-// Realized metrics are based on SELL rows only.
-func (r *TradeRepository) GetSymbolPerformance() ([]domain.SymbolPerformance, error) {
+// GetSymbolPerformanceSince returns realized performance grouped by symbol.
+// Realized metrics are based on SELL rows only. When since is non-zero, only
+// trades executed at or after it are counted; this lets callers exclude a
+// period whose recorded PnL is known to be untrustworthy (see the
+// risk_management.pnl_epoch setting).
+func (r *TradeRepository) GetSymbolPerformanceSince(since time.Time) ([]domain.SymbolPerformance, error) {
 	query := `SELECT
 			symbol,
 			COUNT(*) AS total_trades,
 			AVG(CASE WHEN pnl > 0 THEN 1.0 ELSE 0.0 END) AS win_rate,
 			COALESCE(SUM(pnl), 0) AS total_pnl
 		FROM trades
-		WHERE side = 'SELL'
+		WHERE side = 'SELL' AND executed_at >= ?
 		GROUP BY symbol
 		ORDER BY total_pnl DESC, total_trades DESC, symbol ASC`
 
-	rows, err := r.db.db.Query(query)
+	rows, err := r.db.db.Query(query, since)
 	if err != nil {
 		return nil, err
 	}

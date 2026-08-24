@@ -167,6 +167,22 @@ func parseSince(raw string) (time.Time, error) {
 	return t, nil
 }
 
+// pnlEpoch returns the configured risk_management.pnl_epoch, or the zero time
+// when it is unset or unparseable. Config validation already rejects a
+// malformed value at startup, so a parse failure here is not worth failing a
+// read-only request over — it only means the response stays unscoped.
+func (s *Server) pnlEpoch() time.Time {
+	cfg := s.getConfig()
+	if cfg == nil {
+		return time.Time{}
+	}
+	epoch, err := cfg.Trading.RiskManagement.ParsePnLEpoch()
+	if err != nil {
+		return time.Time{}
+	}
+	return epoch
+}
+
 // GetApiPerformance implements StrictServerInterface - get performance metrics
 func (s *Server) GetApiPerformance(ctx context.Context, request GetApiPerformanceRequestObject) (GetApiPerformanceResponseObject, error) {
 	metrics, err := s.db.GetPerformanceMetrics(30)
@@ -176,13 +192,33 @@ func (s *Server) GetApiPerformance(ctx context.Context, request GetApiPerformanc
 		return GetApiPerformance500JSONResponse{InternalServerErrorJSONResponse{Message: &msg}}, nil
 	}
 
+	// Snapshots written before the epoch describe a period that is explicitly
+	// out of scope, and their totals cannot be rebased because the underlying
+	// per-trade PnL is not recomputable. Drop them rather than show figures the
+	// kill switch no longer trusts. Snapshots at or after the epoch are already
+	// epoch-scoped: the analytics service that writes them uses the same cut-off.
+	if epoch := s.pnlEpoch(); !epoch.IsZero() {
+		metrics = filterMetricsSince(metrics, epoch)
+	}
+
 	s.logger.System().WithField("count", len(metrics)).Info("Returning performance metrics from API")
 	return GetApiPerformance200JSONResponse(domainMetricsToAPI(metrics)), nil
 }
 
+// filterMetricsSince drops performance snapshots recorded before the epoch.
+func filterMetricsSince(metrics []domain.PerformanceMetric, epoch time.Time) []domain.PerformanceMetric {
+	filtered := make([]domain.PerformanceMetric, 0, len(metrics))
+	for i := range metrics {
+		if !metrics[i].Date.Before(epoch) {
+			filtered = append(filtered, metrics[i])
+		}
+	}
+	return filtered
+}
+
 // GetApiV1PerformanceSymbols implements StrictServerInterface - get realized performance grouped by symbol.
 func (s *Server) GetApiV1PerformanceSymbols(ctx context.Context, request GetApiV1PerformanceSymbolsRequestObject) (GetApiV1PerformanceSymbolsResponseObject, error) {
-	items, err := s.db.GetSymbolPerformance()
+	items, err := s.db.GetSymbolPerformanceSince(s.pnlEpoch())
 	if err != nil {
 		s.logger.Error("Failed to get symbol performance: " + err.Error())
 		msg := "Internal server error"

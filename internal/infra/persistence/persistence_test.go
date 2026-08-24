@@ -76,6 +76,59 @@ func TestTradeRepository_Upsert(t *testing.T) {
 	}
 }
 
+// TestTradeRepository_GetSymbolPerformanceSince checks that the cut-off is
+// applied in SQL. The pre-epoch SELL below is deliberately a large fake profit:
+// if the filter is dropped, the assertion flips sign, which is exactly how the
+// inflated figure used to reach the dashboard.
+func TestTradeRepository_GetSymbolPerformanceSince(t *testing.T) {
+	db := newTestDB(t)
+	repo := persistence.NewTradeRepository(db)
+
+	epoch := time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC)
+	trades := []*domain.Trade{
+		{OrderID: "OLD-SELL", Symbol: "XRP_JPY", Side: "SELL", Type: "MARKET",
+			Size: 1, Price: 100, Status: "COMPLETED", PnL: 900, ExecutedAt: epoch.Add(-48 * time.Hour)},
+		{OrderID: "NEW-SELL-WIN", Symbol: "XRP_JPY", Side: "SELL", Type: "MARKET",
+			Size: 1, Price: 100, Status: "COMPLETED", PnL: 20, ExecutedAt: epoch.Add(time.Hour)},
+		{OrderID: "NEW-SELL-LOSS", Symbol: "XRP_JPY", Side: "SELL", Type: "MARKET",
+			Size: 1, Price: 100, Status: "COMPLETED", PnL: -50, ExecutedAt: epoch.Add(2 * time.Hour)},
+		{OrderID: "NEW-BUY", Symbol: "XRP_JPY", Side: "BUY", Type: "MARKET",
+			Size: 1, Price: 100, Status: "COMPLETED", PnL: -1, ExecutedAt: epoch.Add(30 * time.Minute)},
+	}
+	for _, tr := range trades {
+		if err := repo.SaveTrade(tr); err != nil {
+			t.Fatalf("SaveTrade %s: %v", tr.OrderID, err)
+		}
+	}
+
+	got, err := repo.GetSymbolPerformanceSince(epoch)
+	if err != nil {
+		t.Fatalf("GetSymbolPerformanceSince: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 symbol row, got %d", len(got))
+	}
+	// Only the two post-epoch SELL rows count: BUY rows are not realized exits.
+	if got[0].TotalTrades != 2 {
+		t.Errorf("expected 2 realized trades, got %d", got[0].TotalTrades)
+	}
+	if got[0].TotalPnL != -30 {
+		t.Errorf("expected total_pnl -30, got %v", got[0].TotalPnL)
+	}
+	if got[0].WinRate != 0.5 {
+		t.Errorf("expected win_rate 0.5, got %v", got[0].WinRate)
+	}
+
+	// The zero time must keep the full history.
+	all, err := repo.GetSymbolPerformanceSince(time.Time{})
+	if err != nil {
+		t.Fatalf("GetSymbolPerformanceSince(zero): %v", err)
+	}
+	if len(all) != 1 || all[0].TotalPnL != 870 {
+		t.Errorf("expected unscoped total_pnl 870, got %v", all)
+	}
+}
+
 // ─── PositionRepository ───────────────────────────────────────────────────
 
 func TestPositionRepository_SaveAndGetOpen(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/bmf-san/gogocoin/internal/domain"
@@ -22,6 +23,12 @@ type PerformanceAnalytics struct {
 	analyticsRepo  AnalyticsRepository
 	logger         logger.LoggerInterface
 	initialBalance float64
+	// pnlEpoch, when non-zero, restricts every metric to trades executed at or
+	// after it. Trades before the epoch are excluded entirely rather than
+	// corrected, because their recorded PnL cannot be recomputed. This mirrors
+	// risk.Manager.cumulativePnL so the dashboard and the kill switch always
+	// agree on what "cumulative" means.
+	pnlEpoch time.Time
 }
 
 // Verify PerformanceAnalytics implements PerformanceAnalyticsService interface at compile time
@@ -31,6 +38,9 @@ var _ PerformanceAnalyticsService = (*PerformanceAnalytics)(nil)
 type TradingRepository interface {
 	GetRecentTrades(limit int) ([]domain.Trade, error)
 	GetAllTrades() ([]domain.Trade, error)
+	// GetTradesSince returns trades whose executed_at >= since, ordered by
+	// executed_at DESC. Limit is applied only when > 0.
+	GetTradesSince(since time.Time, limit int) ([]domain.Trade, error)
 }
 
 // AnalyticsRepository defines database operations for metrics
@@ -39,18 +49,21 @@ type AnalyticsRepository interface {
 	GetPerformanceMetrics(days int) ([]domain.PerformanceMetric, error)
 }
 
-// NewPerformanceAnalytics creates a new performance analytics service
+// NewPerformanceAnalytics creates a new performance analytics service.
+// Pass the zero time for pnlEpoch to aggregate the entire trade history.
 func NewPerformanceAnalytics(
 	tradingRepo TradingRepository,
 	analyticsRepo AnalyticsRepository,
 	logger logger.LoggerInterface,
 	initialBalance float64,
+	pnlEpoch time.Time,
 ) *PerformanceAnalytics {
 	return &PerformanceAnalytics{
 		tradingRepo:    tradingRepo,
 		analyticsRepo:  analyticsRepo,
 		logger:         logger,
 		initialBalance: initialBalance,
+		pnlEpoch:       pnlEpoch,
 	}
 }
 
@@ -60,13 +73,13 @@ func (pa *PerformanceAnalytics) UpdateMetrics(ctx context.Context) error {
 		pa.logger.System().Debug("Calculating performance metrics")
 	}
 
-	// Get all trades for accurate cumulative P&L
-	trades, err := pa.tradingRepo.GetAllTrades()
+	// Get the trades in scope for accurate cumulative P&L
+	trades, err := pa.tradesInScope()
 	if err != nil {
 		if pa.logger != nil {
-			pa.logger.System().WithError(err).Error("Failed to get all trades for performance calculation")
+			pa.logger.System().WithError(err).Error("Failed to get trades for performance calculation")
 		}
-		return fmt.Errorf("failed to get all trades for performance calculation: %w", err)
+		return fmt.Errorf("failed to get trades for performance calculation: %w", err)
 	}
 
 	if len(trades) == 0 {
@@ -95,6 +108,24 @@ func (pa *PerformanceAnalytics) UpdateMetrics(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// tradesInScope returns the trades the metrics are computed from, in ascending
+// executed_at order. Ordering matters: calculateMaxDrawdown walks the slice as
+// a running equity curve.
+func (pa *PerformanceAnalytics) tradesInScope() ([]domain.Trade, error) {
+	if pa.pnlEpoch.IsZero() {
+		return pa.tradingRepo.GetAllTrades()
+	}
+	trades, err := pa.tradingRepo.GetTradesSince(pa.pnlEpoch, 0)
+	if err != nil {
+		return nil, err
+	}
+	// GetTradesSince returns newest first; the calculations expect oldest first.
+	sort.Slice(trades, func(i, j int) bool {
+		return trades[i].ExecutedAt.Before(trades[j].ExecutedAt)
+	})
+	return trades, nil
 }
 
 // CalculateFromTrades calculates comprehensive performance metrics from trade history

@@ -54,7 +54,7 @@ func (m *mockTradingRepo) GetTradesSince(_ time.Time, _ int) ([]domain.Trade, er
 	return nil, nil
 }
 
-func (m *mockTradingRepo) GetSymbolPerformance() ([]domain.SymbolPerformance, error) {
+func (m *mockTradingRepo) GetSymbolPerformanceSince(_ time.Time) ([]domain.SymbolPerformance, error) {
 	return nil, nil
 }
 
