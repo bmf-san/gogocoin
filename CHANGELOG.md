@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.11.0](https://github.com/bmf-san/gogocoin/compare/v1.10.0...v1.11.0) (2026-08-26)
+
+
+### Features
+
+* **backtest:** infer walk-forward range from the dataset and emit aggregate.csv ([ac2ac89](https://github.com/bmf-san/gogocoin/commit/ac2ac896bf326b0e4e61c1979a309e716a54b35f))
+* **backtest:** infer walk-forward range from the dataset and emit aggregate.csv ([c1c568e](https://github.com/bmf-san/gogocoin/commit/c1c568e42faac7b538d810006acefcf533b4cd51))
+
 ## [1.10.0](https://github.com/bmf-san/gogocoin/compare/v1.9.0...v1.10.0) (2026-08-24)
 
 
