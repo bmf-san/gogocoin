@@ -32,6 +32,8 @@ func WalkForward(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("walkforward", flag.ContinueOnError)
 	configPath := fs.String("config", "configs/backtest.yaml", "path to backtest YAML config")
 	scenario := fs.String("scenario", "", "scenario name (must define a `grid` block)")
+	fromFlag := fs.String("from", "", "override data.from (YYYY-MM-DD); defaults to the first bar in the dataset")
+	toFlag := fs.String("to", "", "override data.to (YYYY-MM-DD); defaults to the last bar in the dataset")
 	trainDays := fs.Int("train-days", 60, "size of training window")
 	testDays := fs.Int("test-days", 14, "size of testing window")
 	step := fs.Int("step", 14, "step size between windows (days)")
@@ -55,17 +57,14 @@ func WalkForward(ctx context.Context, args []string) error {
 	if len(sc.Grid) == 0 {
 		return fmt.Errorf("scenario %q needs a grid block", *scenario)
 	}
-	from, err := backtest.ParseDate(cfg.Data.From)
-	if err != nil || from.IsZero() {
-		return fmt.Errorf("data.from required for walk-forward")
-	}
-	to, err := backtest.ParseDate(cfg.Data.To)
-	if err != nil || to.IsZero() {
-		return fmt.Errorf("data.to required for walk-forward")
-	}
 
 	combos := expandGrid(sc.Grid, sc.Fixed)
 	gridKeys := sortedKeys(sc.Grid)
+
+	from, to, err := resolveWalkForwardRange(ctx, cfg, *scenario, *fromFlag, *toFlag, combos)
+	if err != nil {
+		return err
+	}
 
 	type windowResult = wfWindow
 	var windows []windowResult
@@ -145,7 +144,95 @@ func WalkForward(ctx context.Context, args []string) error {
 	fmt.Printf("  trades:     %.0f\n", totalTrades)
 	fmt.Printf("  win rate:   %.2f %%\n", winRate)
 	fmt.Printf("  total P&L:  %+.2f JPY\n", totalNet)
+
+	// Machine-readable twin of the block above, so that automation can gate on
+	// out-of-sample numbers instead of the in-sample grid ranking.
+	aggPath := filepath.Join(*out, "aggregate.csv")
+	if err := writeWalkForwardAggregate(aggPath, len(windows), totalTrades, winRate, totalNet); err != nil {
+		return err
+	}
+	fmt.Printf("wrote %s\n", aggPath)
 	return nil
+}
+
+// resolveWalkForwardRange determines the [from, to] span to slice into windows.
+//
+// Precedence is flag > data.from/data.to > the actual extent of the dataset.
+// The last fallback matters because a config may deliberately leave the range
+// empty so that `run` and `optimize` always cover every bar available.
+// Forcing the operator to hardcode dates just for walk-forward invites a stale
+// range that silently excludes recent data.
+func resolveWalkForwardRange(ctx context.Context, cfg *backtest.Config, scenario, fromFlag, toFlag string,
+	combos []map[string]interface{},
+) (from, to time.Time, err error) {
+	pick := func(flagVal, cfgVal string) (time.Time, error) {
+		if flagVal != "" {
+			return backtest.ParseDate(flagVal)
+		}
+		return backtest.ParseDate(cfgVal)
+	}
+	if from, err = pick(fromFlag, cfg.Data.From); err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("parse from: %w", err)
+	}
+	if to, err = pick(toFlag, cfg.Data.To); err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("parse to: %w", err)
+	}
+	if !from.IsZero() && !to.IsZero() {
+		return from, to, nil
+	}
+	if len(combos) == 0 {
+		return time.Time{}, time.Time{}, fmt.Errorf("scenario %q expanded to zero grid combinations", scenario)
+	}
+	// Probe the dataset with the first combination. Every combination replays
+	// the same bars, so this costs one extra pass over the data.
+	probe, err := runScenario(ctx, cfg, scenario, time.Time{}, time.Time{}, combos[0], "", true)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("probe dataset range: %w", err)
+	}
+	if probe.StartTime.IsZero() || probe.EndTime.IsZero() {
+		return time.Time{}, time.Time{}, fmt.Errorf("dataset is empty; set data.from/data.to or --from/--to")
+	}
+	if from.IsZero() {
+		from = truncateToDay(probe.StartTime)
+	}
+	if to.IsZero() {
+		// The final day is only partially covered, so stop at its start to keep
+		// every test window a full day.
+		to = truncateToDay(probe.EndTime)
+	}
+	if !to.After(from) {
+		return time.Time{}, time.Time{}, fmt.Errorf("dataset spans less than a day (%s..%s)",
+			from.Format("2006-01-02"), to.Format("2006-01-02"))
+	}
+	fmt.Fprintf(os.Stderr, "inferred range from dataset: %s..%s\n",
+		from.Format("2006-01-02"), to.Format("2006-01-02"))
+	return from, to, nil
+}
+
+func truncateToDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+func writeWalkForwardAggregate(path string, windows int, trades, winRate, netPnL float64) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	w := csv.NewWriter(f)
+	if err := w.Write([]string{"windows", "trades", "win_rate", "net_pnl"}); err != nil {
+		return err
+	}
+	if err := w.Write([]string{
+		strconv.Itoa(windows),
+		strconv.FormatFloat(trades, 'f', 0, 64),
+		strconv.FormatFloat(winRate, 'f', 4, 64),
+		strconv.FormatFloat(netPnL, 'f', 4, 64),
+	}); err != nil {
+		return err
+	}
+	w.Flush()
+	return w.Error()
 }
 
 func writeWalkForwardCSV(path string, windows []wfWindow, gridKeys []string) error {
