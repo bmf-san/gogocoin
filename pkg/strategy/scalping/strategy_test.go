@@ -165,4 +165,3 @@ func TestAnalyze_DelegatesCorrectly(t *testing.T) {
 		t.Fatal("expected non-nil signal from Analyze")
 	}
 }
-

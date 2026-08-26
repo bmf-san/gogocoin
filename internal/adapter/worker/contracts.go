@@ -49,4 +49,3 @@ type PositionReader interface {
 type PositionCloser interface {
 	CloseOpenPositions(symbol string, side string) error
 }
-

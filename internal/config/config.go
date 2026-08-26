@@ -52,9 +52,9 @@ type RateLimitConfig struct {
 
 // TradingConfig represents trading settings
 type TradingConfig struct {
-	FeeRate        float64              `yaml:"fee_rate"`
-	InitialBalance float64              `yaml:"initial_balance"`
-	Symbols        []string             `yaml:"symbols"`
+	FeeRate        float64  `yaml:"fee_rate"`
+	InitialBalance float64  `yaml:"initial_balance"`
+	Symbols        []string `yaml:"symbols"`
 	// ObserveSymbols are subscribed to for market-data collection only.
 	// They are NOT fed to the strategy and never produce trade signals.
 	// Use this to warm up historical data for new symbols before promoting
@@ -71,13 +71,13 @@ type StrategyConfig struct {
 
 // RiskManagementConfig represents risk management settings
 type RiskManagementConfig struct {
-	MaxTotalLossPercent   float64 `yaml:"max_total_loss_percent"`
-	MaxTradeLossPercent   float64 `yaml:"max_trade_loss_percent"`
-	MaxDailyLossPercent   float64 `yaml:"max_daily_loss_percent"`
-	MaxTradeAmountPercent        float64 `yaml:"max_trade_amount_percent"`
-	MaxDailyTrades               int     `yaml:"max_daily_trades"`
-	MinTradeInterval             string  `yaml:"min_trade_interval"`
-	MaxOpenPositionsPerSymbol    int     `yaml:"max_open_positions_per_symbol"` // 0 = unlimited
+	MaxTotalLossPercent       float64 `yaml:"max_total_loss_percent"`
+	MaxTradeLossPercent       float64 `yaml:"max_trade_loss_percent"`
+	MaxDailyLossPercent       float64 `yaml:"max_daily_loss_percent"`
+	MaxTradeAmountPercent     float64 `yaml:"max_trade_amount_percent"`
+	MaxDailyTrades            int     `yaml:"max_daily_trades"`
+	MinTradeInterval          string  `yaml:"min_trade_interval"`
+	MaxOpenPositionsPerSymbol int     `yaml:"max_open_positions_per_symbol"` // 0 = unlimited
 	// PnLEpoch is an optional RFC3339 timestamp. When set, the total-loss limit
 	// ignores trades executed before it. Use it to draw a line under a period of
 	// PnL that is known to be mis-recorded, without deleting the trades.
@@ -197,12 +197,12 @@ func (c *Config) Validate() error {
 		return err
 	}
 
-        // Default API timeout to 30 s if not set in config.
-        if c.API.Timeout == 0 {
-                c.API.Timeout = 30 * time.Second
-        }
+	// Default API timeout to 30 s if not set in config.
+	if c.API.Timeout == 0 {
+		c.API.Timeout = 30 * time.Second
+	}
 
-        // Validate API configuration
+	// Validate API configuration
 	if c.API.Endpoint == "" {
 		return fmt.Errorf("api.endpoint is required")
 	}

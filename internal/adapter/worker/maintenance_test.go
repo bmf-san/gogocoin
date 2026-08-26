@@ -29,8 +29,8 @@ func (m *mockMaintenanceRepository) CleanupOldData(retentionDays int) error {
 func (m *mockMaintenanceRepository) GetTableStats() (map[string]int, error) {
 	m.getTableStatsCalled = true
 	return map[string]int{
-		"trades":     100,
-		"positions":  50,
+		"trades":      100,
+		"positions":   50,
 		"market_data": 1000,
 	}, nil
 }

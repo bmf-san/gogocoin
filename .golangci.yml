@@ -44,3 +44,9 @@ issues:
   # これらは v2 でも有効なまま
   max-issues-per-linter: 0
   max-same-issues: 0
+
+# gofmt 未整形が長期間 main に混入していた (2026-08-26 時点で 17 ファイル)。
+# 保存時整形の有無が人によって違うと差分がノイズになるため CI で固定する。
+formatters:
+  enable:
+    - gofmt
