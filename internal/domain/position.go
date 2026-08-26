@@ -4,7 +4,7 @@ import "time"
 
 // Position represents position information with tracking for partial fills
 type Position struct {
-	ID            int       `json:"id,omitempty"`       // Database ID (populated after persistence)
+	ID            int       `json:"id,omitempty"` // Database ID (populated after persistence)
 	Symbol        string    `json:"symbol"`
 	ProductCode   string    `json:"product_code"`
 	Side          string    `json:"side"`
@@ -14,7 +14,7 @@ type Position struct {
 	EntryPrice    float64   `json:"entry_price"`
 	CurrentPrice  float64   `json:"current_price"`
 	UnrealizedPL  float64   `json:"unrealized_pl"`
-	PnL           float64   `json:"pnl"` // Realized PnL
+	PnL           float64   `json:"pnl"`      // Realized PnL
 	Status        string    `json:"status"`   // OPEN, PARTIAL, CLOSED
 	OrderID       string    `json:"order_id"` // Original order ID
 	CreatedAt     time.Time `json:"created_at"`

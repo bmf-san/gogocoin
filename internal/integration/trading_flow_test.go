@@ -146,11 +146,11 @@ func (m *mockTradingService) SetStrategyName(name string) {}
 
 // mockStrategy simulates a trading strategy
 type mockStrategy struct {
-	signals       []*strategy.Signal
-	tradeCount    int
-	isRunning     bool
-	generateFunc  func() *strategy.Signal
-	mu            sync.Mutex
+	signals      []*strategy.Signal
+	tradeCount   int
+	isRunning    bool
+	generateFunc func() *strategy.Signal
+	mu           sync.Mutex
 }
 
 func newMockStrategy() *mockStrategy {
@@ -316,11 +316,11 @@ func TestTradingFlow_EndToEnd(t *testing.T) {
 
 		// Step 2: Execute order based on signal
 		orderReq := &domain.OrderRequest{
-			Symbol:   signal.Symbol,
-			Side:     string(signal.Action),
-			Type:     "MARKET",
-			Size:     signal.Quantity,
-			Price:    signal.Price,
+			Symbol: signal.Symbol,
+			Side:   string(signal.Action),
+			Type:   "MARKET",
+			Size:   signal.Quantity,
+			Price:  signal.Price,
 		}
 
 		orderResult, err := tradingSvc.PlaceOrder(ctx, orderReq)

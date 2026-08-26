@@ -70,14 +70,16 @@ func (m *mockStrategy) GetMetrics() strategy.StrategyMetrics             { retur
 func (m *mockStrategy) GetConfig() map[string]interface{}                { return map[string]interface{}{} }
 func (m *mockStrategy) Initialize(config map[string]interface{}) error   { return nil }
 func (m *mockStrategy) UpdateConfig(config map[string]interface{}) error { return nil }
-func (m *mockStrategy) IsRunning() bool                                              { return true }
-func (m *mockStrategy) Reset() error                                                 { return nil }
-func (m *mockStrategy) RecordTrade()                                                 {}
-func (m *mockStrategy) InitializeDailyTradeCount(count int)                          {}
-func (m *mockStrategy) GetStopLossPrice(_ float64) float64                           { return 0 }
-func (m *mockStrategy) GetTakeProfitPrice(_ float64) float64                         { return 0 }
-func (m *mockStrategy) GetBaseNotional(_ string) float64                             { return 0 }
-func (m *mockStrategy) GetAutoScaleConfig() strategy.AutoScaleConfig                { return strategy.AutoScaleConfig{} }
+func (m *mockStrategy) IsRunning() bool                                  { return true }
+func (m *mockStrategy) Reset() error                                     { return nil }
+func (m *mockStrategy) RecordTrade()                                     {}
+func (m *mockStrategy) InitializeDailyTradeCount(count int)              {}
+func (m *mockStrategy) GetStopLossPrice(_ float64) float64               { return 0 }
+func (m *mockStrategy) GetTakeProfitPrice(_ float64) float64             { return 0 }
+func (m *mockStrategy) GetBaseNotional(_ string) float64                 { return 0 }
+func (m *mockStrategy) GetAutoScaleConfig() strategy.AutoScaleConfig {
+	return strategy.AutoScaleConfig{}
+}
 
 func setupTestServer(t *testing.T) (*Server, *persistence.Repository, func()) {
 	t.Helper()
@@ -613,4 +615,3 @@ func TestSetApplication(t *testing.T) {
 		t.Errorf("Expected status code 200 after setting application, got %d", w.Code)
 	}
 }
-

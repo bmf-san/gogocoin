@@ -6,13 +6,13 @@ import "time"
 // This is a usecase-layer struct, free from infrastructure/config dependency.
 type ManagerConfig struct {
 	// Risk management parameters (from RiskManagementConfig)
-	MaxTotalLossPercent        float64
-	MaxTradeLossPercent        float64
-	MaxDailyLossPercent        float64
-	MaxTradeAmountPercent      float64
-	MaxDailyTrades             int
-	MinTradeInterval           time.Duration
-	MaxOpenPositionsPerSymbol  int // 0 = unlimited
+	MaxTotalLossPercent       float64
+	MaxTradeLossPercent       float64
+	MaxDailyLossPercent       float64
+	MaxTradeAmountPercent     float64
+	MaxDailyTrades            int
+	MinTradeInterval          time.Duration
+	MaxOpenPositionsPerSymbol int // 0 = unlimited
 	// PnLEpoch discards trade history recorded before this instant when the
 	// total-loss limit is evaluated. Zero means "use the whole history".
 	//

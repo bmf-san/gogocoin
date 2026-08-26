@@ -464,9 +464,9 @@ func TestCheckRiskManagement(t *testing.T) {
 func TestForcedExitSellBypassesPortfolioChecks(t *testing.T) {
 	cfg := ManagerConfig{
 		MaxTradeAmountPercent: 10.0,
-		MaxDailyTrades:        2,    // already exhausted
+		MaxDailyTrades:        2,             // already exhausted
 		MinTradeInterval:      1 * time.Hour, // last trade was recent
-		MaxTotalLossPercent:   10.0, // already exceeded
+		MaxTotalLossPercent:   10.0,          // already exceeded
 		FeeRate:               0.001,
 		InitialBalance:        100000,
 	}

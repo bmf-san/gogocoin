@@ -90,8 +90,10 @@ func (m *mockSignalStrategy) GetConfig() map[string]interface{} { return m.cfg }
 func (m *mockSignalStrategy) GenerateSignal(_ context.Context, _ *strategy.MarketData, _ []strategy.MarketData) (*strategy.Signal, error) {
 	return nil, nil
 }
-func (m *mockSignalStrategy) Analyze(_ []strategy.MarketData) (*strategy.Signal, error) { return nil, nil }
-func (m *mockSignalStrategy) Initialize(_ map[string]interface{}) error                  { return nil }
+func (m *mockSignalStrategy) Analyze(_ []strategy.MarketData) (*strategy.Signal, error) {
+	return nil, nil
+}
+func (m *mockSignalStrategy) Initialize(_ map[string]interface{}) error { return nil }
 func (m *mockSignalStrategy) UpdateConfig(cfg map[string]interface{}) error {
 	m.cfg = cfg
 	return nil
@@ -156,12 +158,12 @@ func buySignal(price, qty float64) *strategy.Signal {
 
 func TestComputeScaledNotional(t *testing.T) {
 	tests := []struct {
-		name         string
-		base         float64
-		available    float64
-		cfg          strategy.AutoScaleConfig
-		wantMin      float64
-		wantMax      float64
+		name      string
+		base      float64
+		available float64
+		cfg       strategy.AutoScaleConfig
+		wantMin   float64
+		wantMax   float64
 	}{
 		{
 			name:      "disabled returns base",
@@ -558,8 +560,8 @@ func TestGetAvailableSellSize(t *testing.T) {
 			// When percentage rounding floors to 0 lots but balance >= 1 lot,
 			// fall back to exactly 1 lot rather than sending a non-lot-rounded
 			// quantity that the exchange would reject.
-			name:    "sell_size_pct rounds to 0 lots but balance covers 1 lot – returns 1 lot",
-			symbol:  "ETH_JPY",
+			name:     "sell_size_pct rounds to 0 lots but balance covers 1 lot – returns 1 lot",
+			symbol:   "ETH_JPY",
 			balances: []domain.Balance{{Currency: "ETH", Available: 0.0105}},
 			// 0.0105 * 0.95 = 0.009975 → floor(0.009975/0.01)*0.01 = 0
 			requestedSize: 0.03,

@@ -21,12 +21,12 @@ func TestBuildOrderRequest(t *testing.T) {
 		{
 			name: "LIMIT BUY order",
 			order: &domain.OrderRequest{
-				Symbol:       "BTC_JPY",
-				Side:         "BUY",
-				Type:         "LIMIT",
-				Size:         0.01,
-				Price:        10000000,
-				TimeInForce:  "GTC",
+				Symbol:         "BTC_JPY",
+				Side:           "BUY",
+				Type:           "LIMIT",
+				Size:           0.01,
+				Price:          10000000,
+				TimeInForce:    "GTC",
 				MinuteToExpire: 60,
 			},
 			validate: func(t *testing.T, req http.PostV1MeSendchildorderJSONRequestBody) {
