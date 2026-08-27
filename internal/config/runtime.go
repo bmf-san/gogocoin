@@ -5,6 +5,18 @@ type StrategyRuntimeConfig struct {
 	// Sell size percentage (0.0-1.0)
 	SellSizePercentage float64 `yaml:"sell_size_percentage"`
 
+	// SharedWallet declares that the exchange account also holds assets this bot
+	// does not manage (another system, or a manual allocation).
+	//
+	// It only takes effect when the open positions cannot be read. On a
+	// dedicated account the bot then falls back to the wallet balance, so a
+	// database problem cannot block every exit. On a shared account that
+	// fallback sells assets belonging to something else, which retrying cannot
+	// undo, so the exit is skipped instead.
+	//
+	// Default false, matching the historical behavior.
+	SharedWallet bool `yaml:"shared_wallet"`
+
 	// Maximum history limit for market data
 	HistoryLimit int `yaml:"history_limit"`
 
