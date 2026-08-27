@@ -31,6 +31,10 @@ type SignalWorker struct {
 	// positionReader is optional; when set, SELL sizing is capped at the size
 	// actually held in open positions instead of the whole wallet balance.
 	positionReader PositionReader
+	// sharedWallet declares that the exchange account also holds assets this bot
+	// does not manage. It changes what happens when the open positions cannot be
+	// read: see getAvailableSellSize.
+	sharedWallet bool
 }
 
 // TradingEnabledGetter defines the interface for checking if trading is enabled
@@ -93,6 +97,10 @@ func (w *SignalWorker) SetPositionCloser(c PositionCloser) { w.positionCloser = 
 // are capped at the remaining size of the open positions for the symbol, so the
 // bot never liquidates holdings it did not buy itself.
 func (w *SignalWorker) SetPositionReader(r PositionReader) { w.positionReader = r }
+
+// SetSharedWallet declares whether the exchange account also holds assets this
+// bot does not manage. See getAvailableSellSize for what it changes.
+func (w *SignalWorker) SetSharedWallet(shared bool) { w.sharedWallet = shared }
 
 // Name returns the worker name.
 func (w *SignalWorker) Name() string { return "signal-worker" }
@@ -401,8 +409,23 @@ func (w *SignalWorker) getAvailableSellSize(ctx context.Context, symbol string, 
 	// exits from the balance alone makes the bot sell more than it holds, which
 	// books the unmatched surplus as if it had no cost basis.
 	sellable := availableBalance
-	if openSize, ok := w.openPositionSize(symbol); ok && openSize < sellable {
-		sellable = openSize
+	openSize, ok := w.openPositionSize(symbol)
+	switch {
+	case ok:
+		if openSize < sellable {
+			sellable = openSize
+		}
+	case w.sharedWallet:
+		// The positions could not be read, so there is no way to tell which part
+		// of the balance belongs to this bot. On a dedicated account falling back
+		// to the wallet is the safer error, because the worst case is exiting a
+		// position early. On a shared account it is the opposite: the fallback
+		// sells assets another system owns, and that is not recoverable by
+		// retrying. Skip the exit and let the next signal try again.
+		w.logger.Trading().WithField("symbol", symbol).
+			Error("Skipping SELL - open positions unreadable and the wallet is shared, " +
+				"so the bot's own holdings cannot be identified")
+		return 0
 	}
 
 	// Return the smaller of requested size and the sellable holdings

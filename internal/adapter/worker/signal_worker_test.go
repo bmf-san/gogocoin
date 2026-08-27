@@ -662,6 +662,52 @@ func TestGetAvailableSellSize_CappedByOpenPosition(t *testing.T) {
 	}
 }
 
+// TestGetAvailableSellSize_SharedWallet covers the account that also holds
+// assets this bot does not manage. Falling back to the wallet balance there
+// sells someone else's coins, and no retry undoes that, so an unreadable
+// position must skip the exit instead.
+func TestGetAvailableSellSize_SharedWallet(t *testing.T) {
+	tests := []struct {
+		name      string
+		positions []domain.Position
+		readerErr error
+		want      float64
+	}{
+		{
+			// The whole point: 50 XRP in the wallet, none of it provably the
+			// bot's, so nothing may be sold.
+			name:      "reader error sells nothing",
+			readerErr: errors.New("db unavailable"),
+			want:      0,
+		},
+		{
+			// A readable position is still honored — the guard must not
+			// disable normal exits.
+			name:      "readable position still caps normally",
+			positions: []domain.Position{{Symbol: "XRP_JPY", Side: "BUY", RemainingSize: 7}},
+			want:      6,
+		},
+		{
+			name:      "no open positions still sells nothing",
+			positions: nil,
+			want:      0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newSellWorker(t, []domain.Balance{{Currency: "XRP", Available: 50}}, 0.95)
+			w.SetPositionReader(&mockPositionReader{positions: tc.positions, err: tc.readerErr})
+			w.SetSharedWallet(true)
+
+			got := w.getAvailableSellSize(context.Background(), "XRP_JPY", 100)
+			if math.Abs(got-tc.want) > 1e-9 {
+				t.Errorf("getAvailableSellSize = %v; want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestRoundBuyQuantityToLotSize verifies that entries are floored to whole lots
 // even when auto scale is off. An un-rounded entry leaves a remainder that is
 // below the exchange minimum order size and therefore can never be sold on its

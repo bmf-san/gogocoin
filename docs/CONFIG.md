@@ -135,3 +135,33 @@ Log levels can be configured per category.
 | `data_retention.retention_days` | `90` (example) | Number of days to retain data in the DB. `1` = current day only (lightest), `90` = last 90 days (keeps full "総損益" window). Code falls back to `1` when unset. |
 
 Data older than `retention_days` is automatically deleted at 00:00 every day. If you need historical trade records, download them from the bitFlyer dashboard.
+
+---
+
+## runtime
+
+| Key | Default | Description |
+|---|---|---|
+| `runtime.sell_size_percentage` | `0.95` | Fraction of the sellable size used when exiting. Kept below `1.0` so rounding cannot push the order past the balance. Must be in `(0, 1]`. |
+| `runtime.shared_wallet` | `false` | Set to `true` when the exchange account also holds assets this bot does not manage. |
+| `runtime.history_limit` | `1000` | Maximum number of market data points kept in memory. |
+| `runtime.signal_strength_threshold` | `0.5` | Minimum signal strength required to act on a signal. |
+
+### runtime.shared_wallet
+
+Exits are normally capped at the size recorded in the bot's own open positions, so
+it cannot sell coins it never bought. That cap needs the position table. When the
+table cannot be read, the bot has to choose between two bad options, and the right
+choice depends on who else owns the balance:
+
+| | `shared_wallet: false` (default) | `shared_wallet: true` |
+|---|---|---|
+| Positions unreadable | Fall back to the wallet balance | Skip the exit and log an error |
+| Risk taken | Exiting a position early | Delaying a stop-loss |
+
+On a dedicated account the whole balance is the bot's, so the fallback is safe and
+keeps a database problem from blocking every exit. On a shared account the same
+fallback sells assets belonging to something else, and no retry undoes a filled
+order, so skipping is the recoverable failure.
+
+The flag has no effect while positions are readable — normal exits are unchanged.
