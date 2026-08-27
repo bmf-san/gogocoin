@@ -134,18 +134,57 @@ func (e OrderResponseStatus) Valid() bool {
 	}
 }
 
+// Defines values for PositionSide.
+const (
+	PositionSideBUY  PositionSide = "BUY"
+	PositionSideSELL PositionSide = "SELL"
+)
+
+// Valid indicates whether the value is a known member of the PositionSide enum.
+func (e PositionSide) Valid() bool {
+	switch e {
+	case PositionSideBUY:
+		return true
+	case PositionSideSELL:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PositionStatus.
+const (
+	CLOSED  PositionStatus = "CLOSED"
+	OPEN    PositionStatus = "OPEN"
+	PARTIAL PositionStatus = "PARTIAL"
+)
+
+// Valid indicates whether the value is a known member of the PositionStatus enum.
+func (e PositionStatus) Valid() bool {
+	switch e {
+	case CLOSED:
+		return true
+	case OPEN:
+		return true
+	case PARTIAL:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TradeSide.
 const (
-	TradeSideBUY  TradeSide = "BUY"
-	TradeSideSELL TradeSide = "SELL"
+	BUY  TradeSide = "BUY"
+	SELL TradeSide = "SELL"
 )
 
 // Valid indicates whether the value is a known member of the TradeSide enum.
 func (e TradeSide) Valid() bool {
 	switch e {
-	case TradeSideBUY:
+	case BUY:
 		return true
-	case TradeSideSELL:
+	case SELL:
 		return true
 	default:
 		return false
@@ -372,6 +411,41 @@ type PerformanceMetric struct {
 	WinningTrades *int     `json:"winning_trades,omitempty"`
 }
 
+// Position Bot が管理している建玉。数量は format: double で返す。
+// 外部の資金管理と突き合わせる用途では float32 の丸めが
+// そのまま数量の誤差になるため。
+type Position struct {
+	CreatedAt    *time.Time `json:"created_at,omitempty"`
+	CurrentPrice *float64   `json:"current_price,omitempty"`
+	EntryPrice   *float64   `json:"entry_price,omitempty"`
+	Id           *int       `json:"id,omitempty"`
+	OrderId      *string    `json:"order_id,omitempty"`
+
+	// Pnl 実現損益
+	Pnl         *float64 `json:"pnl,omitempty"`
+	ProductCode *string  `json:"product_code,omitempty"`
+
+	// RemainingSize 未決済の数量。Bot が実際に押さえている数量はこれ。
+	RemainingSize *float64      `json:"remaining_size,omitempty"`
+	Side          *PositionSide `json:"side,omitempty"`
+
+	// Size 建玉の総数量
+	Size         *float64        `json:"size,omitempty"`
+	Status       *PositionStatus `json:"status,omitempty"`
+	Symbol       *string         `json:"symbol,omitempty"`
+	UnrealizedPl *float64        `json:"unrealized_pl,omitempty"`
+	UpdatedAt    *time.Time      `json:"updated_at,omitempty"`
+
+	// UsedSize 決済済みの数量
+	UsedSize *float64 `json:"used_size,omitempty"`
+}
+
+// PositionSide defines model for Position.Side.
+type PositionSide string
+
+// PositionStatus defines model for Position.Status.
+type PositionStatus string
+
 // SimpleSuccess defines model for SimpleSuccess.
 type SimpleSuccess struct {
 	Message *string `json:"message,omitempty"`
@@ -517,6 +591,9 @@ type ServerInterface interface {
 	// パフォーマンス指標の取得
 	// (GET /api/performance)
 	GetApiPerformance(w http.ResponseWriter, r *http.Request)
+	// 保有ポジションの取得
+	// (GET /api/positions)
+	GetApiPositions(w http.ResponseWriter, r *http.Request)
 	// システム状態の取得
 	// (GET /api/status)
 	GetApiStatus(w http.ResponseWriter, r *http.Request, params GetApiStatusParams)
@@ -691,6 +768,20 @@ func (siw *ServerInterfaceWrapper) GetApiPerformance(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetApiPerformance(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetApiPositions operation middleware
+func (siw *ServerInterfaceWrapper) GetApiPositions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetApiPositions(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -989,6 +1080,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/logs", wrapper.GetApiLogs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/orders", wrapper.GetApiOrders)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/performance", wrapper.GetApiPerformance)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/positions", wrapper.GetApiPositions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/status", wrapper.GetApiStatus)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/strategy/reset", wrapper.PostApiStrategyReset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/trades", wrapper.GetApiTrades)
@@ -1247,6 +1339,43 @@ type GetApiPerformance500JSONResponse struct {
 }
 
 func (response GetApiPerformance500JSONResponse) VisitGetApiPerformanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetApiPositionsRequestObject struct {
+}
+
+type GetApiPositionsResponseObject interface {
+	VisitGetApiPositionsResponse(w http.ResponseWriter) error
+}
+
+type GetApiPositions200JSONResponse []Position
+
+func (response GetApiPositions200JSONResponse) VisitGetApiPositionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetApiPositions500JSONResponse struct {
+	InternalServerErrorJSONResponse
+}
+
+func (response GetApiPositions500JSONResponse) VisitGetApiPositionsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1580,6 +1709,9 @@ type StrictServerInterface interface {
 	// パフォーマンス指標の取得
 	// (GET /api/performance)
 	GetApiPerformance(ctx context.Context, request GetApiPerformanceRequestObject) (GetApiPerformanceResponseObject, error)
+	// 保有ポジションの取得
+	// (GET /api/positions)
+	GetApiPositions(ctx context.Context, request GetApiPositionsRequestObject) (GetApiPositionsResponseObject, error)
 	// システム状態の取得
 	// (GET /api/status)
 	GetApiStatus(ctx context.Context, request GetApiStatusRequestObject) (GetApiStatusResponseObject, error)
@@ -1783,6 +1915,30 @@ func (sh *strictHandler) GetApiPerformance(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetApiPerformanceResponseObject); ok {
 		if err := validResponse.VisitGetApiPerformanceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetApiPositions operation middleware
+func (sh *strictHandler) GetApiPositions(w http.ResponseWriter, r *http.Request) {
+	var request GetApiPositionsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetApiPositions(ctx, request.(GetApiPositionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetApiPositions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetApiPositionsResponseObject); ok {
+		if err := validResponse.VisitGetApiPositionsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

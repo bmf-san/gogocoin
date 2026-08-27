@@ -138,6 +138,31 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/positions:
+    get:
+      operationId: GetApiPositions
+      tags: [data]
+      summary: 保有ポジションの取得
+      description: |
+        status が OPEN / PARTIAL のポジションを返す。
+
+        取引所の残高 (`/api/balance`) は、この Bot が管理していない資産も
+        含む口座全体の数量である。同じ口座を Bot 以外の仕組みでも運用する
+        場合、どの数量が Bot の管理下にあるかを外部から知る手段が無いと、
+        双方が同じ残高を取り合ってしまう。このエンドポイントはその切り分け
+        に必要な数量と取得原価を返す。
+      responses:
+        "200":
+          description: 保有ポジション一覧（新しい順）
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Position"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/performance:
     get:
       operationId: GetApiPerformance
@@ -519,6 +544,60 @@ components:
           type: string
           format: date-time
         created_at:
+          type: string
+          format: date-time
+
+    Position:
+      type: object
+      description: |
+        Bot が管理している建玉。数量は format: double で返す。
+        外部の資金管理と突き合わせる用途では float32 の丸めが
+        そのまま数量の誤差になるため。
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+          example: XRP_JPY
+        product_code:
+          type: string
+        side:
+          type: string
+          enum: [BUY, SELL]
+        size:
+          type: number
+          format: double
+          description: 建玉の総数量
+        used_size:
+          type: number
+          format: double
+          description: 決済済みの数量
+        remaining_size:
+          type: number
+          format: double
+          description: 未決済の数量。Bot が実際に押さえている数量はこれ。
+        entry_price:
+          type: number
+          format: double
+        current_price:
+          type: number
+          format: double
+        unrealized_pl:
+          type: number
+          format: double
+        pnl:
+          type: number
+          format: double
+          description: 実現損益
+        status:
+          type: string
+          enum: [OPEN, PARTIAL, CLOSED]
+        order_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
           type: string
           format: date-time
 
