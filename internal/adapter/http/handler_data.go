@@ -183,6 +183,24 @@ func (s *Server) pnlEpoch() time.Time {
 	return epoch
 }
 
+// GetApiPositions implements StrictServerInterface - get open positions.
+//
+// Exposed so an external process can tell which part of the exchange balance
+// this bot is holding. /api/balance reports the whole account, which may also
+// contain assets this bot never bought; without this endpoint the two cannot be
+// told apart and an external allocator would happily sell the bot's position.
+func (s *Server) GetApiPositions(ctx context.Context, request GetApiPositionsRequestObject) (GetApiPositionsResponseObject, error) {
+	positions, err := s.db.GetActivePositions()
+	if err != nil {
+		s.logger.Error("Failed to get positions: " + err.Error())
+		msg := "Internal server error"
+		return GetApiPositions500JSONResponse{InternalServerErrorJSONResponse{Message: &msg}}, nil
+	}
+
+	s.logger.System().WithField("count", len(positions)).Info("Returning positions from API")
+	return GetApiPositions200JSONResponse(domainPositionsToAPI(positions)), nil
+}
+
 // GetApiPerformance implements StrictServerInterface - get performance metrics
 func (s *Server) GetApiPerformance(ctx context.Context, request GetApiPerformanceRequestObject) (GetApiPerformanceResponseObject, error) {
 	metrics, err := s.db.GetPerformanceMetrics(30)
@@ -428,6 +446,47 @@ func domainTradesToAPI(trades []domain.Trade) []Trade {
 			CreatedAt:    &createdAt,
 			ExecutedAt:   &executedAt,
 			UpdatedAt:    &updatedAt,
+		}
+	}
+	return result
+}
+
+// domainPositionsToAPI converts []domain.Position to []Position (generated API type).
+func domainPositionsToAPI(positions []domain.Position) []Position {
+	result := make([]Position, len(positions))
+	for i := range positions {
+		p := &positions[i]
+		id := p.ID
+		symbol := p.Symbol
+		productCode := p.ProductCode
+		side := PositionSide(p.Side)
+		size := p.Size
+		usedSize := p.UsedSize
+		remainingSize := p.RemainingSize
+		entryPrice := p.EntryPrice
+		currentPrice := p.CurrentPrice
+		unrealizedPL := p.UnrealizedPL
+		pnl := p.PnL
+		status := PositionStatus(p.Status)
+		orderID := p.OrderID
+		createdAt := p.CreatedAt
+		updatedAt := p.UpdatedAt
+		result[i] = Position{
+			Id:            &id,
+			Symbol:        &symbol,
+			ProductCode:   &productCode,
+			Side:          &side,
+			Size:          &size,
+			UsedSize:      &usedSize,
+			RemainingSize: &remainingSize,
+			EntryPrice:    &entryPrice,
+			CurrentPrice:  &currentPrice,
+			UnrealizedPl:  &unrealizedPL,
+			Pnl:           &pnl,
+			Status:        &status,
+			OrderId:       &orderID,
+			CreatedAt:     &createdAt,
+			UpdatedAt:     &updatedAt,
 		}
 	}
 	return result
