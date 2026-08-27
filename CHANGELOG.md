@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/bmf-san/gogocoin/compare/v1.12.0...v1.13.0) (2026-08-27)
+
+
+### Features
+
+* **worker:** add runtime.shared_wallet to stop SELL falling back to the wallet ([#157](https://github.com/bmf-san/gogocoin/issues/157)) ([4eb9b73](https://github.com/bmf-san/gogocoin/commit/4eb9b73c6ca7ea4a998e0be3f8eef24828f9320d))
+
 ## [1.12.0](https://github.com/bmf-san/gogocoin/compare/v1.11.0...v1.12.0) (2026-08-27)
 
 
