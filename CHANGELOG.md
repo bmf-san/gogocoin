@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/bmf-san/gogocoin/compare/v1.11.0...v1.12.0) (2026-08-27)
+
+
+### Features
+
+* **api:** add GET /api/positions ([#155](https://github.com/bmf-san/gogocoin/issues/155)) ([3c396b6](https://github.com/bmf-san/gogocoin/commit/3c396b663255552ce9280dd71590b97b8bef98a8))
+
 ## [1.11.0](https://github.com/bmf-san/gogocoin/compare/v1.10.0...v1.11.0) (2026-08-26)
 
 
